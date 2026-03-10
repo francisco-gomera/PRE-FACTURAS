@@ -956,6 +956,12 @@ def guardar_grupo_articulos_view(request):
         except Exception:
             return None
 
+    def _clip_str(v, max_len):
+        s = str(v or "")
+        if max_len is None or max_len <= 0:
+            return s
+        return s if len(s) <= max_len else s[:max_len]
+
     def _to_dec(v, default=Decimal("0")):
         try:
             if v is None or str(v).strip() == "":
@@ -1123,6 +1129,12 @@ def actualizar_prefactura_view(request):
         except Exception:
             return None
 
+    def _clip_str(v, max_len):
+        s = str(v or "")
+        if max_len is None or max_len <= 0:
+            return s
+        return s if len(s) <= max_len else s[:max_len]
+
     est_doc_raw = str(payload.get("est_doc") or "").strip()
     est_map = {
         "abierto": "Abierto",
@@ -1219,14 +1231,14 @@ def actualizar_prefactura_view(request):
                     _parse_date(payload.get("fecha_cont")),
                     _parse_date(payload.get("fecha_venc")),
                     _parse_date(payload.get("fecha_doc")),
-                    str(payload.get("comentario") or ""),
+                    _clip_str(payload.get("comentario"), 500),
                     _to_dec(payload.get("subtotal")),
                     _to_dec(payload.get("total_desc")),
                     _to_dec(payload.get("total_doc")),
                     _to_dec(payload.get("impuesto")),
                     _to_int_or_none(payload.get("id_condicion")),
                     _to_int_or_none(payload.get("dia")),
-                    str(payload.get("condicion") or ""),
+                    _clip_str(payload.get("condicion"), 15),
                     _to_int_or_none(payload.get("id_precio")),
                     id_doc,
                 ],
@@ -1245,9 +1257,9 @@ def actualizar_prefactura_view(request):
                 if not isinstance(d, dict):
                     continue
                 id_detalle = _to_int_or_none(d.get("id_detalle"))
-                descrip_art = str(d.get("descrip_art") or "")
-                id_articulo = str(d.get("id_articulo") or "")
-                medida = str(d.get("uom") or "")
+                descrip_art = _clip_str(d.get("descrip_art"), 500)
+                id_articulo = _clip_str(d.get("id_articulo"), 20)
+                medida = _clip_str(d.get("uom"), 50)
                 cantidad = _to_dec(d.get("cantidad"))
                 cant_und = _to_dec(d.get("cant_emp"), cantidad)
                 cant_ent = Decimal("0")
@@ -1258,9 +1270,9 @@ def actualizar_prefactura_view(request):
                 id_impto = _to_int_or_none(d.get("id_itbis"))
                 id_almacen = _to_int_or_none(d.get("alm"))
                 # Mantener el mapeo actual de UI solicitado previamente.
-                cebe = str(d.get("proyecto") or "")
-                ceco = str(d.get("cebe") or "")
-                referencia = referencia_map.get(id_articulo, "")
+                cebe = _clip_str(d.get("proyecto"), 50)
+                ceco = _clip_str(d.get("cebe"), 12)
+                referencia = _clip_str(referencia_map.get(id_articulo, ""), 15)
                 total_precio = cantidad * precio
                 total_desc_monto = total_precio * (porc_desc / Decimal("100"))
                 total_precio_neto = total_precio - total_desc_monto
@@ -1328,18 +1340,18 @@ def actualizar_prefactura_view(request):
                             id_almacen,
                             ceco,
                             cebe,
-                            "Articulo",
-                            "No",
+                            _clip_str("Articulo", 10),
+                            _clip_str("No", 2),
                             Decimal("1"),
                             Decimal("1"),
                             usuario_id,
                             Decimal("1"),
-                            "41010101",
-                            "11030102",
-                            "51010101",
-                            "11030101",
-                            "21020301",
-                            "41020201",
+                            _clip_str("41010101", 20),
+                            _clip_str("11030102", 20),
+                            _clip_str("51010101", 20),
+                            _clip_str("11030101", 20),
+                            _clip_str("21020301", 20),
+                            _clip_str("41020201", 20),
                             periodo_cont,
                             ejercicio,
                             referencia,
@@ -1379,18 +1391,18 @@ def actualizar_prefactura_view(request):
                             id_almacen,
                             ceco,
                             cebe,
-                            "Articulo",
-                            "No",
+                            _clip_str("Articulo", 10),
+                            _clip_str("No", 2),
                             Decimal("1"),
                             Decimal("1"),
                             usuario_id,
                             Decimal("1"),
-                            "41010101",
-                            "11030102",
-                            "51010101",
-                            "11030101",
-                            "21020301",
-                            "41020201",
+                            _clip_str("41010101", 20),
+                            _clip_str("11030102", 20),
+                            _clip_str("51010101", 20),
+                            _clip_str("11030101", 20),
+                            _clip_str("21020301", 20),
+                            _clip_str("41020201", 20),
                             periodo_cont,
                             ejercicio,
                             referencia,
@@ -1463,6 +1475,12 @@ def crear_prefactura_view(request):
             return int(float(s))
         except Exception:
             return None
+
+    def _clip_str(v, max_len):
+        s = str(v or "")
+        if max_len is None or max_len <= 0:
+            return s
+        return s if len(s) <= max_len else s[:max_len]
 
     est_doc = "Abierto"
     detalles = payload.get("detalles") or []
@@ -1555,13 +1573,13 @@ def crear_prefactura_view(request):
                     fecha_doc,
                     today,
                     None,
-                    id_sn,
-                    nom_socio,
-                    str(payload.get("rnc_ced") or ""),
-                    str(payload.get("contacto") or ""),
-                    str(payload.get("ent_factura") or ""),
-                    str(payload.get("ent_mercancia") or ""),
-                    str(payload.get("comentario") or ""),
+                    _clip_str(id_sn, 12),
+                    _clip_str(nom_socio, 100),
+                    _clip_str(payload.get("rnc_ced"), 13),
+                    _clip_str(payload.get("contacto"), 50),
+                    _clip_str(payload.get("ent_factura"), 200),
+                    _clip_str(payload.get("ent_mercancia"), 200),
+                    _clip_str(payload.get("comentario"), 500),
                     _to_dec(payload.get("subtotal")),
                     _to_dec(payload.get("total_desc")),
                     _to_dec(payload.get("total_doc")),
@@ -1570,12 +1588,12 @@ def crear_prefactura_view(request):
                     Decimal("0"),
                     _to_int_or_none(payload.get("id_condicion")),
                     _to_int_or_none(payload.get("dia")),
-                    str(payload.get("condicion") or ""),
+                    _clip_str(payload.get("condicion"), 15),
                     _to_int_or_none(payload.get("id_precio")),
                     usuario_id,
                     usuario_id,
                     terminal[:50],
-                    "RD$",
+                    _clip_str("RD$", 50),
                     1,
                     "FACTURA DE CONSUMO",
                     periodo_cont,
@@ -1588,9 +1606,9 @@ def crear_prefactura_view(request):
             next_linea = 0
             for d in detalles:
                 next_linea += 1
-                descrip_art = str(d.get("descrip_art") or "")
-                id_articulo = str(d.get("id_articulo") or "")
-                medida = str(d.get("uom") or "")
+                descrip_art = _clip_str(d.get("descrip_art"), 500)
+                id_articulo = _clip_str(d.get("id_articulo"), 20)
+                medida = _clip_str(d.get("uom"), 50)
                 cantidad = _to_dec(d.get("cantidad"))
                 cant_und = _to_dec(d.get("cant_emp"), cantidad)
                 precio = _to_dec(d.get("precio_unit"))
@@ -1598,11 +1616,11 @@ def crear_prefactura_view(request):
                 porc_desc = _to_dec(d.get("porc_desc"))
                 id_impto = _to_int_or_none(d.get("id_itbis"))
                 id_almacen = _to_int_or_none(d.get("alm"))
-                cebe = str(d.get("proyecto") or "")
-                ceco = str(d.get("cebe") or "")
+                cebe = _clip_str(d.get("proyecto"), 50)
+                ceco = _clip_str(d.get("cebe"), 12)
                 cant_ent = Decimal("0")
                 cant_pend = cantidad
-                referencia = referencia_map.get(id_articulo, "")
+                referencia = _clip_str(referencia_map.get(id_articulo, ""), 15)
                 total_precio = cantidad * precio
                 total_desc_monto = total_precio * (porc_desc / Decimal("100"))
                 total_precio_neto = total_precio - total_desc_monto
@@ -1642,18 +1660,18 @@ def crear_prefactura_view(request):
                         ceco,
                         cebe,
                         fecha_cont or fecha_doc or today,
-                        "Articulo",
-                        "No",
+                        _clip_str("Articulo", 10),
+                        _clip_str("No", 2),
                         Decimal("1"),
                         Decimal("1"),
                         usuario_id,
                         Decimal("1"),
-                        "41010101",
-                        "11030102",
-                        "51010101",
-                        "11030101",
-                        "21020301",
-                        "41020201",
+                        _clip_str("41010101", 20),
+                        _clip_str("11030102", 20),
+                        _clip_str("51010101", 20),
+                        _clip_str("11030101", 20),
+                        _clip_str("21020301", 20),
+                        _clip_str("41020201", 20),
                         periodo_cont,
                         ejercicio,
                         referencia,
