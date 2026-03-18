@@ -77,6 +77,7 @@ def _base_context(request, *, page_title, active_nav):
         "etiquetas": has_perm(usuario_id, "etiquetas", "ver"),
         "cobros": has_perm(usuario_id, "cobros", "ver"),
         "cartas": has_perm(usuario_id, "cartas", "ver"),
+        "factura": has_perm(usuario_id, "factura", "ver"),
         "ajustes": has_perm(usuario_id, "ajustes", "ver"),
     }
     empresa = _get_empresa_data()

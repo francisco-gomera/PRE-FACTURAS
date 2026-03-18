@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alertas de Cobro</title>
+    <style>
+        :root {
+            --ink: #1a1a1a;
+            --line: #8c8c8c;
+            --muted: #5a5a5a;
+            --sector: #c81919;
+            --cliente: #184eb8;
+            --alert: #b21111;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: #f3f3f3;
+            color: var(--ink);
+            font-family: "Bahnschrift", "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+
+        .toolbar {
+            max-width: 210mm;
+            margin: 12px auto 0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 0 8px;
+        }
+
+        .toolbar button {
+            border: 1px solid #6b6b6b;
+            background: linear-gradient(#ffffff, #d9d9d9);
+            border-radius: 6px;
+            height: 32px;
+            min-width: 110px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 8px auto 24px;
+            background: #fff;
+            border: 1px solid #bdbdbd;
+            padding: 10mm;
+        }
+
+        .header {
+            border-bottom: 2px solid #4f4f4f;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .title {
+            margin: 0;
+            text-align: center;
+            font-size: 28px;
+            letter-spacing: 1px;
+            color: #122f88;
+        }
+
+        .meta {
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .sector-block {
+            margin-top: 14px;
+            page-break-inside: avoid;
+        }
+
+        .sector-title {
+            margin: 0 0 8px;
+            color: var(--sector);
+            font-size: 22px;
+            font-weight: 800;
+            text-transform: uppercase;
+            border-bottom: 1px solid #d7d7d7;
+            padding-bottom: 4px;
+        }
+
+        .cliente-title {
+            margin: 10px 0 6px;
+            color: var(--cliente);
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        th, td {
+            border: 1px solid #b8b8b8;
+            padding: 6px 7px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            background: #efefef;
+            font-size: 11px;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .alert-cell {
+            color: var(--alert);
+            font-weight: 800;
+        }
+
+        .empty {
+            min-height: 420px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7a7a7a;
+            text-align: center;
+            border: 1px dashed #c8c8c8;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .page {
+                border: none;
+                margin: 0;
+                width: auto;
+                min-height: auto;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% if not embed %}
+    <div class="toolbar">
+        <button type="button" onclick="window.print()">Imprimir</button>
+        <button type="button" onclick="window.close()">Cerrar</button>
+    </div>
+    {% endif %}
+
+    <main class="page">
+        <header class="header">
+            <h1 class="title">ALERTAS DE COBRO</h1>
+            <div class="meta">
+                <div>
+                    Rango de días:
+                    <strong>
+                        {{ min_days }}
+                        {% if has_max_days %} a {{ max_days }}{% else %} en adelante{% endif %}
+                    </strong>
+                </div>
+                <div>Fecha impresión: <strong>{{ fecha_impresion|date:"d/m/Y" }}</strong></div>
+                <div>Total registros: <strong>{{ total_items }}</strong></div>
+            </div>
+        </header>
+
+        {% if grupos %}
+            {% for grupo in grupos %}
+            <section class="sector-block">
+                <h2 class="sector-title">{{ grupo.sector }}</h2>
+                {% for cliente in grupo.clientes %}
+                <div class="cliente-title">{{ cliente.nombre }}{% if cliente.telefono %} - {{ cliente.telefono }}{% endif %}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No. Factura</th>
+                            <th class="text-right">Monto total</th>
+                            <th>Fecha factura</th>
+                            <th>Últ. pago</th>
+                            <th class="text-right">Monto pendiente</th>
+                            <th>Días en atraso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cliente.items %}
+                        <tr>
+                            <td>{{ item.id_doc }}</td>
+                            <td class="text-right">{{ item.monto_total|floatformat:2 }}</td>
+                            <td>{{ item.fecha_factura }}</td>
+                            <td>{{ item.fecha_ultimo_pago|default:"-" }}</td>
+                            <td class="text-right">{{ item.monto_pendiente|floatformat:2 }}</td>
+                            <td class="alert-cell">{{ item.dias_atraso }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endfor %}
+            </section>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No se encontraron clientes con pagos vencidos para el criterio seleccionado.</div>
+        {% endif %}
+    </main>
+</body>
+</html>

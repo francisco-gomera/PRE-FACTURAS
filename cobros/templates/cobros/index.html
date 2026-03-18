@@ -9,21 +9,21 @@
   <div class="info-card">
     <h3>Estado de cuenta</h3>
     <p>Resumen por cliente y saldo pendiente.</p>
-    <a href="#">Definir estado</a>
+    <a href="{% url 'cobros:estado_cuenta' %}">Abrir estado</a>
   </div>
   {% endif %}
   {% if submodules.alertas %}
   <div class="info-card">
     <h3>Alertas</h3>
     <p>Notificaciones por vencimiento.</p>
-    <a href="#">Definir alertas</a>
+    <a href="{% url 'cobros:alertas' %}">Abrir alertas</a>
   </div>
   {% endif %}
   {% if submodules.acuerdos %}
   <div class="info-card">
     <h3>Acuerdos</h3>
     <p>Planes y compromisos de pago.</p>
-    <a href="#">Definir acuerdos</a>
+    <a href="{% url 'cobros:acuerdos' %}">Abrir acuerdos</a>
   </div>
   {% endif %}
 </div>

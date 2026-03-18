@@ -4,6 +4,7 @@ from .views import (
     index,
     usuarios_view,
     parametros_view,
+    facturacion_electronica_view,
     guardar_parametros_view,
     crear_modulo_view,
     crear_permiso_view,
@@ -30,4 +31,5 @@ urlpatterns = [
     path("usuarios/firma/guardar/", guardar_firma_usuario_view, name="guardar_firma_usuario"),
     path("parametros/", parametros_view, name="parametros"),
     path("parametros/guardar/", guardar_parametros_view, name="guardar_parametros"),
+    path("integraciones/facturacion-electronica/", facturacion_electronica_view, name="facturacion_electronica"),
 ]

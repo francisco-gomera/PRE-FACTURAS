@@ -16,6 +16,7 @@ class Command(BaseCommand):
             ("ajustes", "Ajustes"),
             ("cobros", "Cobros"),
             ("cartas", "Cartas"),
+            ("factura", "Factura"),
         ]
         permisos_genericos = [
             ("ver", "Ver"),
@@ -50,6 +51,11 @@ class Command(BaseCommand):
                 ("ver_cartas_aviso", "Ver Cartas de Aviso"),
                 ("ver_cartas_saldo", "Ver Cartas de Saldo"),
                 ("ver_plantillas", "Ver Plantillas"),
+            ],
+            "factura": [
+                ("ver_emision", "Ver Emision de Facturas"),
+                ("ver_electronica", "Ver Facturacion Electronica"),
+                ("ver_documentos", "Ver Documentos de Factura"),
             ],
             "ajustes": [
                 ("ver_parametros", "Ver Parametros"),

@@ -1,11 +1,21 @@
 import base64
+from decimal import Decimal
+from datetime import datetime
+
 from django.db import connection, transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from ajustes.permissions import has_perm
 from core.views import _base_context, render_denied
+from factura.ecf_runtime import build_ecf_runtime_report
 from .models import (
+    FacturacionElectronicaConfig,
+    FacturacionElectronicaDocumento,
+    FacturacionElectronicaEvento,
+    FacturacionElectronicaSecuencia,
     SegModulo,
     SegPermiso,
     SegRol,
@@ -13,6 +23,23 @@ from .models import (
     SegUsuarioPermiso,
     SegUsuarioRol,
 )
+from .user_signatures import get_users_with_signatures, save_user_signature
+
+
+ECF_TIPOS = [
+    ("31", "Factura de Credito Fiscal Electronica"),
+    ("32", "Factura de Consumo Electronica"),
+    ("33", "Nota de Debito Electronica"),
+    ("34", "Nota de Credito Electronica"),
+    ("41", "Comprobante Electronico de Compras"),
+    ("43", "Comprobante Electronico para Gastos Menores"),
+    ("44", "Comprobante Electronico para Regimenes Especiales"),
+    ("45", "Comprobante Electronico Gubernamental"),
+    ("46", "Comprobante Electronico para Pagos al Exterior"),
+    ("47", "Comprobante Electronico para Exportaciones"),
+]
+
+ECF_TIPOS_MAP = {codigo: nombre for codigo, nombre in ECF_TIPOS}
 
 
 def index(request):
@@ -31,45 +58,27 @@ def index(request):
 
 def _fetch_usuarios():
     rows = []
+    signed_user_ids = get_users_with_signatures()
     try:
         with connection.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
-                    SELECT ID_USUARIO, USUARIO, NOMBRE, ESTADO,
-                           CASE WHEN DATALENGTH(FIRMA) > 0 THEN 1 ELSE 0 END AS TIENE_FIRMA
-                    FROM USUARIO
-                    ORDER BY USUARIO
-                    """
+            cursor.execute(
+                """
+                SELECT ID_USUARIO, USUARIO, NOMBRE, ESTADO
+                FROM USUARIO
+                ORDER BY USUARIO
+                """
+            )
+            for r in cursor.fetchall():
+                user_id = int(r[0]) if r[0] is not None else 0
+                rows.append(
+                    {
+                        "id_usuario": user_id,
+                        "usuario": r[1],
+                        "nombre": r[2],
+                        "estado": r[3],
+                        "has_firma": user_id in signed_user_ids,
+                    }
                 )
-                for r in cursor.fetchall():
-                    rows.append(
-                        {
-                            "id_usuario": r[0],
-                            "usuario": r[1],
-                            "nombre": r[2],
-                            "estado": r[3],
-                            "has_firma": bool(r[4]),
-                        }
-                    )
-            except Exception:
-                cursor.execute(
-                    """
-                    SELECT ID_USUARIO, USUARIO, NOMBRE, ESTADO
-                    FROM USUARIO
-                    ORDER BY USUARIO
-                    """
-                )
-                for r in cursor.fetchall():
-                    rows.append(
-                        {
-                            "id_usuario": r[0],
-                            "usuario": r[1],
-                            "nombre": r[2],
-                            "estado": r[3],
-                            "has_firma": False,
-                        }
-                    )
     except Exception:
         rows = []
     return rows
@@ -167,6 +176,177 @@ def crear_modulo_view(request):
             defaults={"nombre": nombre, "descripcion": descripcion or None},
         )
     return redirect("ajustes:usuarios")
+
+
+def _bool_post(value):
+    return str(value or "").strip().lower() in {"1", "true", "on", "si", "sí", "y", "yes"}
+
+
+def _to_int(value, default=0):
+    try:
+        return int(str(value or "").strip())
+    except Exception:
+        return default
+
+
+def _to_date_or_none(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _build_public_ecf_urls(request):
+    return {
+        "recepcion": request.build_absolute_uri(reverse("factura:ecf_recepcion")),
+        "aprobacion": request.build_absolute_uri(reverse("factura:ecf_aprobacion")),
+    }
+
+
+def _apply_demo_qr(documento, empresa_rnc):
+    if not documento:
+        return False
+    base_code = f"DEMO{int(documento.id_doc):010d}"[-10:]
+    documento.codigo_seguridad = f"QR{base_code}"
+    documento.xml_generado = True
+    documento.firmado = True
+    documento.enviado_dgii = True
+    if not str(documento.estado or "").strip():
+        documento.estado = "DEMO_QR"
+    documento.url_consulta_qr = _build_qr_url(empresa_rnc, documento)
+    documento.save(
+        update_fields=[
+            "codigo_seguridad",
+            "xml_generado",
+            "firmado",
+            "enviado_dgii",
+            "estado",
+            "url_consulta_qr",
+            "actualizado_en",
+        ]
+    )
+    FacturacionElectronicaEvento.objects.create(
+        documento=documento,
+        tipo_evento="QR_DEMO",
+        detalle="Codigo de seguridad demo generado para validar visualmente el QR.",
+    )
+    return True
+
+
+def _inferir_tipo_ecf(tipo_texto, id_ncf):
+    normalized = str(tipo_texto or "").strip().upper()
+    if id_ncf in (31, 32, 33, 34, 41, 43, 44, 45, 46, 47):
+        return str(int(id_ncf))
+    if "CREDITO FISCAL" in normalized:
+        return "31"
+    if "CONSUMO" in normalized:
+        return "32"
+    if "DEBITO" in normalized:
+        return "33"
+    if "CREDITO" in normalized and "NOTA" in normalized:
+        return "34"
+    if "COMPRA" in normalized:
+        return "41"
+    if "GASTO" in normalized:
+        return "43"
+    if "REGIMEN" in normalized:
+        return "44"
+    if "GUBERN" in normalized:
+        return "45"
+    if "EXTERIOR" in normalized:
+        return "46"
+    if "EXPORT" in normalized:
+        return "47"
+    return ""
+
+
+def _build_qr_url(empresa_rnc, documento):
+    if not empresa_rnc or not documento.encf or not documento.codigo_seguridad:
+        return ""
+    monto_total = f"{Decimal(documento.monto_total or 0):.2f}"
+    if documento.tipo_ecf == "32" and Decimal(documento.monto_total or 0) < Decimal("250000"):
+        return (
+            "https://fc.dgii.gov.do/eCF/ConsultaTimbreFC"
+            f"?RNCEmisor={empresa_rnc}&ENCF={documento.encf}"
+            f"&MontoTotal={monto_total}&CodigoSeguridad={documento.codigo_seguridad}"
+        )
+    fecha_doc = timezone.localtime(documento.fecha_doc).strftime("%d-%m-%Y") if documento.fecha_doc else ""
+    fecha_firma = timezone.localtime(documento.actualizado_en).strftime("%d-%m-%Y %H:%M:%S") if documento.actualizado_en else ""
+    return (
+        "https://ecf.dgii.gov.do/ecf/ConsultaTimbre"
+        f"?RncEmisor={empresa_rnc}"
+        f"&RncComprador={documento.cliente_rnc or ''}"
+        f"&ENCF={documento.encf}"
+        f"&FechaEmision={fecha_doc}"
+        f"&MontoTotal={monto_total}"
+        f"&FechaFirma={fecha_firma}"
+        f"&CodigoSeguridad={documento.codigo_seguridad}"
+    )
+
+
+def _sync_ecf_documentos(limit=150):
+    documentos = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT TOP {max(int(limit), 1)} ID_DOC, FECHA_DOC, NOM_SOCIO, RNC_CED, TOTAL_DOC,
+                       ISNULL(NCF, ''), ISNULL(TIPO, ''), ISNULL(ID_NCF, 0), ISNULL(EST_DOC, '')
+                FROM CAB_PEDIDO
+                ORDER BY FECHA_DOC DESC, ID_DOC DESC
+                """
+            )
+            documentos = list(cursor.fetchall())
+    except Exception:
+        return 0
+
+    sincronizados = 0
+    for row in documentos:
+        id_doc = _to_int(row[0], 0)
+        if id_doc <= 0:
+            continue
+        fecha_doc = row[1]
+        cliente_nombre = str(row[2] or "").strip()
+        cliente_rnc = str(row[3] or "").strip()
+        monto_total = Decimal(row[4] or 0)
+        encf = str(row[5] or "").strip()
+        tipo_cab = str(row[6] or "").strip()
+        id_ncf = _to_int(row[7], 0)
+        est_doc = str(row[8] or "").strip().upper()
+        tipo_ecf = _inferir_tipo_ecf(tipo_cab, id_ncf)
+        estado = "PENDIENTE"
+        if encf.startswith("E"):
+            estado = "REGISTRADO"
+        elif not tipo_ecf:
+            estado = "TIPO_PENDIENTE"
+        elif est_doc == "CERRADO":
+            estado = "LISTO_PARA_XML"
+
+        defaults = {
+            "tipo_ecf": tipo_ecf or None,
+            "encf": encf or None,
+            "estado": estado,
+            "cliente_rnc": cliente_rnc or None,
+            "cliente_nombre": cliente_nombre or None,
+            "fecha_doc": fecha_doc,
+            "monto_total": monto_total,
+            "observaciones": tipo_cab or None,
+        }
+        documento, created = FacturacionElectronicaDocumento.objects.update_or_create(
+            id_doc=id_doc,
+            defaults=defaults,
+        )
+        if created:
+            FacturacionElectronicaEvento.objects.create(
+                documento=documento,
+                tipo_evento="SINCRONIZADO",
+                detalle="Documento importado desde CAB_PEDIDO para preparacion e-CF.",
+            )
+        sincronizados += 1
+    return sincronizados
 
 
 @require_http_methods(["POST"])
@@ -317,13 +497,7 @@ def guardar_firma_usuario_view(request):
     if not firma_bytes:
         return redirect("ajustes:usuarios")
 
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE USUARIO SET FIRMA = %s WHERE ID_USUARIO = %s",
-                [firma_bytes, id_usuario],
-            )
-    except Exception:
+    if not save_user_signature(id_usuario, firma_bytes):
         return redirect("ajustes:usuarios")
     return redirect("ajustes:usuarios")
 
@@ -479,3 +653,137 @@ def guardar_parametros_view(request):
         return redirect("ajustes:parametros")
 
     return redirect("ajustes:parametros")
+
+
+@require_http_methods(["GET", "POST"])
+def facturacion_electronica_view(request):
+    ctx = _base_context(request, page_title="Integraciones - Facturacion Electronica", active_nav="ajustes")
+    if not ctx:
+        return redirect("login")
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "ajustes", "ver_integraciones"):
+        return render_denied(request, active_nav="ajustes")
+
+    config, _ = FacturacionElectronicaConfig.objects.get_or_create(
+        id_config=1,
+        defaults={"habilitado": False, "ambiente": "precertificacion", "modo_envio": "manual"},
+    )
+    status_message = ""
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip().lower()
+        if action == "save_config":
+            public_urls = _build_public_ecf_urls(request)
+            config.habilitado = _bool_post(request.POST.get("habilitado"))
+            config.ambiente = (request.POST.get("ambiente") or "precertificacion").strip() or "precertificacion"
+            config.modo_envio = (request.POST.get("modo_envio") or "manual").strip() or "manual"
+            config.certificado_ruta = (request.POST.get("certificado_ruta") or "").strip() or None
+            config.certificado_clave = (request.POST.get("certificado_clave") or "").strip() or None
+            config.url_recepcion_emisor = (request.POST.get("url_recepcion_emisor") or "").strip() or public_urls["recepcion"]
+            config.url_aprobacion_emisor = (request.POST.get("url_aprobacion_emisor") or "").strip() or public_urls["aprobacion"]
+            config.observaciones = (request.POST.get("observaciones") or "").strip() or None
+            config.save()
+            status_message = "Configuracion e-CF guardada."
+        elif action == "save_sequence":
+            tipo_ecf = (request.POST.get("tipo_ecf") or "").strip()
+            if tipo_ecf in ECF_TIPOS_MAP:
+                secuencia, _ = FacturacionElectronicaSecuencia.objects.get_or_create(
+                    tipo_ecf=tipo_ecf,
+                    defaults={"descripcion": ECF_TIPOS_MAP[tipo_ecf]},
+                )
+                secuencia.descripcion = ECF_TIPOS_MAP[tipo_ecf]
+                secuencia.habilitada = _bool_post(request.POST.get("habilitada"))
+                secuencia.secuencia_actual = max(_to_int(request.POST.get("secuencia_actual"), 1), 1)
+                secuencia.secuencia_desde = max(_to_int(request.POST.get("secuencia_desde"), 1), 1)
+                secuencia.secuencia_hasta = max(_to_int(request.POST.get("secuencia_hasta"), 0), 0)
+                secuencia.vencimiento_secuencia = _to_date_or_none(request.POST.get("vencimiento_secuencia"))
+                secuencia.save()
+                status_message = f"Secuencia e-CF {tipo_ecf} actualizada."
+        elif action == "sync_docs":
+            total = _sync_ecf_documentos(limit=200)
+            status_message = f"Sincronizados {total} documentos desde CAB_PEDIDO."
+        elif action == "demo_qr":
+            documento_id = _to_int(request.POST.get("id_doc"), 0)
+            empresa = ctx.get("empresa") or {}
+            documento = FacturacionElectronicaDocumento.objects.filter(id_doc=documento_id).first()
+            if documento and documento.encf:
+                _apply_demo_qr(documento, empresa.get("rnc", ""))
+                status_message = f"QR demo generado para el documento {documento_id}."
+            elif documento:
+                status_message = f"El documento {documento_id} aun no tiene e-NCF; no se pudo generar QR demo."
+            else:
+                status_message = "Documento no encontrado para la prueba QR."
+
+    if not FacturacionElectronicaDocumento.objects.exists():
+        _sync_ecf_documentos(limit=80)
+
+    empresa = ctx.get("empresa") or {}
+    seq_map = {item.tipo_ecf: item for item in FacturacionElectronicaSecuencia.objects.all()}
+    secuencias = []
+    for codigo, nombre in ECF_TIPOS:
+        secuencia = seq_map.get(codigo)
+        preview = ""
+        if secuencia:
+            preview = f"E{codigo}{int(secuencia.secuencia_actual):010d}"
+        secuencias.append(
+            {
+                "codigo": codigo,
+                "nombre": nombre,
+                "obj": secuencia,
+                "preview": preview,
+            }
+        )
+
+    documentos = list(FacturacionElectronicaDocumento.objects.all()[:60])
+    for documento in documentos:
+        documento.tipo_ecf_nombre = ECF_TIPOS_MAP.get(documento.tipo_ecf or "", "Sin definir")
+        documento.url_consulta_qr = _build_qr_url(empresa.get("rnc", ""), documento)
+
+    readiness = {
+        "empresa_rnc": bool(str(empresa.get("rnc") or "").strip()),
+        "config_activa": bool(config.habilitado),
+        "certificado": bool(str(config.certificado_ruta or "").strip()),
+        "urls_receptor": bool(str(config.url_recepcion_emisor or "").strip()) and bool(str(config.url_aprobacion_emisor or "").strip()),
+        "secuencias": FacturacionElectronicaSecuencia.objects.filter(habilitada=True).exists(),
+    }
+    readiness["completo"] = all(readiness.values())
+
+    resumen = {
+        "total": FacturacionElectronicaDocumento.objects.count(),
+        "listos": FacturacionElectronicaDocumento.objects.filter(estado="LISTO_PARA_XML").count(),
+        "registrados": FacturacionElectronicaDocumento.objects.filter(estado="REGISTRADO").count(),
+        "pendientes_tipo": FacturacionElectronicaDocumento.objects.filter(estado="TIPO_PENDIENTE").count(),
+    }
+    ecf_public_urls = _build_public_ecf_urls(request)
+    runtime_report = build_ecf_runtime_report()
+
+    ctx.update(
+        {
+            "status_message": status_message,
+            "ecf_config": config,
+            "ecf_secuencias": secuencias,
+            "ecf_documentos": documentos,
+            "ecf_resumen": resumen,
+            "ecf_readiness": readiness,
+            "ecf_public_urls": ecf_public_urls,
+            "ecf_runtime": runtime_report,
+            "dgii_fuentes": [
+                {
+                    "title": "Documentacion sobre e-CF",
+                    "url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Paginas/documentacionSobreE-CF.aspx",
+                },
+                {
+                    "title": "Descripcion tecnica de facturacion electronica",
+                    "url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion-tecnica-de-facturacion-electronica.pdf",
+                },
+                {
+                    "title": "Preguntas Tecnicas e-CF",
+                    "url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Preguntas%20frecuentes/T%C3%A9cnicas/Preguntas%20T%C3%A9cnicas%20e-CF.pdf",
+                },
+                {
+                    "title": "Calendario oficial de implementacion",
+                    "url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Paginas/Listados-contribuyentes-obligados-implementar-facturacion-electronica.aspx",
+                },
+            ],
+        }
+    )
+    return render(request, "ajustes/facturacion_electronica.html", ctx)

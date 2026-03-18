@@ -34,6 +34,15 @@
           <label for="aviso_ciudad">Ciudad</label>
           <input id="aviso_ciudad" type="text" value="" />
         </div>
+        <div class="form-row">
+          <label for="aviso_plantilla">Plantilla</label>
+          <select id="aviso_plantilla">
+            <option value="">Formato predeterminado</option>
+            {% for plantilla in plantillas_activas %}
+            <option value="{{ plantilla.id_plantilla }}">{{ plantilla.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <div class="actions-row">
           <button id="btn_aviso_imprimir" type="button">Imprimir Aviso</button>
         </div>
@@ -67,6 +76,7 @@
     </div>
   </div>
 </div>
+{{ plantillas_activas|json_script:"aviso_plantillas_data" }}
 
 <div id="aviso_cliente_modal" class="modal-backdrop" aria-hidden="true">
   <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="aviso_modal_title">
@@ -179,6 +189,15 @@
     border: 1px solid #ced4da;
     border-radius: 8px;
     font-size: 14px;
+  }
+
+  .form-row select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
   }
 
   .form-row input[readonly] {
@@ -628,6 +647,7 @@
   const avisoClienteRnc = document.getElementById("aviso_cliente_rnc");
   const avisoClienteDir = document.getElementById("aviso_cliente_dir");
   const avisoCiudad = document.getElementById("aviso_ciudad");
+  const avisoPlantilla = document.getElementById("aviso_plantilla");
   const avisoPreview = document.getElementById("aviso_preview");
   const avisoFacturasBody = document.getElementById("aviso_facturas_body");
   const btnAvisoBuscarCliente = document.getElementById("btn_aviso_buscar_cliente");
@@ -639,6 +659,7 @@
   const btnAvisoSearch = document.getElementById("btn_aviso_search");
   const avisoResultsBody = document.getElementById("aviso_results_body");
   const avisoDetalleUrl = "{% url 'cartas:aviso_detalle' %}";
+  const avisoPlantillas = JSON.parse(document.getElementById("aviso_plantillas_data")?.textContent || "[]");
   let avisoData = null;
 
   function escapeHtml(value) {
@@ -655,6 +676,63 @@
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  }
+
+  function getSelectedAvisoPlantilla() {
+    const currentId = String((avisoPlantilla && avisoPlantilla.value) || "");
+    return avisoPlantillas.find((p) => String(p.id_plantilla) === currentId) || null;
+  }
+
+  function renderTemplateText(templateText, vars) {
+    let safe = escapeHtml(templateText || "");
+    Object.entries(vars || {}).forEach(([key, rawValue]) => {
+      const token = "{" + "{" + String(key) + "}" + "}";
+      safe = safe.replaceAll(token, escapeHtml(String(rawValue ?? "")));
+    });
+    return safe.replace(/\r?\n/g, "<br/>");
+  }
+
+  function buildAvisoTemplateVars(data, facturas) {
+    const cliente = (data && data.cliente) || {};
+    const empresa = (data && data.empresa) || {};
+    const totales = (data && data.totales) || {};
+    const docs = Array.isArray(facturas) ? facturas : [];
+    return {
+      cliente_nombre: cliente.nombre || "",
+      cliente_rnc: cliente.rnc_ced || "",
+      cliente_direccion: cliente.direccion || "",
+      cliente_ciudad: (avisoCiudad && avisoCiudad.value) || "",
+      cliente_telefono: cliente.telefono || "",
+      cliente_sector: cliente.sector || "",
+      fecha: data?.fecha || "",
+      hora: data?.hora || "",
+      empresa_nombre: empresa.nombre || empresaNombre,
+      ciudad_impresion: (avisoCiudad && avisoCiudad.value) || "",
+      carta_titulo: "AVISO",
+      balance_atraso: formatMoney(totales.saldo || 0),
+      total_mora: formatMoney(totales.mora || 0),
+      facturas_count: docs.length,
+    };
+  }
+
+  function renderAvisoBody(data, facturas) {
+    const plantilla = getSelectedAvisoPlantilla();
+    if (!plantilla || !String(plantilla.cuerpo || "").trim()) {
+      return `
+        <p>Estimado Sr (a),</p>
+        <p>Por medio de la presente le informamos que su cuenta se encuentra en ATRASO, le invitamos a ponerse al día con nosotros a la brevedad posible, evite cargos por mora.</p>
+        <p>El no cumplimiento de sus pagos nos da la autoridad de proceder con la recuperación de los artículos y/o electrodomésticos relacionados a su cuenta en atraso. A continuación detalle de deuda:</p>
+      `;
+    }
+    const vars = buildAvisoTemplateVars(data, facturas);
+    const asunto = String(plantilla.asunto || "").trim();
+    const asuntoHtml = asunto
+      ? `<p><strong>Asunto:</strong> ${renderTemplateText(asunto, vars)}</p>`
+      : "";
+    return `
+      ${asuntoHtml}
+      <p>${renderTemplateText(plantilla.cuerpo || "", vars)}</p>
+    `;
   }
 
   function openAvisoModal() {
@@ -769,9 +847,7 @@
             Ciudad: ${escapeHtml((avisoCiudad && avisoCiudad.value) || "")}<br/>
             Teléfono: ${escapeHtml(cliente.telefono || "")}</p>
 
-            <p>Estimado Sr (a),</p>
-            <p>Por medio de la presente le informamos que su cuenta se encuentra en ATRASO, le invitamos a ponerse al día con nosotros a la brevedad posible, evite cargos por mora.</p>
-            <p>El no cumplimiento de sus pagos nos da la autoridad de proceder con la recuperación de los artículos y/o electrodomésticos relacionados a su cuenta en atraso. A continuación detalle de deuda:</p>
+            ${renderAvisoBody(data, facturas)}
           </div>
 
           <table class="carta-table">
@@ -914,6 +990,9 @@
     }
   });
   avisoCiudad?.addEventListener("input", () => {
+    if (avisoData) renderAvisoPreview(avisoData);
+  });
+  avisoPlantilla?.addEventListener("change", () => {
     if (avisoData) renderAvisoPreview(avisoData);
   });
   btnAvisoImprimir?.addEventListener("click", () => {

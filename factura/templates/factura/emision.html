@@ -1,0 +1,608 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<style>
+  .factura-layout { display:grid; grid-template-columns: 420px 1fr; gap:18px; align-items:start; }
+  .factura-card { background:#fff; border:1px solid #d9e3f3; border-radius:16px; box-shadow:0 10px 24px rgba(23,43,77,.06); overflow:hidden; }
+  .factura-head { padding:16px 18px 8px; }
+  .factura-head h3 { margin:0; color:#173d7a; }
+  .factura-sub { margin:6px 0 0; color:#627089; font-size:.94rem; }
+  .factura-body { padding:16px 18px 18px; }
+  .search-row { display:grid; grid-template-columns: 1fr 130px auto; gap:8px; margin-bottom:12px; }
+  .search-row input, .search-row select, .search-row button,
+  .factura-form input, .factura-form textarea { width:100%; padding:9px 10px; border:1px solid #c9d7ef; border-radius:10px; font:inherit; }
+  .search-row button, .btn-main, .btn-soft { border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:600; }
+  .search-row button, .btn-main { background:#1f5fbf; color:#fff; }
+  .btn-soft { background:#e9f1ff; color:#1f4f9d; }
+  .pref-list { max-height:720px; overflow:auto; border:1px solid #e4ebf7; border-radius:12px; }
+  .pref-table { width:100%; border-collapse:collapse; }
+  .pref-table th, .pref-table td { padding:10px 8px; border-bottom:1px solid #edf2fb; text-align:left; font-size:.93rem; }
+  .pref-table th { background:#f8fbff; color:#3b5680; position:sticky; top:0; }
+  .pref-row { cursor:pointer; }
+  .pref-row:hover { background:#f4f8ff; }
+  .pref-row.active { background:#e8f0ff; }
+  .form-grid { display:grid; grid-template-columns: 120px 1fr 120px 1fr; gap:10px 12px; align-items:center; }
+  .form-grid textarea { min-height:74px; resize:vertical; }
+  .section-title { margin:16px 0 10px; color:#173d7a; font-size:1rem; font-weight:700; }
+  .detail-wrap { overflow:auto; border:1px solid #e4ebf7; border-radius:12px; }
+  .detail-table { width:100%; border-collapse:collapse; min-width:900px; }
+  .detail-table th, .detail-table td { padding:10px 8px; border-bottom:1px solid #edf2fb; text-align:left; font-size:.92rem; }
+  .detail-table th { background:#f8fbff; color:#3b5680; }
+  .totals-grid { display:grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap:10px; margin-top:14px; }
+  .total-box { background:#f7faff; border:1px solid #dce7fb; border-radius:12px; padding:12px; }
+  .total-box span { display:block; color:#64768f; font-size:.9rem; }
+  .total-box strong { display:block; margin-top:4px; color:#173d7a; font-size:1.2rem; }
+  .empty-box { border:1px dashed #cbd8ef; border-radius:12px; padding:22px; color:#64768f; background:#fbfdff; text-align:center; }
+  .top-actions { display:flex; gap:10px; justify-content:flex-end; margin-bottom:12px; }
+  .status-bar { margin:0 0 14px; padding:12px 14px; border-radius:12px; display:none; }
+  .status-bar.ok { display:block; background:#eef8ec; color:#1d6e2b; border:1px solid #bde0c2; }
+  .status-bar.err { display:block; background:#fff1f1; color:#972727; border:1px solid #efc2c2; }
+  .status-help { display:none; gap:10px; align-items:center; margin:-4px 0 14px; flex-wrap:wrap; }
+  .status-help span { color:#5a6882; font-size:.93rem; }
+  .print-actions { display:flex; justify-content:flex-end; margin-top:10px; }
+  .history-card { margin-top:18px; }
+  .history-table-wrap { overflow:auto; border:1px solid #e4ebf7; border-radius:12px; }
+  .history-table { width:100%; border-collapse:collapse; }
+  .history-table th, .history-table td { padding:10px 8px; border-bottom:1px solid #edf2fb; text-align:left; font-size:.93rem; }
+  .history-table th { background:#f8fbff; color:#3b5680; }
+  @media (max-width: 1180px) {
+    .factura-layout { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .totals-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  }
+</style>
+
+<h2 class="page-title">Emision de Factura</h2>
+<p class="page-subtitle">Pantalla independiente para facturar a partir de prefacturas activas, sin entrar al modulo de prefacturas.</p>
+
+<div class="factura-layout">
+  <section class="factura-card">
+    <div class="factura-head">
+      <h3>Prefacturas Activas</h3>
+      <p class="factura-sub">Haz doble click sobre una prefactura para cargarla en la factura.</p>
+    </div>
+    <div class="factura-body">
+      <div class="search-row">
+        <input id="pref_q" type="text" placeholder="Documento, cliente o nombre" />
+        <select id="pref_filtro">
+          <option value="documento">Documento</option>
+          <option value="cliente">Cliente</option>
+          <option value="nombre">Nombre</option>
+        </select>
+        <button id="btn_pref_buscar" type="button">Buscar</button>
+      </div>
+      <div class="pref-list">
+        <table class="pref-table">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="pref_results_body">
+            <tr><td colspan="4" class="empty-box">Cargando prefacturas activas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="factura-card">
+    <div class="factura-head">
+      <h3>Factura</h3>
+      <p class="factura-sub">Los datos se autocompletan desde la prefactura seleccionada.</p>
+    </div>
+    <div class="factura-body">
+      <div class="top-actions">
+        <select id="fac_tipo_ecf" class="btn-soft" style="border:1px solid #c9d7ef;">
+          {% for codigo, nombre in tipos_emision %}
+          <option value="{{ codigo }}">{{ codigo }} - {{ nombre }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="btn-main" id="btn_emitir_factura">Emitir factura</button>
+        <button type="button" class="btn-soft" id="btn_limpiar_factura">Limpiar</button>
+      </div>
+      <div id="factura_status" class="status-bar"></div>
+      <div id="factura_status_help" class="status-help"></div>
+      <div class="print-actions" id="print_actions" style="display:none;">
+        <button type="button" class="btn-soft" id="btn_imprimir_factura">Abrir impresion</button>
+      </div>
+
+      <div id="factura_empty" class="empty-box">
+        Selecciona una prefactura activa para cargar cliente, pedido y detalle de articulos.
+      </div>
+
+      <div id="factura_content" style="display:none;">
+        <div class="section-title">Cabecera</div>
+        <div class="form-grid factura-form">
+          <label>No. prefactura</label><input id="fac_id_doc" type="text" readonly />
+          <label>Estado</label><input id="fac_est_doc" type="text" readonly />
+
+          <label>Cliente</label><input id="fac_nom_socio" type="text" readonly />
+          <label>Codigo cliente</label><input id="fac_id_sn" type="text" readonly />
+
+          <label>RNC/Ced.</label><input id="fac_rnc_ced" type="text" readonly />
+          <label>Apodo</label><input id="fac_contacto" type="text" readonly />
+
+          <label>Fecha cont.</label><input id="fac_fecha_cont" type="date" readonly />
+          <label>Fecha doc.</label><input id="fac_fecha_doc" type="date" readonly />
+
+          <label>Fecha venc.</label><input id="fac_fecha_venc" type="date" readonly />
+          <label>Condicion</label><input id="fac_condicion" type="text" readonly />
+
+          <label>Direccion fact.</label><input id="fac_ent_factura" type="text" readonly />
+          <label>Entrega</label><input id="fac_ent_mercancia" type="text" readonly />
+
+          <label>Comentario</label>
+          <textarea id="fac_comentario" readonly></textarea>
+          <label></label><div></div>
+        </div>
+
+        <div class="section-title">Detalle</div>
+        <div class="detail-wrap">
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>Articulo</th>
+                <th>Descripcion</th>
+                <th>Cant. Emp</th>
+                <th>Cantidad</th>
+                <th>UoM</th>
+                <th>Precio Unit.</th>
+                <th>Precio Bruto</th>
+                <th>% Desc.</th>
+                <th>Valor</th>
+                <th>Alm.</th>
+                <th>Proyecto</th>
+                <th>CeBe</th>
+              </tr>
+            </thead>
+            <tbody id="fac_detalle_body">
+              <tr><td colspan="12" class="empty-box">Sin detalle cargado.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="totals-grid">
+          <div class="total-box"><span>Subtotal</span><strong id="fac_subtotal">0.00</strong></div>
+          <div class="total-box"><span>Descuento</span><strong id="fac_total_desc">0.00</strong></div>
+          <div class="total-box"><span>Impuesto</span><strong id="fac_impuesto">0.00</strong></div>
+          <div class="total-box"><span>Total</span><strong id="fac_total_doc">0.00</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<section class="factura-card history-card">
+  <div class="factura-head">
+    <h3>Facturas Emitidas</h3>
+    <p class="factura-sub">Buscador para reimprimir facturas ya emitidas desde este modulo.</p>
+  </div>
+  <div class="factura-body">
+    <div class="search-row">
+      <input id="hist_q" type="text" placeholder="No. factura, cliente, nombre o e-NCF" />
+      <select id="hist_filtro">
+        <option value="documento">Factura</option>
+        <option value="cliente">Cliente</option>
+        <option value="nombre">Nombre</option>
+        <option value="encf">e-NCF</option>
+      </select>
+      <button id="btn_hist_buscar" type="button">Buscar</button>
+    </div>
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>No. Factura</th>
+            <th>Cliente</th>
+            <th>e-NCF</th>
+            <th>Fecha</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Prefactura</th>
+            <th>Imprimir</th>
+            <th>Cancelar</th>
+          </tr>
+        </thead>
+        <tbody id="hist_results_body">
+          <tr><td colspan="9" class="empty-box">Cargando facturas emitidas...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+  const prefListUrl = "{% url 'factura:emision_prefacturas' %}";
+  const prefDetailUrl = "{% url 'factura:emision_prefactura_detalle' %}";
+  const emitirFacturaUrl = "{% url 'factura:emitir_factura' %}";
+  const facturasBuscarUrl = "{% url 'factura:buscar_facturas' %}";
+  const cancelarFacturaUrl = "{% url 'factura:cancelar_factura' %}";
+  const electronicaUrl = "{% url 'factura:electronica' %}";
+
+  const prefQ = document.getElementById("pref_q");
+  const prefFiltro = document.getElementById("pref_filtro");
+  const btnPrefBuscar = document.getElementById("btn_pref_buscar");
+  const prefResultsBody = document.getElementById("pref_results_body");
+  const facturaEmpty = document.getElementById("factura_empty");
+  const facturaContent = document.getElementById("factura_content");
+  const btnLimpiarFactura = document.getElementById("btn_limpiar_factura");
+  const btnEmitirFactura = document.getElementById("btn_emitir_factura");
+  const facDetalleBody = document.getElementById("fac_detalle_body");
+  const facturaStatus = document.getElementById("factura_status");
+  const facturaStatusHelp = document.getElementById("factura_status_help");
+  const facTipoEcf = document.getElementById("fac_tipo_ecf");
+  const printActions = document.getElementById("print_actions");
+  const btnImprimirFactura = document.getElementById("btn_imprimir_factura");
+  const histQ = document.getElementById("hist_q");
+  const histFiltro = document.getElementById("hist_filtro");
+  const btnHistBuscar = document.getElementById("btn_hist_buscar");
+  const histResultsBody = document.getElementById("hist_results_body");
+
+  let prefDebounce = null;
+  let activePrefId = "";
+  let lastPrintUrl = "";
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function fmtNum(value, digits = 2) {
+    const num = Number(value ?? 0);
+    return Number.isFinite(num) ? num.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }) : "0.00";
+  }
+
+  function setFacturaValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? "";
+  }
+
+  function clearFactura(preserveStatus = false) {
+    activePrefId = "";
+    facturaEmpty.style.display = "";
+    facturaContent.style.display = "none";
+    [
+      "fac_id_doc", "fac_est_doc", "fac_nom_socio", "fac_id_sn", "fac_rnc_ced", "fac_contacto",
+      "fac_fecha_cont", "fac_fecha_doc", "fac_fecha_venc", "fac_condicion", "fac_ent_factura",
+      "fac_ent_mercancia", "fac_comentario"
+    ].forEach((id) => setFacturaValue(id, ""));
+    document.getElementById("fac_subtotal").textContent = "0.00";
+    document.getElementById("fac_total_desc").textContent = "0.00";
+    document.getElementById("fac_impuesto").textContent = "0.00";
+    document.getElementById("fac_total_doc").textContent = "0.00";
+    facDetalleBody.innerHTML = '<tr><td colspan="12" class="empty-box">Sin detalle cargado.</td></tr>';
+    if (!preserveStatus) {
+      facturaStatus.className = "status-bar";
+      facturaStatus.textContent = "";
+      facturaStatusHelp.innerHTML = "";
+      facturaStatusHelp.style.display = "none";
+    }
+    if (!preserveStatus) {
+      lastPrintUrl = "";
+      printActions.style.display = "none";
+    }
+    prefResultsBody.querySelectorAll(".pref-row.active").forEach((row) => row.classList.remove("active"));
+  }
+
+  function buildStatusHelp(data) {
+    if (!data || data.error_code !== "missing_ecf_sequence") return null;
+    return {
+      url: data.help_url || electronicaUrl,
+      label: data.help_label || "Configurar secuencia e-CF",
+      text: `Activa y guarda la secuencia ${data.tipo_ecf || "requerida"} antes de reintentar.`,
+    };
+  }
+
+  function showStatus(message, ok = true, help = null) {
+    facturaStatus.textContent = message || "";
+    facturaStatus.className = `status-bar ${ok ? "ok" : "err"}`;
+    facturaStatusHelp.innerHTML = "";
+    facturaStatusHelp.style.display = "none";
+    if (help && help.url) {
+      facturaStatusHelp.innerHTML = `
+        <a class="btn-soft" href="${escapeHtml(help.url)}">${escapeHtml(help.label || "Abrir configuracion")}</a>
+        <span>${escapeHtml(help.text || "")}</span>
+      `;
+      facturaStatusHelp.style.display = "flex";
+    }
+  }
+
+  function renderPrefResults(rows) {
+    if (!rows.length) {
+      prefResultsBody.innerHTML = '<tr><td colspan="4" class="empty-box">No hay prefacturas activas.</td></tr>';
+      return;
+    }
+    prefResultsBody.innerHTML = rows.map((row) => `
+      <tr class="pref-row ${activePrefId === String(row.id_doc) ? "active" : ""}" data-id-doc="${escapeHtml(row.id_doc)}">
+        <td>${escapeHtml(row.id_doc)}</td>
+        <td>
+          <strong>${escapeHtml(row.nom_socio || "")}</strong><br>
+          <span style="color:#64768f;">${escapeHtml(row.id_sn || "")}</span>
+        </td>
+        <td>${escapeHtml(row.fecha_doc || "")}</td>
+        <td>${escapeHtml(fmtNum(row.total_doc || 0))}</td>
+      </tr>
+    `).join("");
+
+    prefResultsBody.querySelectorAll(".pref-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        prefResultsBody.querySelectorAll(".pref-row.active").forEach((item) => item.classList.remove("active"));
+        row.classList.add("active");
+        activePrefId = row.dataset.idDoc || "";
+      });
+      row.addEventListener("dblclick", () => {
+        const idDoc = row.dataset.idDoc || "";
+        if (idDoc) loadPrefactura(idDoc);
+      });
+    });
+  }
+
+  function renderFacturaResults(rows) {
+    if (!rows.length) {
+      histResultsBody.innerHTML = '<tr><td colspan="9" class="empty-box">No se encontraron facturas emitidas.</td></tr>';
+      return;
+    }
+    histResultsBody.innerHTML = rows.map((row) => `
+      <tr>
+        <td><strong>${escapeHtml(row.id_doc)}</strong></td>
+        <td>
+          <strong>${escapeHtml(row.nom_socio || "")}</strong><br>
+          <span style="color:#64768f;">${escapeHtml(row.id_sn || "")}</span>
+        </td>
+        <td><code>${escapeHtml(row.encf || "Pendiente")}</code></td>
+        <td>${escapeHtml(row.fecha_doc || "")}</td>
+        <td>${escapeHtml(fmtNum(row.total_doc || 0))}</td>
+        <td>${row.ncf_nc ? `<span style="color:#9a2525;font-weight:700;">Cancelada con ${escapeHtml(row.ncf_nc)}</span>` : '<span style="color:#1d6e2b;font-weight:700;">Activa</span>'}</td>
+        <td>${escapeHtml(row.id_doc_pv || "-")}</td>
+        <td><button type="button" class="btn-soft hist-print-btn" data-print-url="${escapeHtml(row.print_url)}">Abrir impresion</button></td>
+        <td>
+          <button
+            type="button"
+            class="btn-soft hist-cancel-btn"
+            data-factura-id="${escapeHtml(row.id_doc)}"
+            ${row.cancelable ? "" : "disabled"}
+          >
+            ${row.ncf_nc ? "Cancelada" : "Cancelar"}
+          </button>
+        </td>
+      </tr>
+    `).join("");
+    histResultsBody.querySelectorAll(".hist-print-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        const printUrl = button.dataset.printUrl || "";
+        if (printUrl) window.open(printUrl, "_blank");
+      });
+    });
+    histResultsBody.querySelectorAll(".hist-cancel-btn").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const facturaId = button.dataset.facturaId || "";
+        if (!facturaId) return;
+        const motivo = window.prompt(`Motivo de cancelacion para la factura ${facturaId}:`, "Cancelacion solicitada por el usuario");
+        if (motivo === null) return;
+        button.disabled = true;
+        try {
+          const res = await fetch(cancelarFacturaUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": "{{ csrf_token }}",
+            },
+            body: JSON.stringify({
+              factura_id: facturaId,
+              motivo,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showStatus(data.detail || "No se pudo cancelar la factura.", false, buildStatusHelp(data));
+            button.disabled = false;
+            return;
+          }
+          const encfLabel = data.encf ? ` | e-NCF NC: ${data.encf}` : "";
+          const dispatchLabel = data.dispatch_message ? ` | Integracion: ${data.dispatch_message}` : "";
+          const actionLabel = data.already_cancelled
+            ? `Factura ${facturaId} ya estaba asociada a la nota de credito ${data.nota_credito_id || "existente"}${encfLabel}.`
+            : `Factura ${facturaId} cancelada con nota de credito ${data.nota_credito_id}${encfLabel}${dispatchLabel}.`;
+          showStatus(actionLabel, true);
+          lastPrintUrl = data.print_url || "";
+          printActions.style.display = lastPrintUrl ? "flex" : "none";
+          await fetchFacturas();
+        } catch (error) {
+          showStatus("Error de conexion al cancelar la factura.", false);
+          button.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function fetchPrefacturas() {
+    const q = (prefQ.value || "").trim();
+    const filtro = (prefFiltro.value || "documento").trim();
+    prefResultsBody.innerHTML = '<tr><td colspan="4" class="empty-box">Buscando...</td></tr>';
+    try {
+      const res = await fetch(`${prefListUrl}?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      if (!res.ok) {
+        prefResultsBody.innerHTML = '<tr><td colspan="4" class="empty-box">No se pudo cargar la lista.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      renderPrefResults(Array.isArray(data.results) ? data.results : []);
+    } catch (error) {
+      prefResultsBody.innerHTML = '<tr><td colspan="4" class="empty-box">Error de conexion.</td></tr>';
+    }
+  }
+
+  async function fetchFacturas() {
+    const q = (histQ.value || "").trim();
+    const filtro = (histFiltro.value || "documento").trim();
+    histResultsBody.innerHTML = '<tr><td colspan="7" class="empty-box">Buscando facturas...</td></tr>';
+    try {
+      const res = await fetch(`${facturasBuscarUrl}?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      if (!res.ok) {
+        histResultsBody.innerHTML = '<tr><td colspan="9" class="empty-box">No se pudo cargar la lista.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      renderFacturaResults(Array.isArray(data.results) ? data.results : []);
+    } catch (error) {
+      histResultsBody.innerHTML = '<tr><td colspan="9" class="empty-box">Error de conexion.</td></tr>';
+    }
+  }
+
+  function renderDetalle(detalles) {
+    if (!Array.isArray(detalles) || !detalles.length) {
+      facDetalleBody.innerHTML = '<tr><td colspan="12" class="empty-box">Sin detalle cargado.</td></tr>';
+      return;
+    }
+    facDetalleBody.innerHTML = detalles.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.id_articulo || "")}</td>
+        <td>${escapeHtml(item.descrip_art || "")}</td>
+        <td>${escapeHtml(fmtNum(item.cant_emp || 0, 2))}</td>
+        <td>${escapeHtml(fmtNum(item.cantidad || 0, 2))}</td>
+        <td>${escapeHtml(item.uom || "")}</td>
+        <td>${escapeHtml(fmtNum(item.precio_unit || 0, 2))}</td>
+        <td>${escapeHtml(fmtNum(item.precio_bruto || 0, 2))}</td>
+        <td>${escapeHtml(fmtNum(item.porc_desc || 0, 2))}</td>
+        <td>${escapeHtml(fmtNum(item.valor || 0, 2))}</td>
+        <td>${escapeHtml(item.alm ?? "")}</td>
+        <td>${escapeHtml(item.proyecto || "")}</td>
+        <td>${escapeHtml(item.cebe || "")}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function loadPrefactura(idDoc) {
+    facturaEmpty.style.display = "none";
+    facturaContent.style.display = "";
+    facDetalleBody.innerHTML = '<tr><td colspan="12" class="empty-box">Cargando detalle...</td></tr>';
+    try {
+      const res = await fetch(`${prefDetailUrl}?id_doc=${encodeURIComponent(idDoc)}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      if (!res.ok) {
+        clearFactura();
+        return;
+      }
+      const data = await res.json();
+      const p = data.prefactura || {};
+      activePrefId = String(p.id_doc || idDoc);
+      prefResultsBody.querySelectorAll(".pref-row").forEach((row) => {
+        row.classList.toggle("active", (row.dataset.idDoc || "") === activePrefId);
+      });
+
+      setFacturaValue("fac_id_doc", p.id_doc || "");
+      setFacturaValue("fac_est_doc", p.est_doc || "");
+      setFacturaValue("fac_nom_socio", p.nom_socio || "");
+      setFacturaValue("fac_id_sn", p.id_sn || "");
+      setFacturaValue("fac_rnc_ced", p.rnc_ced || "");
+      setFacturaValue("fac_contacto", p.contacto || "");
+      setFacturaValue("fac_fecha_cont", p.fecha_cont || "");
+      setFacturaValue("fac_fecha_doc", p.fecha_doc || "");
+      setFacturaValue("fac_fecha_venc", p.fecha_venc || "");
+      setFacturaValue("fac_condicion", p.condicion || "");
+      setFacturaValue("fac_ent_factura", p.ent_factura || "");
+      setFacturaValue("fac_ent_mercancia", p.ent_mercancia || "");
+      setFacturaValue("fac_comentario", p.comentario || "");
+
+      document.getElementById("fac_subtotal").textContent = fmtNum(p.subtotal || 0);
+      document.getElementById("fac_total_desc").textContent = fmtNum(p.total_desc || 0);
+      document.getElementById("fac_impuesto").textContent = fmtNum(p.impuesto || 0);
+      document.getElementById("fac_total_doc").textContent = fmtNum(p.total_doc || 0);
+
+      renderDetalle(data.detalles || []);
+      showStatus("", true);
+      facturaStatus.className = "status-bar";
+    } catch (error) {
+      clearFactura();
+    }
+  }
+
+  async function emitirFactura() {
+    const prefacturaId = document.getElementById("fac_id_doc").value || "";
+    const tipoEcf = facTipoEcf?.value || "32";
+    if (!prefacturaId) {
+      showStatus("Selecciona una prefactura antes de emitir.", false);
+      return;
+    }
+    btnEmitirFactura.disabled = true;
+    showStatus("Generando factura...", true);
+    try {
+      const res = await fetch(emitirFacturaUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": "{{ csrf_token }}",
+        },
+        body: JSON.stringify({
+          prefactura_id: prefacturaId,
+          tipo_ecf: tipoEcf,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showStatus(data.detail || "No se pudo emitir la factura.", false, buildStatusHelp(data));
+        return;
+      }
+      const encfLabel = data.encf ? ` | e-NCF: ${data.encf}` : "";
+      const dispatchLabel = data.dispatch_message ? ` | Integracion: ${data.dispatch_message}` : "";
+      showStatus(`Factura ${data.factura_id} generada correctamente${encfLabel}${dispatchLabel}.`, true);
+      lastPrintUrl = data.print_url || "";
+      printActions.style.display = lastPrintUrl ? "flex" : "none";
+      clearFactura(true);
+      await fetchPrefacturas();
+    } catch (error) {
+      showStatus("Error de conexion al emitir la factura.", false);
+    } finally {
+      btnEmitirFactura.disabled = false;
+    }
+  }
+
+  btnPrefBuscar?.addEventListener("click", fetchPrefacturas);
+  btnHistBuscar?.addEventListener("click", fetchFacturas);
+  prefQ?.addEventListener("input", () => {
+    clearTimeout(prefDebounce);
+    prefDebounce = setTimeout(fetchPrefacturas, 280);
+  });
+  prefQ?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      fetchPrefacturas();
+    }
+  });
+  prefFiltro?.addEventListener("change", fetchPrefacturas);
+  histQ?.addEventListener("input", () => {
+    clearTimeout(prefDebounce);
+    prefDebounce = setTimeout(fetchFacturas, 280);
+  });
+  histQ?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      fetchFacturas();
+    }
+  });
+  histFiltro?.addEventListener("change", fetchFacturas);
+  btnLimpiarFactura?.addEventListener("click", clearFactura);
+  btnEmitirFactura?.addEventListener("click", emitirFactura);
+  btnImprimirFactura?.addEventListener("click", () => {
+    if (lastPrintUrl) window.open(lastPrintUrl, "_blank");
+  });
+
+  fetchPrefacturas();
+  fetchFacturas();
+</script>
+{% endblock %}

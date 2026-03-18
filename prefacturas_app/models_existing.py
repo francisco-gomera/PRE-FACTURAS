@@ -376,7 +376,7 @@ class Usuario(models.Model):
     terminal = models.CharField(db_column='TERMINAL', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     version = models.CharField(db_column='VERSION', max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     preliminar = models.CharField(db_column='PRELIMINAR', max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-    firma = models.BinaryField(db_column='FIRMA', blank=True, null=True)
+    id_firma = models.IntegerField(db_column='ID_FIRMA', blank=True, null=True)
 
     class Meta:
         managed = False

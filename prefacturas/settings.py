@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'ajustes',
     'cobros',
     'cartas',
+    'factura',
 ]
 
 MIDDLEWARE = [

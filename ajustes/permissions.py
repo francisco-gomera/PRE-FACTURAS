@@ -22,12 +22,21 @@ def _tables_exist():
 def ensure_base_perms():
     if not _tables_exist():
         return
+    permisos_genericos = [
+        ("ver", "Ver"),
+        ("crear", "Crear"),
+        ("editar", "Editar"),
+        ("borrar", "Borrar"),
+        ("imprimir", "Imprimir"),
+        ("exportar", "Exportar"),
+    ]
     modulos = {
         "inventario": "Inventario",
         "reportes": "Reportes",
         "etiquetas": "Etiquetas",
         "cobros": "Cobros",
         "cartas": "Cartas",
+        "factura": "Factura",
         "ajustes": "Ajustes",
     }
     sub_perms = {
@@ -56,6 +65,11 @@ def ensure_base_perms():
             ("ver_cartas_saldo", "Ver Cartas de Saldo"),
             ("ver_plantillas", "Ver Plantillas"),
         ],
+        "factura": [
+            ("ver_emision", "Ver Emision de Facturas"),
+            ("ver_electronica", "Ver Facturacion Electronica"),
+            ("ver_documentos", "Ver Documentos de Factura"),
+        ],
         "ajustes": [
             ("ver_parametros", "Ver Parametros"),
             ("ver_usuarios", "Ver Usuarios"),
@@ -68,6 +82,12 @@ def ensure_base_perms():
             codigo=codigo,
             defaults={"nombre": nombre},
         )
+        for perm_code, perm_name in permisos_genericos:
+            SegPermiso.objects.get_or_create(
+                modulo=modulo,
+                codigo=perm_code,
+                defaults={"nombre": f"{perm_name} {nombre}"},
+            )
         for perm_code, perm_name in sub_perms.get(codigo, []):
             SegPermiso.objects.get_or_create(
                 modulo=modulo,

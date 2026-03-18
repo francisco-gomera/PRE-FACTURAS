@@ -59,6 +59,13 @@
     <a href="{% url 'cartas:index' %}">Abrir modulo</a>
   </div>
   {% endif %}
+  {% if visible_modules.factura %}
+  <div class="info-card">
+    <h3>Factura</h3>
+    <p>Facturacion formal y preparacion para facturacion electronica DGII.</p>
+    <a href="{% url 'factura:index' %}">Abrir modulo</a>
+  </div>
+  {% endif %}
   {% if visible_modules.ajustes %}
   <div class="info-card">
     <h3>Ajustes</h3>

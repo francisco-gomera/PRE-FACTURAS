@@ -1,42 +1,482 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="page-header">
-  <h2 class="page-title">Plantillas de Cartas</h2>
-  <a href="#" class="btn btn-primary">Crear nueva plantilla</a>
-</div>
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Plantillas de Cartas</h2>
+      <p class="page-subtitle">Crea y administra plantillas reutilizables para avisos, saldos y futuras cartas.</p>
+    </div>
+    <a href="{% url 'cartas:plantillas' %}" class="btn-primary-link">Nueva plantilla</a>
+  </div>
 
-<div class="card">
-  <div class="card-body">
-    <h3 class="card-title">Plantillas existentes</h3>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Asunto</th>
-          <th>Activa</th>
-          <th>Fecha de Creación</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for plantilla in plantillas %}
-        <tr>
-          <td>{{ plantilla.nombre }}</td>
-          <td>{{ plantilla.asunto }}</td>
-          <td>{% if plantilla.activa %}Sí{% else %}No{% endif %}</td>
-          <td>{{ plantilla.fecha_creacion|date:"d/m/Y" }}</td>
-          <td>
-            <a href="#">Editar</a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5">No hay plantillas creadas.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if plantilla_error %}
+  <div class="alert error">{{ plantilla_error }}</div>
+  {% elif plantilla_status == "created" %}
+  <div class="alert success">La plantilla fue creada correctamente.</div>
+  {% endif %}
+
+  <div class="plantillas-layout">
+    <section class="info-card">
+      <div class="section-head">
+        <h3>Plantillas existentes</h3>
+        <form method="get" class="search-row">
+          <input type="text" name="q" value="{{ plantilla_query }}" placeholder="Buscar por nombre, asunto o cuerpo" />
+          <button type="submit" class="btn-small">Buscar</button>
+        </form>
+      </div>
+
+      <div class="table-wrap">
+        <table class="plantillas-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Asunto</th>
+              <th>Estado</th>
+              <th>Actualizada</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for plantilla in plantillas %}
+            <tr>
+              <td>{{ plantilla.nombre }}</td>
+              <td>{{ plantilla.asunto }}</td>
+              <td>
+                {% if plantilla.activa %}
+                <span class="badge success">Activa</span>
+                {% else %}
+                <span class="badge muted">Inactiva</span>
+                {% endif %}
+              </td>
+              <td>{{ plantilla.fecha_modificacion|date:"d/m/Y H:i" }}</td>
+              <td class="actions-cell">
+                <a class="table-link" href="{% url 'cartas:plantillas' %}?edit={{ plantilla.id_plantilla }}">Editar</a>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle" />
+                  <input type="hidden" name="id_plantilla" value="{{ plantilla.id_plantilla }}" />
+                  <button type="submit" class="table-link button-link">
+                    {% if plantilla.activa %}Desactivar{% else %}Activar{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="empty-row">No hay plantillas registradas.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="info-card editor-card">
+      <div class="section-head">
+        <h3>{% if selected_plantilla %}Editar plantilla{% else %}Nueva plantilla{% endif %}</h3>
+        <span class="helper-text">Puedes usar variables dentro del asunto y el cuerpo.</span>
+      </div>
+
+      <form method="post" class="plantilla-form">
+        {% csrf_token %}
+        <input type="hidden" name="id_plantilla" value="{% if selected_plantilla %}{{ selected_plantilla.id_plantilla }}{% endif %}" />
+
+        <div class="form-row">
+          <label for="nombre">Nombre</label>
+          <input id="nombre" name="nombre" type="text" maxlength="100" value="{% if selected_plantilla %}{{ selected_plantilla.nombre }}{% endif %}" required />
+        </div>
+
+        <div class="form-row">
+          <label for="asunto">Asunto</label>
+          <input id="asunto" name="asunto" type="text" maxlength="255" value="{% if selected_plantilla %}{{ selected_plantilla.asunto }}{% endif %}" required />
+        </div>
+
+        <div class="form-row">
+          <label for="cuerpo">Cuerpo</label>
+          <textarea id="cuerpo" name="cuerpo" rows="14" required>{% if selected_plantilla %}{{ selected_plantilla.cuerpo }}{% endif %}</textarea>
+        </div>
+
+        <div class="form-inline">
+          <label class="toggle-check">
+            <input type="checkbox" name="activa" value="1" {% if not selected_plantilla or selected_plantilla.activa %}checked{% endif %} />
+            <span>Plantilla activa</span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-save">{% if selected_plantilla %}Guardar cambios{% else %}Crear plantilla{% endif %}</button>
+          <a href="{% url 'cartas:plantillas' %}" class="btn-secondary-link">Limpiar</a>
+        </div>
+      </form>
+
+      <div class="tokens-box">
+        <h4>Variables disponibles</h4>
+        <div class="tokens-list">
+          {% for token in placeholders %}
+          <button type="button" class="token-chip" data-token="{{ token }}">{{ token }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="preview-box">
+        <h4>Vista previa rápida</h4>
+        <div class="preview-line"><strong>Asunto:</strong> <span id="preview_asunto"></span></div>
+        <pre id="preview_cuerpo" class="preview-body"></pre>
+      </div>
+    </section>
   </div>
 </div>
+
+<style>
+  :root {
+    --page-bg: #f3f6fb;
+    --card-bg: #ffffff;
+    --border-color: #d8e2f3;
+    --text-color: #334e68;
+    --text-light: #627d98;
+    --primary-color: #1f5fbf;
+    --primary-dark: #174d9e;
+    --success-bg: #edfdf3;
+    --success-text: #17663a;
+    --error-bg: #fff1f2;
+    --error-text: #a11a2b;
+    --shadow: 0 8px 24px rgba(18, 52, 102, 0.08);
+    --radius: 14px;
+  }
+
+  .page-container {
+    padding: 16px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+  }
+
+  .page-title {
+    margin: 0;
+    color: var(--text-color);
+  }
+
+  .page-subtitle {
+    margin: 6px 0 0;
+    color: var(--text-light);
+  }
+
+  .btn-primary-link,
+  .btn-secondary-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .btn-primary-link {
+    background: var(--primary-color);
+    color: #fff;
+  }
+
+  .btn-secondary-link {
+    background: #eef4ff;
+    color: var(--primary-color);
+    border: 1px solid #cfe0ff;
+  }
+
+  .alert {
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  .alert.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+
+  .alert.error {
+    background: var(--error-bg);
+    color: var(--error-text);
+  }
+
+  .plantillas-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .section-head h3,
+  .tokens-box h4,
+  .preview-box h4 {
+    margin: 0;
+    color: var(--text-color);
+  }
+
+  .helper-text {
+    color: var(--text-light);
+    font-size: 13px;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 8px;
+    width: min(100%, 380px);
+  }
+
+  .search-row input,
+  .plantilla-form input[type="text"],
+  .plantilla-form textarea {
+    width: 100%;
+    border: 1px solid #c9d7ec;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--text-color);
+    background: #fff;
+  }
+
+  .plantilla-form textarea {
+    resize: vertical;
+    min-height: 280px;
+  }
+
+  .btn-small,
+  .btn-save {
+    min-height: 40px;
+    border: none;
+    border-radius: 10px;
+    padding: 0 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-small,
+  .btn-save {
+    background: var(--primary-color);
+    color: #fff;
+  }
+
+  .table-wrap {
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+  }
+
+  .plantillas-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .plantillas-table th,
+  .plantillas-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .plantillas-table th {
+    background: #f7faff;
+    color: var(--text-color);
+    font-size: 13px;
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .table-link,
+  .button-link {
+    color: var(--primary-color);
+    font-weight: 700;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .badge.success {
+    background: #e7f9ef;
+    color: #177245;
+  }
+
+  .badge.muted {
+    background: #eef3f9;
+    color: #5d7288;
+  }
+
+  .empty-row {
+    text-align: center;
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  .plantilla-form {
+    display: grid;
+    gap: 14px;
+  }
+
+  .form-row label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-color);
+    font-weight: 700;
+  }
+
+  .toggle-check {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--text-color);
+    font-weight: 600;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tokens-box,
+  .preview-box {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .tokens-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .token-chip {
+    border: 1px solid #c8d8f3;
+    background: #f5f9ff;
+    color: var(--primary-color);
+    border-radius: 999px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+  }
+
+  .preview-line {
+    margin-top: 10px;
+    color: var(--text-color);
+  }
+
+  .preview-body {
+    margin: 10px 0 0;
+    padding: 14px;
+    background: #f7faff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    white-space: pre-wrap;
+    color: #1f2d3d;
+    min-height: 160px;
+  }
+
+  @media (min-width: 1100px) {
+    .plantillas-layout {
+      grid-template-columns: 1.05fr 0.95fr;
+      align-items: start;
+    }
+
+    .editor-card {
+      position: sticky;
+      top: 20px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .page-header,
+    .section-head,
+    .search-row,
+    .form-actions {
+      flex-direction: column;
+    }
+
+    .btn-primary-link,
+    .btn-secondary-link,
+    .btn-small,
+    .btn-save {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  const asuntoInput = document.getElementById("asunto");
+  const cuerpoInput = document.getElementById("cuerpo");
+  const previewAsunto = document.getElementById("preview_asunto");
+  const previewCuerpo = document.getElementById("preview_cuerpo");
+  const tokenButtons = document.querySelectorAll(".token-chip");
+
+  function updatePreview() {
+    if (previewAsunto) {
+      previewAsunto.textContent = asuntoInput?.value || "(sin asunto)";
+    }
+    if (previewCuerpo) {
+      previewCuerpo.textContent = cuerpoInput?.value || "Escribe el contenido de la plantilla para ver la vista previa.";
+    }
+  }
+
+  function insertToken(token) {
+    if (!cuerpoInput) return;
+    const start = cuerpoInput.selectionStart || 0;
+    const end = cuerpoInput.selectionEnd || 0;
+    const current = cuerpoInput.value || "";
+    cuerpoInput.value = `${current.slice(0, start)}${token}${current.slice(end)}`;
+    cuerpoInput.focus();
+    const nextPos = start + token.length;
+    cuerpoInput.setSelectionRange(nextPos, nextPos);
+    updatePreview();
+  }
+
+  asuntoInput?.addEventListener("input", updatePreview);
+  cuerpoInput?.addEventListener("input", updatePreview);
+  tokenButtons.forEach((btn) => {
+    btn.addEventListener("click", () => insertToken(btn.dataset.token || ""));
+  });
+  document.addEventListener("DOMContentLoaded", updatePreview);
+</script>
 {% endblock %}

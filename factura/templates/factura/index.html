@@ -1,0 +1,30 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<h2 class="page-title">Factura</h2>
+<p class="page-subtitle">Modulo independiente para facturacion formal y facturacion electronica, sin tocar prefacturas.</p>
+
+<div class="card-grid">
+  {% if submodules.emision %}
+  <div class="info-card">
+    <h3>Emision</h3>
+    <p>Factura formal separada de prefacturas, con carga desde prefacturas activas.</p>
+    <a href="{% url 'factura:emision' %}">Abrir emision</a>
+  </div>
+  {% endif %}
+  {% if submodules.electronica %}
+  <div class="info-card">
+    <h3>Facturacion Electronica</h3>
+    <p>Configuracion DGII, secuencias e-CF y seguimiento documental.</p>
+    <a href="{% url 'factura:electronica' %}">Abrir facturacion electronica</a>
+  </div>
+  {% endif %}
+  {% if submodules.documentos %}
+  <div class="info-card">
+    <h3>Documentos</h3>
+    <p>Base lista para construir emision de facturas en este modulo.</p>
+    <a href="{% url 'factura:electronica' %}">Ver documentos preparados</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

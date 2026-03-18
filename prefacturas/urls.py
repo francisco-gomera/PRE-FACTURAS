@@ -29,6 +29,7 @@ urlpatterns = [
     path('app/ajustes/', include('ajustes.urls')),
     path('app/cobros/', include('cobros.urls')),
     path('app/cartas/', include('cartas.urls')),
+    path('app/factura/', include('factura.urls')),
 ]
 
 if settings.DEBUG:

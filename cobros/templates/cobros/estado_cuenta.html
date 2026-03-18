@@ -1,0 +1,488 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <h2 class="page-title">Estado de Cuenta</h2>
+    <p class="page-subtitle">Consulta e imprime el estado de cuenta de un cliente desde el módulo de cobros.</p>
+  </div>
+
+  <div class="estado-layout">
+    <div class="estado-form-container">
+      <div class="info-card">
+        <h3>Cliente</h3>
+
+        <div class="form-row">
+          <label for="cobro_cliente_id">Cliente</label>
+          <div class="inline-input">
+            <input id="cobro_cliente_id" type="text" readonly placeholder="Ninguno" />
+            <button id="btn_cobro_buscar_cliente" type="button" class="btn-small">Buscar</button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="cobro_cliente_nombre">Nombre</label>
+          <input id="cobro_cliente_nombre" type="text" readonly />
+        </div>
+
+        <div class="form-row">
+          <label for="cobro_cliente_rnc">Cédula/RNC</label>
+          <input id="cobro_cliente_rnc" type="text" readonly />
+        </div>
+
+        <div class="form-row">
+          <label for="cobro_cliente_dir">Dirección</label>
+          <input id="cobro_cliente_dir" type="text" readonly />
+        </div>
+
+        <div class="form-row">
+          <label for="cobro_cliente_tel">Teléfono</label>
+          <input id="cobro_cliente_tel" type="text" readonly />
+        </div>
+
+        <div class="actions-row">
+          <button id="btn_cobro_abrir" type="button">Abrir en ventana</button>
+          <button id="btn_cobro_imprimir" type="button">Imprimir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <div class="preview-card">
+        <iframe id="estado_cuenta_frame" title="Vista previa de estado de cuenta"></iframe>
+        <div id="estado_cuenta_empty" class="result-empty">Selecciona un cliente para visualizar su estado de cuenta.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cobro_cliente_modal" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cobro_modal_title">
+    <div class="win-titlebar">
+      <span id="cobro_modal_title">Seleccionar cliente</span>
+      <button id="btn_close_cobro_modal" type="button" aria-label="Cerrar">X</button>
+    </div>
+    <div class="win-body">
+      <div class="search-row">
+        <label for="cobro_search_input">Buscar</label>
+        <input id="cobro_search_input" type="text" placeholder="Código, Nombre, Apodo o Cédula/RNC" />
+        <select id="cobro_search_filter">
+          <option value="nombre" selected>Nombre</option>
+          <option value="codigo">Código (ID_SN)</option>
+          <option value="apodo">Apodo</option>
+          <option value="rnc">Cédula/RNC</option>
+        </select>
+        <button id="btn_cobro_search" type="button" class="btn-small">Buscar</button>
+      </div>
+      <div class="search-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Cédula/RNC</th>
+              <th>Apodo</th>
+            </tr>
+          </thead>
+          <tbody id="cobro_results_body">
+            <tr><td colspan="4" class="result-empty">Ingrese un texto y pulse Buscar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --page-bg: #f0f4f8;
+    --card-bg: #ffffff;
+    --border-color: #d8e2f3;
+    --text-color: #334e68;
+    --text-light: #627d98;
+    --primary-color: #2a67c7;
+    --primary-dark: #1f5aad;
+    --white: #ffffff;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --border-radius: 12px;
+  }
+
+  .page-container {
+    padding: 16px;
+  }
+
+  .page-header {
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    color: var(--text-color);
+  }
+
+  .page-subtitle {
+    color: var(--text-light);
+  }
+
+  .estado-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .info-card,
+  .preview-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .info-card h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--text-color);
+    font-size: 18px;
+  }
+
+  .form-row {
+    margin-bottom: 12px;
+  }
+
+  .form-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+
+  .form-row input,
+  .search-row input,
+  .search-row select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+
+  .form-row input[readonly] {
+    background-color: #e9ecef;
+    opacity: 1;
+  }
+
+  .inline-input {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .actions-row {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .actions-row button,
+  .btn-small {
+    min-height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary-color);
+    color: var(--white);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .actions-row button {
+    flex: 1 1 0;
+  }
+
+  .btn-small {
+    padding: 0 14px;
+  }
+
+  .preview-card {
+    position: relative;
+    min-height: 760px;
+    padding: 0;
+    overflow: hidden;
+    background: #edf2f8;
+  }
+
+  #estado_cuenta_frame {
+    width: 100%;
+    min-height: 760px;
+    border: none;
+    display: none;
+    background: #fff;
+  }
+
+  .result-empty {
+    padding: 28px;
+    color: var(--text-light);
+    font-style: italic;
+    text-align: center;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1400;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .win-modal {
+    width: min(980px, 94vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: 0 18px 40px rgba(10, 45, 110, 0.2);
+  }
+
+  .win-titlebar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--primary-color);
+    color: var(--white);
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+  }
+
+  .win-titlebar button {
+    background: transparent;
+    border: none;
+    color: var(--white);
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .win-body {
+    padding: 16px;
+    overflow: auto;
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .search-grid {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    height: 400px;
+    display: block;
+    overflow-y: auto;
+  }
+
+  .search-grid table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .search-grid th,
+  .search-grid td {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .search-grid th {
+    background: #f8f9fa;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+
+  .search-grid tr.click-row {
+    cursor: pointer;
+  }
+
+  .search-grid tr.click-row:hover {
+    background: #f0f5ff;
+  }
+
+  @media (min-width: 992px) {
+    .estado-layout {
+      grid-template-columns: 360px 1fr;
+    }
+
+    .estado-form-container {
+      position: sticky;
+      top: 20px;
+    }
+  }
+</style>
+
+<script>
+  const cobroClienteId = document.getElementById("cobro_cliente_id");
+  const cobroClienteNombre = document.getElementById("cobro_cliente_nombre");
+  const cobroClienteRnc = document.getElementById("cobro_cliente_rnc");
+  const cobroClienteDir = document.getElementById("cobro_cliente_dir");
+  const cobroClienteTel = document.getElementById("cobro_cliente_tel");
+  const btnCobroBuscarCliente = document.getElementById("btn_cobro_buscar_cliente");
+  const btnCobroAbrir = document.getElementById("btn_cobro_abrir");
+  const btnCobroImprimir = document.getElementById("btn_cobro_imprimir");
+  const cobroModal = document.getElementById("cobro_cliente_modal");
+  const btnCloseCobroModal = document.getElementById("btn_close_cobro_modal");
+  const cobroSearchInput = document.getElementById("cobro_search_input");
+  const cobroSearchFilter = document.getElementById("cobro_search_filter");
+  const btnCobroSearch = document.getElementById("btn_cobro_search");
+  const cobroResultsBody = document.getElementById("cobro_results_body");
+  const estadoCuentaFrame = document.getElementById("estado_cuenta_frame");
+  const estadoCuentaEmpty = document.getElementById("estado_cuenta_empty");
+  const estadoCuentaUrl = "{% url 'cobros:estado_cuenta_impresion' %}";
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll("\"", "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function openCobroModal() {
+    cobroModal.classList.add("open");
+    cobroModal.setAttribute("aria-hidden", "false");
+    cobroSearchInput.focus();
+  }
+
+  function closeCobroModal() {
+    cobroModal.classList.remove("open");
+    cobroModal.setAttribute("aria-hidden", "true");
+  }
+
+  function buildEstadoCuentaUrl(idSn) {
+    return `${estadoCuentaUrl}?id_sn=${encodeURIComponent(idSn || "")}`;
+  }
+
+  function buildEstadoCuentaEmbedUrl(idSn) {
+    return `${buildEstadoCuentaUrl(idSn)}&embed=1`;
+  }
+
+  function showPreview(url) {
+    if (!url) {
+      estadoCuentaFrame.style.display = "none";
+      estadoCuentaFrame.removeAttribute("src");
+      estadoCuentaEmpty.style.display = "block";
+      return;
+    }
+    estadoCuentaFrame.src = url;
+    estadoCuentaFrame.style.display = "block";
+    estadoCuentaEmpty.style.display = "none";
+  }
+
+  function renderCobroResults(rows) {
+    if (!rows.length) {
+      cobroResultsBody.innerHTML = '<tr><td colspan="4" class="result-empty">No se encontraron clientes.</td></tr>';
+      return;
+    }
+    cobroResultsBody.innerHTML = rows.map((row) => {
+      const safeJson = encodeURIComponent(JSON.stringify(row));
+      return `
+        <tr class="click-row" data-row="${safeJson}">
+          <td>${escapeHtml(row.id_sn || "")}</td>
+          <td>${escapeHtml(row.nom_socio || "")}</td>
+          <td>${escapeHtml(row.rnc_ced || "")}</td>
+          <td>${escapeHtml(row.contacto || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    cobroResultsBody.querySelectorAll("tr.click-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const raw = row.getAttribute("data-row");
+        if (!raw) return;
+        try {
+          const data = JSON.parse(decodeURIComponent(raw));
+          cobroClienteId.value = data.id_sn || "";
+          cobroClienteNombre.value = data.nom_socio || "";
+          cobroClienteRnc.value = data.rnc_ced || "";
+          cobroClienteDir.value = data.dir_factura || "";
+          cobroClienteTel.value = data.tel1 || "";
+          closeCobroModal();
+          showPreview(buildEstadoCuentaEmbedUrl(data.id_sn));
+        } catch (error) {
+          // no-op
+        }
+      });
+    });
+  }
+
+  async function buscarCobroClientes() {
+    const q = (cobroSearchInput.value || "").trim();
+    const filtro = (cobroSearchFilter.value || "nombre").trim().toLowerCase();
+    const url = `/clientes/buscar/?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`;
+    cobroResultsBody.innerHTML = '<tr><td colspan="4" class="result-empty">Buscando...</td></tr>';
+    try {
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) {
+        cobroResultsBody.innerHTML = '<tr><td colspan="4" class="result-empty">No se pudo consultar clientes.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      renderCobroResults(Array.isArray(data.results) ? data.results : []);
+    } catch (error) {
+      cobroResultsBody.innerHTML = '<tr><td colspan="4" class="result-empty">Error de conexión.</td></tr>';
+    }
+  }
+
+  btnCobroBuscarCliente?.addEventListener("click", openCobroModal);
+  btnCloseCobroModal?.addEventListener("click", closeCobroModal);
+  cobroModal?.addEventListener("click", (event) => {
+    if (event.target === cobroModal) closeCobroModal();
+  });
+  btnCobroSearch?.addEventListener("click", buscarCobroClientes);
+  cobroSearchInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      buscarCobroClientes();
+    }
+    if (event.key === "Escape") {
+      closeCobroModal();
+    }
+  });
+  btnCobroAbrir?.addEventListener("click", () => {
+    if (!cobroClienteId.value) {
+      window.alert("Selecciona un cliente primero.");
+      return;
+    }
+    window.open(buildEstadoCuentaUrl(cobroClienteId.value), "_blank");
+  });
+  btnCobroImprimir?.addEventListener("click", () => {
+    if (!cobroClienteId.value) {
+      window.alert("Selecciona un cliente primero.");
+      return;
+    }
+    if (estadoCuentaFrame && estadoCuentaFrame.contentWindow) {
+      estadoCuentaFrame.contentWindow.focus();
+      estadoCuentaFrame.contentWindow.print();
+      return;
+    }
+    window.open(buildEstadoCuentaUrl(cobroClienteId.value), "_blank");
+  });
+</script>
+{% endblock %}

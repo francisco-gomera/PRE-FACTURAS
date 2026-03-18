@@ -2,12 +2,15 @@ import base64
 from datetime import datetime
 
 from django.db import connection
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .models import CartaPlantilla
 from ajustes.permissions import has_perm
+from ajustes.user_signatures import get_user_signature_bytes
 from core.views import _base_context, render_denied
 
 
@@ -80,14 +83,9 @@ def _load_cliente_carta(id_sn):
 def _load_firma_b64(usuario_id):
     firma_b64 = ""
     try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT FIRMA FROM USUARIO WHERE ID_USUARIO = %s",
-                [int(usuario_id)],
-            )
-            row_firma = cursor.fetchone()
-            if row_firma and row_firma[0]:
-                firma_b64 = base64.b64encode(row_firma[0]).decode("ascii")
+        firma_bytes = get_user_signature_bytes(usuario_id)
+        if firma_bytes:
+            firma_b64 = base64.b64encode(firma_bytes).decode("ascii")
     except Exception:
         firma_b64 = ""
     return firma_b64
@@ -106,6 +104,14 @@ def _build_empresa_payload(ctx):
         "logo_tipo": empresa.get("logo_tipo", ""),
         "sello_b64": empresa.get("sello_b64", ""),
     }
+
+
+def _load_plantillas_activas():
+    return list(
+        CartaPlantilla.objects.filter(activa=True)
+        .order_by("nombre")
+        .values("id_plantilla", "nombre", "asunto", "cuerpo")
+    )
 
 
 def index(request):
@@ -128,10 +134,8 @@ def saldo_view(request):
         return redirect("login")
     if not has_perm(ctx["auth_payload"]["usuario_id"], "cartas", "ver_cartas_saldo"):
         return render_denied(request, active_nav="cartas")
+    ctx["plantillas_activas"] = _load_plantillas_activas()
     return render(request, "cartas/saldo.html", ctx)
-
-
-from .models import CartaPlantilla
 
 
 def aviso_view(request):
@@ -140,6 +144,7 @@ def aviso_view(request):
         return redirect("login")
     if not has_perm(ctx["auth_payload"]["usuario_id"], "cartas", "ver_cartas_aviso"):
         return render_denied(request, active_nav="cartas")
+    ctx["plantillas_activas"] = _load_plantillas_activas()
     return render(request, "cartas/aviso.html", ctx)
 
 
@@ -150,8 +155,101 @@ def plantillas_view(request):
     if not has_perm(ctx["auth_payload"]["usuario_id"], "cartas", "ver_plantillas"):
         return render_denied(request, active_nav="cartas")
 
-    plantillas = CartaPlantilla.objects.all()
+    usuario_id = ctx["auth_payload"]["usuario_id"]
+    q = (request.GET.get("q") or "").strip()
+    edit_id = (request.GET.get("edit") or "").strip()
+    status = (request.GET.get("status") or "").strip().lower()
+    selected = None
+    error_message = ""
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "save").strip().lower()
+        plantilla_id = (request.POST.get("id_plantilla") or "").strip()
+
+        if action == "toggle" and plantilla_id:
+            plantilla = CartaPlantilla.objects.filter(id_plantilla=plantilla_id).first()
+            if not plantilla:
+                return redirect("cartas:plantillas")
+            plantilla.activa = not bool(plantilla.activa)
+            plantilla.save(update_fields=["activa", "fecha_modificacion"])
+            return redirect("cartas:plantillas")
+
+        nombre = (request.POST.get("nombre") or "").strip()
+        asunto = (request.POST.get("asunto") or "").strip()
+        cuerpo = (request.POST.get("cuerpo") or "").strip()
+        activa = (request.POST.get("activa") or "").strip() == "1"
+
+        if not nombre:
+            error_message = "El nombre es obligatorio."
+        elif not asunto:
+            error_message = "El asunto es obligatorio."
+        elif not cuerpo:
+            error_message = "El cuerpo es obligatorio."
+        else:
+            duplicate_qs = CartaPlantilla.objects.filter(nombre__iexact=nombre)
+            if plantilla_id:
+                duplicate_qs = duplicate_qs.exclude(id_plantilla=plantilla_id)
+            if duplicate_qs.exists():
+                error_message = "Ya existe una plantilla con ese nombre."
+
+        if not error_message:
+            if plantilla_id:
+                plantilla = CartaPlantilla.objects.filter(id_plantilla=plantilla_id).first()
+                if not plantilla:
+                    error_message = "La plantilla seleccionada no existe."
+                else:
+                    plantilla.nombre = nombre
+                    plantilla.asunto = asunto
+                    plantilla.cuerpo = cuerpo
+                    plantilla.activa = activa
+                    plantilla.save()
+                    return redirect("cartas:plantillas")
+            else:
+                CartaPlantilla.objects.create(
+                    nombre=nombre,
+                    asunto=asunto,
+                    cuerpo=cuerpo,
+                    activa=activa,
+                    creado_por_id=int(usuario_id),
+                )
+                return redirect(f"{reverse('cartas:plantillas')}?status=created")
+
+        selected = {
+            "id_plantilla": plantilla_id,
+            "nombre": nombre,
+            "asunto": asunto,
+            "cuerpo": cuerpo,
+            "activa": activa,
+        }
+    elif edit_id:
+        selected = CartaPlantilla.objects.filter(id_plantilla=edit_id).first()
+
+    plantillas = CartaPlantilla.objects.all().order_by("-activa", "nombre")
+    if q:
+        plantillas = plantillas.filter(Q(nombre__icontains=q) | Q(asunto__icontains=q) | Q(cuerpo__icontains=q))
+
     ctx["plantillas"] = plantillas
+    ctx["selected_plantilla"] = selected
+    ctx["plantilla_query"] = q
+    ctx["plantilla_status"] = status
+    ctx["plantilla_error"] = error_message
+    ctx["placeholders"] = [
+        "{{cliente_nombre}}",
+        "{{cliente_rnc}}",
+        "{{cliente_direccion}}",
+        "{{cliente_ciudad}}",
+        "{{cliente_telefono}}",
+        "{{cliente_sector}}",
+        "{{fecha}}",
+        "{{hora}}",
+        "{{empresa_nombre}}",
+        "{{ciudad_impresion}}",
+        "{{carta_titulo}}",
+        "{{saldo_total}}",
+        "{{facturas_count}}",
+        "{{balance_atraso}}",
+        "{{total_mora}}",
+    ]
     return render(request, "cartas/plantillas.html", ctx)
 
 

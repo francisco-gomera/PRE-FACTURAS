@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Factura {{ factura.id_doc }}</title>
+    <style>
+        :root {
+            --ink: #1d1d1d;
+            --muted: #6a6a6a;
+            --line: #bfc7d6;
+            --blue: #153d8a;
+            --soft: #eef4ff;
+            --danger: #a32020;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #eceff4;
+            color: var(--ink);
+            font-family: "Bahnschrift", "Segoe UI", sans-serif;
+        }
+        .toolbar {
+            max-width: 210mm;
+            margin: 10px auto 0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 0 8px;
+        }
+        .toolbar button {
+            border: 1px solid #6b6b6b;
+            background: linear-gradient(#ffffff, #d9d9d9);
+            border-radius: 6px;
+            height: 32px;
+            min-width: 110px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 8px auto 24px;
+            background: #fff;
+            border: 1px solid #c6ccd7;
+            padding: 10mm 10mm 12mm;
+        }
+        .header {
+            display: grid;
+            grid-template-columns: 1.4fr .9fr;
+            gap: 14px;
+            align-items: start;
+            border-bottom: 2px solid #cad4e8;
+            padding-bottom: 10px;
+        }
+        .brand h1 {
+            margin: 0;
+            font-size: 30px;
+            letter-spacing: .5px;
+            color: var(--blue);
+        }
+        .brand .meta {
+            margin-top: 6px;
+            line-height: 1.45;
+            font-size: 13px;
+        }
+        .doc-box {
+            border: 2px solid var(--blue);
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        }
+        .doc-title {
+            margin: 0;
+            text-align: center;
+            font-size: 20px;
+            color: var(--blue);
+            font-weight: 800;
+            letter-spacing: 1.2px;
+        }
+        .doc-meta {
+            margin-top: 10px;
+            display: grid;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .label {
+            color: var(--muted);
+            font-weight: 700;
+        }
+        .section {
+            margin-top: 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .section-head {
+            background: var(--soft);
+            color: var(--blue);
+            font-weight: 800;
+            padding: 8px 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+        }
+        .section-body {
+            padding: 10px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 18px;
+            font-size: 13px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #d8e0ee;
+            padding: 7px 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #f6f9ff;
+            color: #38537c;
+            font-size: 11px;
+        }
+        .align-r { text-align: right; }
+        .totals {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr 290px;
+            gap: 12px;
+            align-items: start;
+        }
+        .notes {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px;
+            min-height: 96px;
+            font-size: 12px;
+        }
+        .totals-box {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .totals-box table td {
+            font-size: 13px;
+        }
+        .totals-box .grand td {
+            font-weight: 800;
+            color: var(--blue);
+            font-size: 14px;
+            background: #f3f7ff;
+        }
+        .footer {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr 180px;
+            gap: 12px;
+            align-items: start;
+        }
+        .ri-box {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px;
+            font-size: 12px;
+        }
+        .ri-box h4 {
+            margin: 0 0 8px;
+            color: var(--blue);
+            font-size: 14px;
+        }
+        .qr-box {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            font-size: 11px;
+        }
+        .qr-box img {
+            width: 140px;
+            height: 140px;
+            object-fit: contain;
+            border: 1px solid #d5dcea;
+            padding: 4px;
+            background: #fff;
+        }
+        .danger { color: var(--danger); font-weight: 700; }
+        .mono { font-family: Consolas, "Courier New", monospace; }
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .page {
+                width: auto;
+                min-height: auto;
+                margin: 0;
+                border: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button type="button" onclick="window.print()">Imprimir</button>
+        <button type="button" onclick="window.close()">Cerrar</button>
+    </div>
+
+    <main class="page">
+        <header class="header">
+            <section class="brand">
+                <h1>{{ empresa.nombre|default:"EMPRESA" }}</h1>
+                <div class="meta">
+                    <div><span class="label">RNC:</span>{{ empresa.rnc|default:"-" }}</div>
+                    <div><span class="label">Direccion:</span>{{ empresa.direccion|default:"-" }}</div>
+                    <div><span class="label">Telefonos:</span>{{ empresa.tel1|default:"-" }} {% if empresa.tel2 %}/ {{ empresa.tel2 }}{% endif %}</div>
+                    <div><span class="label">Email:</span>{{ empresa.email|default:"-" }}</div>
+                </div>
+            </section>
+            <section class="doc-box">
+                <h2 class="doc-title">{{ doc_label }}</h2>
+                <div class="doc-meta">
+                    <div><span class="label">{{ doc_numero_label }}:</span><strong>{{ factura.id_doc }}</strong></div>
+                    <div><span class="label">Tipo:</span>{{ factura.tipo|default:"Factura Electronica" }}</div>
+                    <div><span class="label">e-NCF:</span><span class="mono">{{ factura.encf|default:"Pendiente" }}</span></div>
+                    <div><span class="label">Fecha emision:</span>{{ factura.fecha_doc|date:"d/m/Y" }}</div>
+                    <div><span class="label">Estado e-CF:</span>{{ estado_ecf|default:"Pendiente" }}</div>
+                    {% if factura.cancelado %}
+                    <div><span class="label">Cancelacion:</span><span class="danger">Cancelada con NC {{ factura.ncf_nc|default:"-" }}</span></div>
+                    {% endif %}
+                </div>
+            </section>
+        </header>
+
+        <section class="section">
+            <div class="section-head">Datos del Comprador</div>
+            <div class="section-body grid-2">
+                <div><span class="label">Cliente:</span>{{ factura.nom_socio|default:"-" }}</div>
+                <div><span class="label">Codigo:</span>{{ factura.id_sn|default:"-" }}</div>
+                <div><span class="label">RNC/Cedula:</span>{{ factura.rnc_ced|default:"-" }}</div>
+                <div><span class="label">Contacto:</span>{{ factura.contacto|default:"-" }}</div>
+                <div><span class="label">Direccion facturacion:</span>{{ factura.ent_factura|default:"-" }}</div>
+                <div><span class="label">Direccion entrega:</span>{{ factura.ent_mercancia|default:"-" }}</div>
+                <div><span class="label">Condicion:</span>{{ factura.condicion|default:"-" }}</div>
+                <div><span class="label">Vence:</span>{{ factura.fecha_venc|date:"d/m/Y" }}</div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-head">{{ detalle_label }}</div>
+            <div class="section-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">No.</th>
+                            <th style="width:100px;">Articulo</th>
+                            <th>Descripcion</th>
+                            <th style="width:70px;" class="align-r">Cantidad</th>
+                            <th style="width:55px;">U/M</th>
+                            <th style="width:88px;" class="align-r">Precio</th>
+                            <th style="width:70px;" class="align-r">% Desc.</th>
+                            <th style="width:85px;" class="align-r">ITBIS</th>
+                            <th style="width:95px;" class="align-r">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in detalles %}
+                        <tr>
+                            <td>{{ item.linea }}</td>
+                            <td>{{ item.id_articulo }}</td>
+                            <td>{{ item.descrip_art }}</td>
+                            <td class="align-r">{{ item.cantidad|floatformat:2 }}</td>
+                            <td>{{ item.medida }}</td>
+                            <td class="align-r">{{ item.precio|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.porc_desc|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.total_itbis|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.total_linea|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" style="text-align:center; color:#6a6a6a;">No hay detalle disponible.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="totals">
+                    <div class="notes">
+                        <div><span class="label">Prefactura origen:</span>{{ factura.id_doc_pv|default:"-" }}</div>
+                        <div style="margin-top:8px;"><span class="label">Comentario:</span></div>
+                        <div>{{ factura.comentario|default:"Sin comentario." }}</div>
+                        {% if factura.ncf_nc %}
+                        <div style="margin-top:8px;"><span class="label">NC relacionada:</span>{{ factura.ncf_nc }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="totals-box">
+                        <table>
+                            <tbody>
+                                <tr>
+                                    <td>Subtotal</td>
+                                    <td class="align-r">{{ factura.subtotal|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Descuento</td>
+                                    <td class="align-r">{{ factura.total_desc|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>ITBIS</td>
+                                    <td class="align-r">{{ factura.total_itbis|floatformat:2 }}</td>
+                                </tr>
+                                <tr class="grand">
+                                    <td>Total</td>
+                                    <td class="align-r">{{ factura.total_doc|floatformat:2 }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <section class="ri-box">
+                <h4>Representacion Impresa e-CF</h4>
+                <div><span class="label">Codigo de seguridad:</span>
+                    {% if codigo_seguridad %}
+                    <span class="mono">{{ codigo_seguridad }}</span>
+                    {% else %}
+                    <span class="danger">Pendiente de firma / envio DGII</span>
+                    {% endif %}
+                </div>
+                <div style="margin-top:6px;"><span class="label">Consulta QR:</span>
+                    {% if qr_target_url %}
+                    <span class="mono">{{ qr_target_url }}</span>
+                    {% else %}
+                    <span class="danger">Se mostrara cuando el e-CF tenga codigo de seguridad y consulta habilitada.</span>
+                    {% endif %}
+                </div>
+                <div style="margin-top:6px;"><span class="label">Fecha impresion:</span>{{ fecha_impresion|date:"d/m/Y H:i" }}</div>
+                <div style="margin-top:8px; color:#5f6d84;">
+                    Formato preparado para RI de la DGII. Cuando se complete firma y envio, esta impresion reflejara QR y codigo de seguridad definitivos.
+                </div>
+            </section>
+            <section class="qr-box">
+                {% if qr_image_url %}
+                <img src="{{ qr_image_url }}" alt="QR de consulta DGII" />
+                <div style="margin-top:8px;">Escanea para validar el e-CF</div>
+                {% else %}
+                <div style="height:140px; display:flex; align-items:center; justify-content:center; border:1px dashed #c7d0e0; border-radius:8px; color:#7c879c;">
+                    QR pendiente
+                </div>
+                <div style="margin-top:8px;">Disponible al completar los datos DGII</div>
+                {% endif %}
+            </section>
+        </footer>
+    </main>
+</body>
+</html>

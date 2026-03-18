@@ -34,6 +34,15 @@
           <label for="saldo_ciudad">Ciudad</label>
           <input id="saldo_ciudad" type="text" value="" />
         </div>
+        <div class="form-row">
+          <label for="saldo_plantilla">Plantilla</label>
+          <select id="saldo_plantilla">
+            <option value="">Formato predeterminado</option>
+            {% for plantilla in plantillas_activas %}
+            <option value="{{ plantilla.id_plantilla }}">{{ plantilla.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <div class="actions-row">
           <button id="btn_saldo_imprimir_todas" type="button">Imprimir Todas</button>
           <button id="btn_saldo_imprimir_una" type="button">Imprimir Seleccionada</button>
@@ -72,6 +81,7 @@
     </div>
   </div>
 </div>
+{{ plantillas_activas|json_script:"saldo_plantillas_data" }}
 
 <div id="saldo_cliente_modal" class="modal-backdrop" aria-hidden="true">
   <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="saldo_modal_title">
@@ -179,13 +189,22 @@
     color: var(--text-light);
   }
 
-  .form-row input[type="text"] {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #ced4da;
-    border-radius: 8px;
-    font-size: 14px;
-  }
+	  .form-row input[type="text"] {
+	    width: 100%;
+	    padding: 8px 10px;
+	    border: 1px solid #ced4da;
+	    border-radius: 8px;
+	    font-size: 14px;
+	  }
+
+	  .form-row select {
+	    width: 100%;
+	    padding: 8px 10px;
+	    border: 1px solid #ced4da;
+	    border-radius: 8px;
+	    font-size: 14px;
+	    background: #fff;
+	  }
 
   .form-row input[readonly] {
     background-color: #e9ecef;
@@ -645,6 +664,7 @@
 	  const saldoClienteRnc = document.getElementById("saldo_cliente_rnc");
 	  const saldoClienteDir = document.getElementById("saldo_cliente_dir");
 	  const saldoCiudad = document.getElementById("saldo_ciudad");
+	  const saldoPlantilla = document.getElementById("saldo_plantilla");
 	  const saldoPreview = document.getElementById("saldo_preview");
 	  const btnSaldoBuscarCliente = document.getElementById("btn_saldo_buscar_cliente");
 	  const btnSaldoImprimirTodas = document.getElementById("btn_saldo_imprimir_todas");
@@ -659,6 +679,7 @@
 	  const btnSaldoSearch = document.getElementById("btn_saldo_search");
 	  const saldoResultsBody = document.getElementById("saldo_results_body");
 	  const saldoDetalleUrl = "{% url 'cartas:saldo_detalle' %}";
+	  const saldoPlantillas = JSON.parse(document.getElementById("saldo_plantillas_data")?.textContent || "[]");
 	  let saldoData = null;
 	  let selectedDocId = "";
 
@@ -669,6 +690,61 @@
       .replaceAll(">", "&gt;")
       .replaceAll("\"", "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function getSelectedSaldoPlantilla() {
+    const currentId = String((saldoPlantilla && saldoPlantilla.value) || "");
+    return saldoPlantillas.find((p) => String(p.id_plantilla) === currentId) || null;
+  }
+
+  function renderTemplateText(templateText, vars) {
+    let safe = escapeHtml(templateText || "");
+    Object.entries(vars || {}).forEach(([key, rawValue]) => {
+      const token = "{" + "{" + String(key) + "}" + "}";
+      safe = safe.replaceAll(token, escapeHtml(String(rawValue ?? "")));
+    });
+    return safe.replace(/\r?\n/g, "<br/>");
+  }
+
+  function buildSaldoTemplateVars(data, facturas) {
+    const cliente = (data && data.cliente) || {};
+    const empresa = (data && data.empresa) || {};
+    const docs = Array.isArray(facturas) ? facturas : [];
+    const saldoTotal = docs.reduce((acc, item) => acc + Number(item.saldo || 0), 0);
+    return {
+      cliente_nombre: cliente.nombre || "",
+      cliente_rnc: cliente.rnc_ced || "",
+      cliente_direccion: cliente.direccion || "",
+      cliente_ciudad: (saldoCiudad && saldoCiudad.value) || "",
+      cliente_telefono: cliente.telefono || "",
+      cliente_sector: cliente.sector || "",
+      fecha: data?.fecha || "",
+      hora: data?.hora || "",
+      empresa_nombre: empresa.nombre || empresaNombre,
+      ciudad_impresion: (saldoCiudad && saldoCiudad.value) || "",
+      carta_titulo: "CARTA DE SALDO",
+      saldo_total: saldoTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      facturas_count: docs.length,
+    };
+  }
+
+  function renderSaldoBody(data, facturas) {
+    const plantilla = getSelectedSaldoPlantilla();
+    if (!plantilla || !String(plantilla.cuerpo || "").trim()) {
+      return `
+        <p>Estimado Sr(a),</p>
+        <p>Por medio de la presente certificamos que en los archivos de nuestra empresa no existen deudas pendientes para los siguientes contratos de ventas:</p>
+      `;
+    }
+    const vars = buildSaldoTemplateVars(data, facturas);
+    const asunto = String(plantilla.asunto || "").trim();
+    const asuntoHtml = asunto
+      ? `<p><strong>Asunto:</strong> ${renderTemplateText(asunto, vars)}</p>`
+      : "";
+    return `
+      ${asuntoHtml}
+      <p>${renderTemplateText(plantilla.cuerpo || "", vars)}</p>
+    `;
   }
 
   function openSaldoModal() {
@@ -827,8 +903,7 @@
             Teléfono: <strong>${escapeHtml(cliente.telefono || "")}</strong>
           </div>
           
-          <p>Estimado Sr(a),</p>
-          <p>Por medio de la presente certificamos que en los archivos de nuestra empresa no existen deudas pendientes para los siguientes contratos de ventas:</p>
+          ${renderSaldoBody(data, facturas)}
           
           <table class="carta-table">
             <thead>
@@ -1001,6 +1076,13 @@
     }
     renderSaldoPreview(saldoData, getFacturasForPreview(saldoData));
     doPrint();
+  });
+
+  saldoPlantilla?.addEventListener("change", () => {
+    if (saldoData) renderSaldoPreview(saldoData, getFacturasForPreview(saldoData));
+  });
+  saldoCiudad?.addEventListener("input", () => {
+    if (saldoData) renderSaldoPreview(saldoData, getFacturasForPreview(saldoData));
   });
 
   window.addEventListener("resize", updateCartaScale);

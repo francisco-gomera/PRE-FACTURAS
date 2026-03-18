@@ -144,10 +144,12 @@
     </style>
 </head>
 <body>
+    {% if not embed %}
     <div class="toolbar">
         <button type="button" onclick="window.print()">Imprimir</button>
         <button type="button" onclick="window.close()">Cerrar</button>
     </div>
+    {% endif %}
 
     <main class="page">
         <header class="header">

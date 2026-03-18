@@ -54,6 +54,11 @@
           Cartas <span>Avisos</span>
         </a>
         {% endif %}
+        {% if visible_modules.factura %}
+        <a href="{% url 'factura:index' %}" class="{% if active_nav == 'factura' %}active{% endif %}">
+          Factura <span>e-CF</span>
+        </a>
+        {% endif %}
         {% if visible_modules.ajustes %}
         <a href="{% url 'ajustes:index' %}" class="{% if active_nav == 'ajustes' %}active{% endif %}">
           Ajustes <span>Parametros</span>

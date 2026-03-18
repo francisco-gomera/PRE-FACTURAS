@@ -1,0 +1,236 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <h2 class="page-title">Alertas de Cobro</h2>
+    <p class="page-subtitle">Lista clientes con pagos vencidos dentro de un rango de días y organiza el resultado por sector.</p>
+  </div>
+
+  <div class="alertas-layout">
+    <div class="alertas-form-container">
+      <div class="info-card">
+        <h3>Filtro de vencimiento</h3>
+
+        <div class="form-row">
+          <label for="alertas_dias_desde">Días desde</label>
+          <input id="alertas_dias_desde" type="number" min="0" step="1" value="{{ dias_desde_default|default:30 }}" />
+        </div>
+
+        <div class="form-row">
+          <label for="alertas_dias_hasta">Días hasta</label>
+          <input id="alertas_dias_hasta" type="number" min="0" step="1" value="{{ dias_hasta_default }}" placeholder="Sin límite" />
+        </div>
+
+        <div class="form-row">
+          <label for="alertas_sector">Sector</label>
+          <select id="alertas_sector">
+            <option value="">Todos los sectores</option>
+            {% for sector in sectores %}
+            <option value="{{ sector.id_codigo }}" {% if sector_default == sector.id_codigo %}selected{% endif %}>{{ sector.descripcion }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="actions-row">
+          <button id="btn_alertas_ver" type="button">Ver listado</button>
+          <button id="btn_alertas_abrir" type="button">Abrir en ventana</button>
+          <button id="btn_alertas_imprimir" type="button">Imprimir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <div class="preview-card">
+        <iframe id="alertas_frame" title="Vista previa de alertas"></iframe>
+        <div id="alertas_empty" class="result-empty">Ingresa el rango de días y pulsa “Ver listado” para generar las alertas.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --page-bg: #f0f4f8;
+    --card-bg: #ffffff;
+    --border-color: #d8e2f3;
+    --text-color: #334e68;
+    --text-light: #627d98;
+    --primary-color: #2a67c7;
+    --white: #ffffff;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --border-radius: 12px;
+  }
+
+  .page-container {
+    padding: 16px;
+  }
+
+  .page-header {
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    color: var(--text-color);
+  }
+
+  .page-subtitle {
+    color: var(--text-light);
+  }
+
+  .alertas-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .info-card,
+  .preview-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .info-card h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--text-color);
+    font-size: 18px;
+  }
+
+  .form-row {
+    margin-bottom: 12px;
+  }
+
+  .form-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+
+  .form-row input,
+  .form-row select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+
+  .actions-row {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .actions-row button {
+    flex: 1 1 0;
+    min-height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary-color);
+    color: var(--white);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .preview-card {
+    position: relative;
+    min-height: 760px;
+    padding: 0;
+    overflow: hidden;
+    background: #edf2f8;
+  }
+
+  #alertas_frame {
+    width: 100%;
+    min-height: 760px;
+    border: none;
+    display: none;
+    background: #fff;
+  }
+
+  .result-empty {
+    padding: 28px;
+    color: var(--text-light);
+    font-style: italic;
+    text-align: center;
+  }
+
+  @media (min-width: 992px) {
+    .alertas-layout {
+      grid-template-columns: 320px 1fr;
+    }
+
+    .alertas-form-container {
+      position: sticky;
+      top: 20px;
+    }
+  }
+</style>
+
+<script>
+  const alertasDiasDesde = document.getElementById("alertas_dias_desde");
+  const alertasDiasHasta = document.getElementById("alertas_dias_hasta");
+  const alertasSector = document.getElementById("alertas_sector");
+  const btnAlertasVer = document.getElementById("btn_alertas_ver");
+  const btnAlertasAbrir = document.getElementById("btn_alertas_abrir");
+  const btnAlertasImprimir = document.getElementById("btn_alertas_imprimir");
+  const alertasFrame = document.getElementById("alertas_frame");
+  const alertasEmpty = document.getElementById("alertas_empty");
+  const alertasUrl = "{% url 'cobros:alertas_impresion' %}";
+
+  function getDiasValue(inputEl, fallbackValue = 0) {
+    const raw = (inputEl?.value || "").trim();
+    if (!raw) return fallbackValue;
+    const num = Number(raw);
+    if (Number.isNaN(num) || num < 0) return fallbackValue;
+    return Math.floor(num);
+  }
+
+  function buildAlertasUrl(embed) {
+    const diasDesde = getDiasValue(alertasDiasDesde, 0);
+    const diasHastaRaw = (alertasDiasHasta?.value || "").trim();
+    const diasHasta = diasHastaRaw ? getDiasValue(alertasDiasHasta, 0) : "";
+    const sector = (alertasSector?.value || "").trim();
+    const suffix = embed ? "&embed=1" : "";
+    return `${alertasUrl}?dias_desde=${encodeURIComponent(diasDesde)}&dias_hasta=${encodeURIComponent(diasHasta)}&sector=${encodeURIComponent(sector)}${suffix}`;
+  }
+
+  function showAlertasPreview() {
+    const url = buildAlertasUrl(true);
+    alertasFrame.src = url;
+    alertasFrame.style.display = "block";
+    alertasEmpty.style.display = "none";
+  }
+
+  btnAlertasVer?.addEventListener("click", showAlertasPreview);
+  btnAlertasAbrir?.addEventListener("click", () => {
+    window.open(buildAlertasUrl(false), "_blank");
+  });
+  btnAlertasImprimir?.addEventListener("click", () => {
+    if (alertasFrame.style.display !== "block") {
+      showAlertasPreview();
+      setTimeout(() => {
+        if (alertasFrame.contentWindow) {
+          alertasFrame.contentWindow.focus();
+          alertasFrame.contentWindow.print();
+        }
+      }, 600);
+      return;
+    }
+    if (alertasFrame.contentWindow) {
+      alertasFrame.contentWindow.focus();
+      alertasFrame.contentWindow.print();
+    }
+  });
+</script>
+{% endblock %}

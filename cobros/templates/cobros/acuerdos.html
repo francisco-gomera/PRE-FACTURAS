@@ -1,0 +1,401 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Acuerdos y Recordatorios</h2>
+      <p class="page-subtitle">Registra promesas de pago, recordatorios y notas de seguimiento por cliente.</p>
+    </div>
+    <a href="{% url 'cobros:acuerdos' %}" class="btn-primary-link">Nuevo registro</a>
+  </div>
+
+  {% if acuerdo_error %}
+  <div class="alert error">{{ acuerdo_error }}</div>
+  {% elif acuerdo_success %}
+  <div class="alert success">{{ acuerdo_success }}</div>
+  {% endif %}
+
+  {% if acuerdos_hoy %}
+  <div class="alert warn">
+    <strong>Vencen hoy ({{ fecha_hoy|date:"d/m/Y" }}):</strong>
+    {% for acuerdo in acuerdos_hoy %}
+      {{ acuerdo.cliente_nombre }}{% if acuerdo.telefono %} - {{ acuerdo.telefono }}{% endif %} ({{ acuerdo.tipo }}){% if not forloop.last %}, {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="acuerdos-layout">
+    <section class="info-card">
+      <div class="section-head">
+        <h3>Seguimientos registrados</h3>
+        <form method="get" class="filters-row">
+          <input type="text" name="q" value="{{ acuerdo_query }}" placeholder="Buscar cliente, teléfono, sector o nota" />
+          <select name="estado">
+            <option value="">Todos los estados</option>
+            {% for code, label in estado_options %}
+            <option value="{{ code }}" {% if acuerdo_estado == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-small">Buscar</button>
+        </form>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Tipo</th>
+              <th>Compromiso</th>
+              <th>Monto</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for acuerdo in acuerdos %}
+            <tr>
+              <td>
+                <strong>{{ acuerdo.cliente_nombre }}</strong><br />
+                <span class="muted">{{ acuerdo.id_sn }}{% if acuerdo.telefono %} - {{ acuerdo.telefono }}{% endif %}</span>
+              </td>
+              <td>{{ acuerdo.tipo }}</td>
+              <td>{{ acuerdo.fecha_compromiso|date:"d/m/Y"|default:"-" }}</td>
+              <td>{{ acuerdo.monto_compromiso|floatformat:2|default:"-" }}</td>
+              <td>
+                <span class="badge {% if acuerdo.estado == 'PENDIENTE' %}warn{% elif acuerdo.estado == 'CUMPLIDO' %}success{% else %}muted{% endif %}">
+                  {{ acuerdo.estado }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <a class="table-link" href="{% url 'cobros:acuerdos' %}?edit={{ acuerdo.id_acuerdo }}">Editar</a>
+                {% if acuerdo.estado != "CUMPLIDO" %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="complete" />
+                  <input type="hidden" name="id_acuerdo" value="{{ acuerdo.id_acuerdo }}" />
+                  <button type="submit" class="table-link button-link">Cumplido</button>
+                </form>
+                {% endif %}
+                {% if acuerdo.estado != "CANCELADO" %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="cancel" />
+                  <input type="hidden" name="id_acuerdo" value="{{ acuerdo.id_acuerdo }}" />
+                  <button type="submit" class="table-link button-link">Cancelar</button>
+                </form>
+                {% endif %}
+                {% if acuerdo.estado != "PENDIENTE" %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reopen" />
+                  <input type="hidden" name="id_acuerdo" value="{{ acuerdo.id_acuerdo }}" />
+                  <button type="submit" class="table-link button-link">Reabrir</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="empty-row">No hay acuerdos registrados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="info-card editor-card">
+      <div class="section-head">
+        <h3>{% if selected_acuerdo %}Editar seguimiento{% else %}Nuevo seguimiento{% endif %}</h3>
+        <span class="helper-text">Usa esta ficha para promesas de pago, recordatorios y observaciones.</span>
+      </div>
+
+      <form method="post" class="editor-form">
+        {% csrf_token %}
+        <input type="hidden" name="id_acuerdo" value="{% if selected_acuerdo %}{{ selected_acuerdo.id_acuerdo }}{% endif %}" />
+
+        <div class="form-row">
+          <label for="acuerdo_id_sn">Cliente</label>
+          <div class="inline-input">
+            <input id="acuerdo_id_sn" name="id_sn" type="text" readonly value="{% if selected_acuerdo %}{{ selected_acuerdo.id_sn }}{% endif %}" placeholder="Selecciona un cliente" />
+            <button id="btn_acuerdo_buscar_cliente" type="button" class="btn-small">Buscar</button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="acuerdo_cliente_nombre">Nombre</label>
+          <input id="acuerdo_cliente_nombre" name="cliente_nombre" type="text" readonly value="{% if selected_acuerdo %}{{ selected_acuerdo.cliente_nombre }}{% endif %}" />
+        </div>
+
+        <div class="grid-2">
+          <div class="form-row">
+            <label for="acuerdo_telefono">Teléfono</label>
+            <input id="acuerdo_telefono" name="telefono" type="text" readonly value="{% if selected_acuerdo %}{{ selected_acuerdo.telefono }}{% endif %}" />
+          </div>
+          <div class="form-row">
+            <label for="acuerdo_sector">Sector</label>
+            <input id="acuerdo_sector" name="sector" type="text" readonly value="{% if selected_acuerdo %}{{ selected_acuerdo.sector }}{% endif %}" />
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="form-row">
+            <label for="acuerdo_tipo">Tipo</label>
+            <select id="acuerdo_tipo" name="tipo">
+              {% for code, label in tipo_options %}
+              <option value="{{ code }}" {% if selected_acuerdo and selected_acuerdo.tipo == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="acuerdo_fecha">Fecha compromiso</label>
+            <input id="acuerdo_fecha" name="fecha_compromiso" type="date" value="{% if selected_acuerdo and selected_acuerdo.fecha_compromiso %}{{ selected_acuerdo.fecha_compromiso|date:'Y-m-d' }}{% elif selected_acuerdo.fecha_compromiso %}{{ selected_acuerdo.fecha_compromiso }}{% endif %}" />
+          </div>
+          <div class="form-row">
+            <label for="acuerdo_monto">Monto compromiso</label>
+            <input id="acuerdo_monto" name="monto_compromiso" type="text" inputmode="decimal" value="{% if selected_acuerdo %}{{ selected_acuerdo.monto_compromiso|default:'' }}{% endif %}" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="acuerdo_estado">Estado</label>
+          <select id="acuerdo_estado" name="estado">
+            {% for code, label in estado_options %}
+            <option value="{{ code }}" {% if selected_acuerdo and selected_acuerdo.estado == code %}selected{% elif not selected_acuerdo and code == 'PENDIENTE' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="acuerdo_nota">Nota / detalle</label>
+          <textarea id="acuerdo_nota" name="nota" rows="8" placeholder="Ej.: Cliente promete pagar el viernes, llamar de nuevo en la tarde." required>{% if selected_acuerdo %}{{ selected_acuerdo.nota }}{% endif %}</textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-save">{% if selected_acuerdo %}Guardar cambios{% else %}Guardar seguimiento{% endif %}</button>
+          <a href="{% url 'cobros:acuerdos' %}" class="btn-secondary-link">Limpiar</a>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<div id="acuerdo_cliente_modal" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="acuerdo_modal_title">
+    <div class="win-titlebar">
+      <span id="acuerdo_modal_title">Seleccionar cliente</span>
+      <button id="btn_close_acuerdo_modal" type="button" aria-label="Cerrar">X</button>
+    </div>
+    <div class="win-body">
+      <div class="filters-row">
+        <input id="acuerdo_search_input" type="text" placeholder="Código, Nombre, Apodo o Cédula/RNC" />
+        <select id="acuerdo_search_filter">
+          <option value="nombre" selected>Nombre</option>
+          <option value="codigo">Código (ID_SN)</option>
+          <option value="apodo">Apodo</option>
+          <option value="rnc">Cédula/RNC</option>
+        </select>
+        <button id="btn_acuerdo_search" type="button" class="btn-small">Buscar</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Cédula/RNC</th>
+              <th>Apodo</th>
+            </tr>
+          </thead>
+          <tbody id="acuerdo_results_body">
+            <tr><td colspan="4" class="empty-row">Ingrese un texto y pulse Buscar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --page-bg: #f3f6fb;
+    --card-bg: #ffffff;
+    --border-color: #d8e2f3;
+    --text-color: #334e68;
+    --text-light: #627d98;
+    --primary-color: #1f5fbf;
+    --success-bg: #edfdf3;
+    --success-text: #17663a;
+    --error-bg: #fff1f2;
+    --error-text: #a11a2b;
+    --shadow: 0 8px 24px rgba(18, 52, 102, 0.08);
+    --radius: 14px;
+  }
+
+  .page-container { padding: 16px; }
+  .page-header { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
+  .page-title { margin:0; color:var(--text-color); }
+  .page-subtitle { margin:6px 0 0; color:var(--text-light); }
+  .acuerdos-layout { display:grid; grid-template-columns:1fr; gap:20px; }
+  .info-card { background:var(--card-bg); border:1px solid var(--border-color); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; }
+  .section-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; margin-bottom:14px; }
+  .section-head h3 { margin:0; color:var(--text-color); }
+  .helper-text, .muted { color:var(--text-light); font-size:13px; }
+  .btn-primary-link, .btn-secondary-link { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 16px; border-radius:10px; text-decoration:none; font-weight:700; }
+  .btn-primary-link { background:var(--primary-color); color:#fff; }
+  .btn-secondary-link { background:#eef4ff; color:var(--primary-color); border:1px solid #cfe0ff; }
+  .alert { border-radius:10px; padding:12px 14px; margin-bottom:16px; font-weight:600; }
+  .alert.success { background:var(--success-bg); color:var(--success-text); }
+  .alert.error { background:var(--error-bg); color:var(--error-text); }
+  .alert.warn { background:#fff7e6; color:#8a5700; }
+  .filters-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .filters-row input, .filters-row select, .editor-form input, .editor-form textarea, .editor-form select { width:100%; border:1px solid #c9d7ec; border-radius:10px; padding:10px 12px; font:inherit; color:var(--text-color); background:#fff; }
+  .table-wrap { overflow:auto; border:1px solid var(--border-color); border-radius:12px; }
+  .data-table { width:100%; border-collapse:collapse; }
+  .data-table th, .data-table td { padding:12px 14px; border-bottom:1px solid var(--border-color); text-align:left; vertical-align:top; }
+  .data-table th { background:#f7faff; color:var(--text-color); font-size:13px; }
+  .empty-row { text-align:center; color:var(--text-light); font-style:italic; }
+  .actions-cell { display:flex; gap:12px; flex-wrap:wrap; }
+  .table-link, .button-link { color:var(--primary-color); font-weight:700; text-decoration:none; background:transparent; border:none; padding:0; cursor:pointer; font:inherit; }
+  .badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .badge.warn { background:#fff7e6; color:#a66200; }
+  .badge.success { background:#e7f9ef; color:#177245; }
+  .badge.muted { background:#eef3f9; color:#5d7288; }
+  .editor-form { display:grid; gap:14px; }
+  .form-row label { display:block; margin-bottom:6px; color:var(--text-color); font-weight:700; }
+  .grid-2, .grid-3 { display:grid; gap:12px; }
+  .grid-2 { grid-template-columns:1fr 1fr; }
+  .grid-3 { grid-template-columns:1fr 1fr 1fr; }
+  .inline-input { display:flex; gap:8px; align-items:center; }
+  .btn-small, .btn-save { min-height:40px; border:none; border-radius:10px; padding:0 16px; font-weight:700; cursor:pointer; background:var(--primary-color); color:#fff; }
+  .form-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:1400; }
+  .modal-backdrop.open { display:flex; }
+  .win-modal { width:min(980px,94vw); max-height:90vh; display:flex; flex-direction:column; background:var(--card-bg); border-radius:var(--radius); box-shadow:0 18px 40px rgba(10,45,110,.2); }
+  .win-titlebar { height:40px; display:flex; align-items:center; justify-content:space-between; background:var(--primary-color); color:#fff; padding:0 16px; font-size:14px; font-weight:700; border-radius:var(--radius) var(--radius) 0 0; }
+  .win-titlebar button { background:transparent; border:none; color:#fff; font-size:20px; cursor:pointer; }
+  .win-body { padding:16px; overflow:auto; }
+  @media (min-width: 1100px) { .acuerdos-layout { grid-template-columns: 1.1fr .9fr; align-items:start; } .editor-card { position:sticky; top:20px; } }
+  @media (max-width: 820px) { .page-header, .section-head, .filters-row, .form-actions, .grid-2, .grid-3 { grid-template-columns:1fr; flex-direction:column; display:flex; } .btn-primary-link, .btn-secondary-link, .btn-small, .btn-save { width:100%; } }
+</style>
+
+<script>
+  const acuerdoIdSn = document.getElementById("acuerdo_id_sn");
+  const acuerdoClienteNombre = document.getElementById("acuerdo_cliente_nombre");
+  const acuerdoTelefono = document.getElementById("acuerdo_telefono");
+  const acuerdoSector = document.getElementById("acuerdo_sector");
+  const acuerdoModal = document.getElementById("acuerdo_cliente_modal");
+  const btnAcuerdoBuscarCliente = document.getElementById("btn_acuerdo_buscar_cliente");
+  const btnCloseAcuerdoModal = document.getElementById("btn_close_acuerdo_modal");
+  const acuerdoSearchInput = document.getElementById("acuerdo_search_input");
+  const acuerdoSearchFilter = document.getElementById("acuerdo_search_filter");
+  const btnAcuerdoSearch = document.getElementById("btn_acuerdo_search");
+  const acuerdoResultsBody = document.getElementById("acuerdo_results_body");
+  const detalleClienteUrl = "/clientes/detalle/";
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll("\"", "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function openAcuerdoModal() {
+    acuerdoModal.classList.add("open");
+    acuerdoModal.setAttribute("aria-hidden", "false");
+    acuerdoSearchInput.focus();
+  }
+
+  function closeAcuerdoModal() {
+    acuerdoModal.classList.remove("open");
+    acuerdoModal.setAttribute("aria-hidden", "true");
+  }
+
+  function renderAcuerdoResults(rows) {
+    if (!rows.length) {
+      acuerdoResultsBody.innerHTML = '<tr><td colspan="4" class="empty-row">No se encontraron clientes.</td></tr>';
+      return;
+    }
+    acuerdoResultsBody.innerHTML = rows.map((row) => {
+      const safeJson = encodeURIComponent(JSON.stringify(row));
+      return `
+        <tr class="click-row" data-row="${safeJson}">
+          <td>${escapeHtml(row.id_sn || "")}</td>
+          <td>${escapeHtml(row.nom_socio || "")}</td>
+          <td>${escapeHtml(row.rnc_ced || "")}</td>
+          <td>${escapeHtml(row.contacto || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    acuerdoResultsBody.querySelectorAll("tr.click-row").forEach((row) => {
+      row.addEventListener("click", async () => {
+        const raw = row.getAttribute("data-row");
+        if (!raw) return;
+        try {
+          const data = JSON.parse(decodeURIComponent(raw));
+          acuerdoIdSn.value = data.id_sn || "";
+          acuerdoClienteNombre.value = data.nom_socio || "";
+          acuerdoTelefono.value = data.tel1 || "";
+          acuerdoSector.value = "";
+          try {
+            const res = await fetch(`${detalleClienteUrl}?id_sn=${encodeURIComponent(data.id_sn || "")}`, {
+              headers: { "X-Requested-With": "XMLHttpRequest" },
+            });
+            if (res.ok) {
+              const detailData = await res.json().catch(() => ({}));
+              const cliente = detailData.cliente || {};
+              acuerdoClienteNombre.value = cliente.nom_socio || data.nom_socio || "";
+              acuerdoTelefono.value = cliente.tel1 || data.tel1 || "";
+              acuerdoSector.value = cliente.comentario || "";
+            }
+          } catch (error) {
+            acuerdoSector.value = data.comentario || "";
+          }
+          closeAcuerdoModal();
+        } catch (error) {
+          // no-op
+        }
+      });
+    });
+  }
+
+  async function buscarAcuerdoClientes() {
+    const q = (acuerdoSearchInput.value || "").trim();
+    const filtro = (acuerdoSearchFilter.value || "nombre").trim().toLowerCase();
+    const url = `/clientes/buscar/?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`;
+    acuerdoResultsBody.innerHTML = '<tr><td colspan="4" class="empty-row">Buscando...</td></tr>';
+    try {
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) {
+        acuerdoResultsBody.innerHTML = '<tr><td colspan="4" class="empty-row">No se pudo consultar clientes.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      renderAcuerdoResults(Array.isArray(data.results) ? data.results : []);
+    } catch (error) {
+      acuerdoResultsBody.innerHTML = '<tr><td colspan="4" class="empty-row">Error de conexión.</td></tr>';
+    }
+  }
+
+  btnAcuerdoBuscarCliente?.addEventListener("click", openAcuerdoModal);
+  btnCloseAcuerdoModal?.addEventListener("click", closeAcuerdoModal);
+  acuerdoModal?.addEventListener("click", (event) => {
+    if (event.target === acuerdoModal) closeAcuerdoModal();
+  });
+  btnAcuerdoSearch?.addEventListener("click", buscarAcuerdoClientes);
+  acuerdoSearchInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      buscarAcuerdoClientes();
+    }
+    if (event.key === "Escape") {
+      closeAcuerdoModal();
+    }
+  });
+</script>
+{% endblock %}
