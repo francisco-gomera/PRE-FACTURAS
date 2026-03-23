@@ -13,6 +13,7 @@ from django.utils import timezone
 from ajustes.permissions import has_perm
 from django.views.decorators.http import require_http_methods
 from datetime import datetime, time
+from functools import lru_cache
 import json
 import os
 import socket
@@ -45,6 +46,83 @@ def _require_perm_or_denied(request, modulo, permiso):
     if not has_perm(auth_payload.get("usuario_id"), modulo, permiso):
         return HttpResponse("Acceso denegado.", status=403)
     return auth_payload
+
+
+@lru_cache(maxsize=None)
+def _load_table_columns_cached(table_name):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION
+            """,
+            [table_name],
+        )
+        return tuple(str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0])
+
+
+def _pick_existing_table_column(columns, *candidates):
+    available = {str(column).upper(): str(column).upper() for column in columns}
+    for candidate in candidates:
+        if not candidate:
+            continue
+        found = available.get(str(candidate).upper())
+        if found:
+            return found
+    return None
+
+
+def _get_open_ed_balance(id_sn):
+    id_sn = str(id_sn or "").strip()
+    if not id_sn:
+        return 0.0
+
+    det_columns = _load_table_columns_cached("DET_ED")
+    cab_columns = _load_table_columns_cached("CAB_ED")
+    if not det_columns or not cab_columns:
+        return 0.0
+
+    det_client_col = _pick_existing_table_column(det_columns, "ID_SN", "CLIENTE", "COD_CLIENTE")
+    det_debito_col = _pick_existing_table_column(det_columns, "DEBITO", "DEBE")
+    det_credito_col = _pick_existing_table_column(det_columns, "CREDITO", "HABER")
+    cab_status_col = _pick_existing_table_column(cab_columns, "ESTATUS", "EST_DOC", "ESTADO")
+    if not det_client_col or not det_debito_col or not det_credito_col or not cab_status_col:
+        return 0.0
+
+    det_id_col = _pick_existing_table_column(det_columns, "ID_DOC", "ID_ED")
+    cab_id_col = _pick_existing_table_column(cab_columns, "ID_DOC", "ID_ED")
+    det_no_col = _pick_existing_table_column(det_columns, "NO_DOC", "NO_ED")
+    cab_no_col = _pick_existing_table_column(cab_columns, "NO_DOC", "NO_ED")
+
+    join_parts = []
+    if det_id_col and cab_id_col:
+        join_parts.append(f"CAST(c.[{cab_id_col}] AS NVARCHAR(255)) = CAST(d.[{det_id_col}] AS NVARCHAR(255))")
+    if det_no_col and cab_no_col:
+        join_parts.append(f"CAST(c.[{cab_no_col}] AS NVARCHAR(255)) = CAST(d.[{det_no_col}] AS NVARCHAR(255))")
+    if not join_parts:
+        return 0.0
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT
+                COALESCE(SUM(COALESCE(d.[{det_debito_col}], 0)), 0) -
+                COALESCE(SUM(COALESCE(d.[{det_credito_col}], 0)), 0)
+            FROM DET_ED d
+            WHERE d.[{det_client_col}] = %s
+              AND EXISTS (
+                  SELECT 1
+                  FROM CAB_ED c
+                  WHERE ({' OR '.join(join_parts)})
+                    AND UPPER(LTRIM(RTRIM(COALESCE(CAST(c.[{cab_status_col}] AS NVARCHAR(255)), '')))) = 'ABIERTO'
+              )
+            """,
+            [id_sn],
+        )
+        row = cursor.fetchone()
+    return float(row[0]) if row and row[0] is not None else 0.0
 
 
 def _normalize_bloqueado(value):
@@ -354,17 +432,7 @@ def estado_cuenta_print_view(request):
             .first()
         )
         if cliente:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COALESCE(SUM(DEBITO), 0) - COALESCE(SUM(CREDITO), 0)
-                    FROM DET_ED
-                    WHERE ID_SN = %s
-                    """,
-                    [id_sn],
-                )
-                row = cursor.fetchone()
-            balance = float(row[0]) if row and row[0] is not None else 0.0
+            balance = _get_open_ed_balance(id_sn)
 
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -2205,18 +2273,8 @@ def detalle_cliente_view(request):
     if not cliente:
         return JsonResponse({"detail": "Cliente no encontrado"}, status=404)
 
-    # Balance dinamico: SUM(DEBITO) - SUM(CREDITO) en DET_ED por cliente.
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT COALESCE(SUM(DEBITO), 0) - COALESCE(SUM(CREDITO), 0)
-            FROM DET_ED
-            WHERE ID_SN = %s
-            """,
-            [id_sn],
-        )
-        balance_row = cursor.fetchone()
-    cliente["saldo"] = float(balance_row[0]) if balance_row and balance_row[0] is not None else 0.0
+    # Balance dinamico: solo cuenta DET_ED cuyos documentos en CAB_ED esten Abiertos.
+    cliente["saldo"] = _get_open_ed_balance(id_sn)
     cliente["foto_url"] = _build_foto_url(cliente.get("foto"))
     return JsonResponse({"cliente": cliente})
 

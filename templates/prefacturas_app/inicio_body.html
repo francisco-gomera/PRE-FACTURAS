@@ -1341,7 +1341,7 @@
             });
 
             if (setTodayDates) {
-                const today = new Date().toISOString().slice(0, 10);
+                const today = "{{ server_today_iso|default:''|escapejs }}";
                 fieldFechaCont.value = today;
                 fieldFechaVenc.value = today;
                 fieldFechaDoc.value = today;

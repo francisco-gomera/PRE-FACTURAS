@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recibo de ingreso {{ documento.no_recibo|default:"" }}</title>
+  <style>
+    @page {
+      size: 210mm 148.5mm;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 210mm;
+      height: 148.5mm;
+      background: #ffffff;
+      color: #000000;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;
+    }
+
+    .print-sheet {
+      width: 210mm;
+      height: 148.5mm;
+      padding: 6mm 14mm 0 6mm;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+
+    .print-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .receipt {
+      width: 190mm;
+      max-width: 100%;
+      height: 140mm;
+      padding: 2.8mm 1.8mm 1.4mm 1.2mm;
+      margin: 0 auto 0 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: 33mm minmax(0, 1fr);
+      gap: 4mm;
+      align-items: start;
+    }
+
+    .logo-box {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .logo-box img {
+      max-width: 24mm;
+      max-height: 24mm;
+      object-fit: contain;
+    }
+
+    .company-meta {
+      min-width: 0;
+    }
+
+    .company-name {
+      margin: 0;
+      font-size: 11.4pt;
+      color: #001c9c;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .company-line {
+      font-size: 7.7pt;
+      line-height: 1.14;
+    }
+
+    .company-rnc {
+      margin-top: 0.5mm;
+      font-size: 8.1pt;
+      font-weight: 800;
+    }
+
+    .sector-badge {
+      margin-top: 0.5mm;
+      text-align: right;
+      font-size: 8pt;
+      font-weight: 800;
+      color: #ff0000;
+      text-transform: uppercase;
+    }
+
+    .cancelled-badge {
+      margin-top: 0.7mm;
+      text-align: right;
+      font-size: 11.4pt;
+      font-weight: 900;
+      color: #c31212;
+      text-transform: uppercase;
+      letter-spacing: 1pt;
+    }
+
+    .title {
+      margin: 1.8mm 0 1.6mm;
+      text-align: center;
+      font-size: 12pt;
+      font-weight: 800;
+      letter-spacing: 2.3pt;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44mm;
+      gap: 7mm;
+      align-items: start;
+    }
+
+    .info-block {
+      font-size: 8.1pt;
+      line-height: 1.2;
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: auto 2.6mm 1fr;
+      gap: 0.4mm;
+      align-items: baseline;
+    }
+
+    .info-row strong {
+      font-weight: 800;
+    }
+
+    .info-right .info-row {
+      grid-template-columns: auto 2.6mm auto;
+      justify-content: end;
+    }
+
+    .receipt-table {
+      width: 100%;
+      margin-top: 1.8mm;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 6.4pt;
+    }
+
+    .receipt-table thead th {
+      padding: 0.75mm 0.45mm;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      text-align: left;
+      font-weight: 800;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.08;
+    }
+
+    .receipt-table tbody td {
+      padding: 0.8mm 0.45mm;
+      border-bottom: 1px solid #d7d7d7;
+      font-size: 7pt;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.08;
+    }
+
+    .receipt-table .num {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .comment-payment {
+      margin-top: 1.8mm;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44mm;
+      gap: 8mm;
+      align-items: start;
+    }
+
+    .comment-box {
+      font-size: 7.5pt;
+      line-height: 1.18;
+    }
+
+    .comment-box strong {
+      display: inline-block;
+      margin-bottom: 0.3mm;
+    }
+
+    .payment-summary {
+      font-size: 7.5pt;
+      padding-top: 1.2mm;
+    }
+
+    .payment-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 2.4mm;
+      margin-bottom: 0.5mm;
+    }
+
+    .totals-grid {
+      margin-top: 2mm;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 54mm;
+      gap: 7mm;
+      align-items: end;
+    }
+
+    .balance-stack {
+      display: grid;
+      gap: 1.2mm;
+    }
+
+    .paid-balance-box {
+      padding: 1.1mm 1.5mm;
+      border: 1px solid #000;
+      font-size: 8pt;
+      line-height: 1.2;
+    }
+
+    .paid-balance-title {
+      margin-bottom: 0.7mm;
+      font-weight: 800;
+    }
+
+    .paid-balance-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 2.2mm;
+      margin-bottom: 0.45mm;
+      font-size: 7.6pt;
+    }
+
+    .paid-balance-line:last-child {
+      margin-bottom: 0;
+    }
+
+    .paid-balance-empty {
+      font-size: 7.4pt;
+    }
+
+    .balance-box {
+      font-size: 8.3pt;
+      font-weight: 800;
+    }
+
+    .total-box {
+      justify-self: end;
+      width: 100%;
+      font-size: 8.3pt;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .total-box .line {
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      gap: 1mm;
+      align-items: center;
+    }
+
+    .total-amount {
+      min-width: 25mm;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      text-align: right;
+      padding: 0.45mm 0.7mm;
+    }
+
+    .end-line {
+      margin: 3mm auto 0;
+      width: 82%;
+      text-align: center;
+      font-size: 7.2pt;
+      position: relative;
+    }
+
+    .end-line::before,
+    .end-line::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 38%;
+      border-top: 1px dashed #333;
+    }
+
+    .end-line::before {
+      left: 0;
+    }
+
+    .end-line::after {
+      right: 0;
+    }
+
+    .signatures {
+      margin-top: auto;
+      padding-top: 8mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16mm;
+      align-items: start;
+    }
+
+    .signature-box {
+      text-align: center;
+      font-size: 7.2pt;
+    }
+
+    .signature-line {
+      width: 40mm;
+      margin: 0 auto 1mm;
+      border-top: 1px solid #000;
+      height: 0;
+    }
+
+    .footer-meta {
+      margin-top: 2mm;
+      padding-top: 0.8mm;
+      border-top: 1px solid #000;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 3mm;
+      align-items: center;
+      font-size: 6.2pt;
+    }
+
+    .footer-meta .center {
+      text-align: center;
+    }
+
+    .footer-meta .right {
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  {% for _ in copies_range %}
+    <section class="print-sheet">
+      <div class="receipt">
+        <div class="header">
+          <div class="logo-box">
+            {% if empresa.logo_src %}
+              <img src="{{ empresa.logo_src }}" alt="Logo empresa" />
+            {% endif %}
+          </div>
+          <div class="company-meta">
+            <h1 class="company-name">{{ empresa.nombre }}</h1>
+            <div class="company-line">{{ empresa.direccion }}</div>
+            <div class="company-line">Telefono: {{ empresa.tel1 }} {{ empresa.tel2 }}{% if empresa.email %}&nbsp;&nbsp; E-Mail: {{ empresa.email }}{% endif %}</div>
+            <div class="company-rnc">RNC: {{ empresa.rnc }}</div>
+            <div class="sector-badge">{{ cliente.sector }}</div>
+            {% if is_cancelled %}
+              <div class="cancelled-badge">CANCELADO</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="title">RECIBO DE INGRESO</div>
+
+        <div class="info-grid">
+          <div class="info-block">
+            <div class="info-row"><strong>Hemos recibido de</strong><span>:</span><span>{{ cliente.nombre }}</span></div>
+            <div class="info-row"><strong>Codigo</strong><span>:</span><span>{{ cliente.codigo }}</span></div>
+            <div class="info-row"><strong>RNC/Ced.</strong><span>:</span><span>{{ cliente.rnc_ced }}</span></div>
+            <div class="info-row"><strong>La suma de</strong><span>:</span><span>{{ documento.suma_letras }}</span></div>
+            <div class="info-row"><strong>Moneda de pago</strong><span>:</span><span>{{ documento.moneda_pago|default:"RD$" }}</span></div>
+            <div class="info-row"><strong>Monto en RD$</strong><span>:</span><span>{{ documento.monto_rd_fmt }}</span></div>
+          </div>
+
+          <div class="info-block info-right">
+            <div class="info-row"><strong>No. Recibo</strong><span>:</span><span style="color:#001c9c;">{{ documento.no_recibo }}</span></div>
+            <div class="info-row"><strong>Fecha cont.</strong><span>:</span><span>{{ documento.fecha_cont }}</span></div>
+            <div class="info-row"><strong>Moneda Doc</strong><span>:</span><span>{{ documento.moneda_doc|default:"RD$" }}</span></div>
+            <div class="info-row"><strong>Tasa pago</strong><span>:</span><span>{{ documento.tasa_pago_fmt }}</span></div>
+          </div>
+        </div>
+
+        <table class="receipt-table">
+          <colgroup>
+            <col style="width: 6%;" />
+            <col style="width: 13%;" />
+            <col style="width: 7%;" />
+            <col style="width: 10%;" />
+            <col style="width: 10%;" />
+            <col style="width: 11%;" />
+            <col style="width: 7%;" />
+            <col style="width: 9%;" />
+            <col style="width: 13%;" />
+            <col style="width: 14%;" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>TDN.</th>
+              <th>Factura No.</th>
+              <th>No. cuota</th>
+              <th>Fecha cont.</th>
+              <th>Fecha venc</th>
+              <th>Balance fact</th>
+              <th>Mora</th>
+              <th>Descuento</th>
+              <th>Monto aplicado</th>
+              <th>Bce. pendiente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if detalle %}
+              {% for item in detalle %}
+                <tr>
+                  <td>{{ item.td }}</td>
+                  <td>{{ item.no_factura }}</td>
+                  <td style="text-align:center;">{{ item.no_cuota }}</td>
+                  <td>{{ item.fecha_cont }}</td>
+                  <td>{{ item.fecha_venc }}</td>
+                  <td class="num">{{ item.balance_fact_fmt }}</td>
+                  <td class="num">{{ item.mora_fmt }}</td>
+                  <td class="num">{{ item.descuento_fmt }}</td>
+                  <td class="num">{{ item.monto_aplicado_fmt }}</td>
+                  <td class="num">{{ item.balance_pendiente_fmt }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="10">Sin lineas de detalle.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+
+        <div class="comment-payment">
+          <div class="comment-box">
+            <strong>Comentario:</strong><br />
+            <span>{{ documento.comentario|default_if_none:""|linebreaksbr }}</span>
+          </div>
+          <div class="payment-summary">
+            {% for item in metodos_pago %}
+              <div class="payment-line">
+                <span>{{ item.label }} ---&gt;</span>
+                <strong>{{ item.amount_fmt }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="totals-grid">
+          <div class="balance-stack">
+            <div class="paid-balance-box">
+              <div class="paid-balance-title">Balance de Fact. pagadas</div>
+              {% if balance_facturas %}
+                {% for item in balance_facturas %}
+                  <div class="paid-balance-line">
+                    <span>#{{ item.no_factura }}</span>
+                    <strong>RD$ {{ item.balance_fmt }}</strong>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="paid-balance-empty">Sin facturas aplicadas.</div>
+              {% endif %}
+            </div>
+            <div class="balance-box">Balance Total del Cliente: RD$ {{ balance_rd_fmt }}</div>
+          </div>
+          <div class="total-box">
+            <div class="line">
+              <span>Total Recibo---&gt; RD$</span>
+              <span></span>
+              <span class="total-amount">{{ total_recibo_fmt }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="end-line">Fin del documento</div>
+
+        <div class="signatures">
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div>{{ usuario_nombre }}</div>
+            <div>Realizado por</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div>&nbsp;</div>
+            <div>Recibido por</div>
+          </div>
+        </div>
+
+        <div class="footer-meta">
+          <div>Page 1 of 1</div>
+          <div class="center">Registrado por: {{ usuario_nombre }}</div>
+          <div class="right">{{ impreso_fecha }} {{ impreso_hora }}</div>
+        </div>
+      </div>
+    </section>
+  {% endfor %}
+</body>
+</html>

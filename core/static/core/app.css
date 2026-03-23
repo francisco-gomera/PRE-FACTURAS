@@ -58,6 +58,7 @@ button {
   gap: 16px;
   padding: 16px;
   min-width: 0;
+  transition: grid-template-columns 0.24s ease;
 }
 
 .sidebar {
@@ -69,6 +70,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  transition: padding 0.24s ease, border-radius 0.24s ease;
 }
 
 .brand {
@@ -90,7 +92,7 @@ button {
 
 .nav {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .nav a {
@@ -98,13 +100,11 @@ button {
   color: #eaf2ff;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 10px 12px;
+  padding: 7px 10px;
   border-radius: 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 14px;
+  justify-content: flex-start;
   transition: 0.2s ease;
 }
 
@@ -114,19 +114,65 @@ button {
   color: #0f3f78;
 }
 
-.nav a span {
-  font-size: 11px;
+.nav-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nav-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.nav-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-copy {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.nav-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.nav-meta {
+  font-size: 10px;
+  line-height: 1.05;
   color: rgba(255, 255, 255, 0.7);
 }
 
-.nav a.active span {
+.nav a:hover .nav-icon,
+.nav a.active .nav-icon {
+  background: rgba(15, 63, 120, 0.1);
+}
+
+.nav a.active .nav-meta {
   color: #6b7d98;
 }
 
 .sidebar-footer {
   margin-top: auto;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .logout {
@@ -134,9 +180,14 @@ button {
   color: #0f3f78;
   background: #ffffff;
   border-radius: 12px;
-  padding: 10px 12px;
-  text-align: center;
-  font-weight: 700;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout .nav-icon {
+  background: rgba(15, 110, 220, 0.1);
 }
 
 .content {
@@ -251,6 +302,85 @@ button {
   font-weight: 700;
 }
 
+.sidebar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  background: #e9f1ff;
+  color: #0f3f78;
+  border: 1px solid #cfe0fb;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 63, 120, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.sidebar-collapse-toggle:hover {
+  background: #dceaff;
+  box-shadow: 0 10px 20px rgba(15, 63, 120, 0.12);
+  transform: translateY(-1px);
+}
+
+@media (min-width: 901px) {
+  body.sidebar-collapsed .app-shell {
+    grid-template-columns: 118px 1fr;
+  }
+
+  body.sidebar-collapsed .sidebar {
+    padding: 16px 10px;
+  }
+
+  body.sidebar-collapsed .brand {
+    justify-items: center;
+    text-align: center;
+  }
+
+  body.sidebar-collapsed .brand-title {
+    font-size: 0;
+    line-height: 1;
+  }
+
+  body.sidebar-collapsed .brand-title::before {
+    content: attr(data-short);
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+
+  body.sidebar-collapsed .brand-subtitle {
+    display: none;
+  }
+
+  body.sidebar-collapsed .nav a {
+    justify-content: center;
+    padding: 7px 6px;
+  }
+
+  body.sidebar-collapsed .nav-item-main {
+    justify-content: center;
+  }
+
+  body.sidebar-collapsed .nav-copy {
+    display: none;
+  }
+
+  body.sidebar-collapsed .nav-icon {
+    margin: 0;
+  }
+
+  body.sidebar-collapsed .logout {
+    padding: 7px 6px;
+  }
+
+  body.sidebar-collapsed .logout .nav-item-main {
+    justify-content: center;
+  }
+}
+
 .overlay {
   display: none;
   position: fixed;
@@ -290,6 +420,10 @@ button {
     gap: 6px;
   }
 
+  .sidebar-collapse-toggle {
+    display: none;
+  }
+
   .overlay {
     display: block;
     opacity: 0;
@@ -317,6 +451,12 @@ button {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (min-width: 901px) {
+  .menu-toggle {
+    display: none;
   }
 }
 

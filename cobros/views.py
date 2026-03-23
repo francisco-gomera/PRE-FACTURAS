@@ -8,7 +8,7 @@ from ajustes.permissions import has_perm
 from core.views import _base_context, render_denied
 from .models import CobroAcuerdo
 from prefacturas_app.models_existing import MaestroSn
-from prefacturas_app.views import _require_perm_or_denied
+from prefacturas_app.views import _get_open_ed_balance, _require_perm_or_denied
 
 
 def _fmt_date(value):
@@ -120,17 +120,7 @@ def _build_estado_cuenta_context(id_sn):
             "fecha_impresion": timezone.localdate(),
         }
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT COALESCE(SUM(DEBITO), 0) - COALESCE(SUM(CREDITO), 0)
-            FROM DET_ED
-            WHERE ID_SN = %s
-            """,
-            [id_sn],
-        )
-        row = cursor.fetchone()
-    balance = _to_float(row[0] if row else 0.0)
+    balance = _to_float(_get_open_ed_balance(id_sn))
 
     with connection.cursor() as cursor:
         cursor.execute(

@@ -1042,7 +1042,121 @@
     }
   });
   function doPrint() {
-    requestAnimationFrame(() => window.print());
+    const cartaDoc = saldoPreview?.querySelector(".carta-doc");
+    if (!cartaDoc) {
+      requestAnimationFrame(() => window.print());
+      return;
+    }
+
+    const clonedCarta = cartaDoc.cloneNode(true);
+    clonedCarta.style.transform = "none";
+    clonedCarta.style.transformOrigin = "";
+
+    const inlineStyles = Array.from(document.querySelectorAll("style"))
+      .map((styleEl) => styleEl.textContent || "")
+      .join("\n");
+
+    const printStyles = `
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        overflow: visible !important;
+      }
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .carta-doc {
+        transform: none !important;
+        transform-origin: top left !important;
+        width: auto !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+      .carta-body,
+      .carta-preview-container,
+      .carta-preview-body,
+      .page-container,
+      .content,
+      .main,
+      .app-shell {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+      }
+      @page {
+        size: auto;
+        margin: 12mm;
+      }
+      @media print {
+        html, body {
+          overflow: visible !important;
+        }
+        .carta-doc {
+          page-break-after: auto !important;
+        }
+      }
+    `;
+
+    const printFrame = document.createElement("iframe");
+    printFrame.setAttribute("aria-hidden", "true");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+    printFrame.style.opacity = "0";
+    printFrame.style.pointerEvents = "none";
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (!frameDoc || !printFrame.contentWindow) {
+      printFrame.remove();
+      requestAnimationFrame(() => window.print());
+      return;
+    }
+
+    frameDoc.open();
+    frameDoc.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Carta de saldo</title>
+        <style>${inlineStyles}</style>
+        <style>${printStyles}</style>
+      </head>
+      <body>${clonedCarta.outerHTML}</body>
+      </html>
+    `);
+    frameDoc.close();
+
+    let hasPrinted = false;
+
+    const cleanup = () => {
+      setTimeout(() => printFrame.remove(), 250);
+    };
+
+    const triggerPrint = () => {
+      if (hasPrinted) return;
+      hasPrinted = true;
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+    };
+
+    printFrame.onload = () => {
+      setTimeout(triggerPrint, 150);
+    };
+    printFrame.contentWindow.onafterprint = cleanup;
+    setTimeout(triggerPrint, 1000);
   }
 
   btnSaldoVerTodas?.addEventListener("click", () => {

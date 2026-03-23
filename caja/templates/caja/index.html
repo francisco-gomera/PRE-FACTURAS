@@ -1,0 +1,31 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<h2 class="page-title">Caja</h2>
+<p class="page-subtitle">Gestion operativa de caja, cuentas por cobrar y financiamiento.</p>
+
+<div class="card-grid">
+  {% if submodules.cuentas_por_cobrar %}
+  <div class="info-card">
+    <h3>Cuentas por cobrar</h3>
+    <p>Consulta, seguimiento y control de balances pendientes.</p>
+    <a href="{% url 'caja:cuentas_por_cobrar' %}">Abrir submodulo</a>
+  </div>
+  {% endif %}
+  {% if submodules.cuadre_caja %}
+  <div class="info-card">
+    <h3>Cuadre de caja</h3>
+    <p>Revision de movimientos, arqueos y cierres diarios.</p>
+    <a href="{% url 'caja:cuadre_caja' %}">Abrir submodulo</a>
+  </div>
+  {% endif %}
+  {% if submodules.financiamiento %}
+  <div class="info-card">
+    <h3>Financiamiento</h3>
+    <p>Planes de pago, cuotas y control de financiamientos.</p>
+    <a href="{% url 'caja:financiamiento' %}">Abrir submodulo</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+

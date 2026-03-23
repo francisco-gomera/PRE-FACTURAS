@@ -1,0 +1,606 @@
+{% extends "core/base.html" %}
+
+{% block head_extra %}
+<style>
+  .cuadre-page,
+  .cuadre-report-list,
+  .cuadre-sheet,
+  .cuadre-filters,
+  .cuadre-filter-grid,
+  .cuadre-field,
+  .cuadre-lines,
+  .cuadre-grand-total {
+    min-width: 0;
+  }
+
+  .cuadre-page {
+    display: grid;
+    gap: 18px;
+  }
+
+  .cuadre-filters {
+    border: 1px solid #d6e1f1;
+    border-radius: 16px;
+    padding: 16px;
+    background: linear-gradient(180deg, #ffffff, #f7fbff);
+    display: grid;
+    gap: 14px;
+  }
+
+  .cuadre-filters-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .cuadre-filters-header h3 {
+    margin: 0;
+    color: #0f3f78;
+    font-size: 18px;
+  }
+
+  .cuadre-filters-header p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  .cuadre-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .cuadre-field {
+    display: grid;
+    gap: 6px;
+  }
+
+  .cuadre-field label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .cuadre-field input,
+  .cuadre-field select {
+    min-height: 40px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    padding: 10px 12px;
+    font: inherit;
+    color: #0f172a;
+    background: #ffffff;
+  }
+
+  .cuadre-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .cuadre-btn {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .cuadre-btn.is-primary {
+    background: #0f6edc;
+    color: #ffffff;
+  }
+
+  .cuadre-btn.is-secondary {
+    background: #e5eefc;
+    color: #0f3f78;
+  }
+
+  .cuadre-error {
+    border: 1px solid #fecaca;
+    background: #fff5f5;
+    color: #b91c1c;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .cuadre-report-list {
+    display: grid;
+    gap: 20px;
+  }
+
+  .cuadre-sheet {
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto;
+    border: 2px solid #2b2b2b;
+    background: #ffffff;
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+    padding: 22px 26px 26px;
+    color: #000000;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .cuadre-sheet-header {
+    display: grid;
+    gap: 4px;
+  }
+
+  .cuadre-company {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #0b35f0;
+    text-transform: uppercase;
+  }
+
+  .cuadre-title {
+    text-align: center;
+    font-size: 19px;
+    font-weight: 900;
+    color: #0b35f0;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    padding-left: 0.42em;
+  }
+
+  .cuadre-range {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .cuadre-divider {
+    margin-top: 6px;
+    border-top: 2px solid #000000;
+  }
+
+  .cuadre-report-name {
+    margin-top: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #000000;
+    overflow-wrap: anywhere;
+  }
+
+  .cuadre-report-name strong {
+    color: #d71717;
+  }
+
+  .cuadre-section {
+    margin-top: 18px;
+  }
+
+  .cuadre-section-title {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 15px;
+    color: #000000;
+  }
+
+  .cuadre-section-title strong {
+    color: #0b35f0;
+    text-decoration: underline;
+  }
+
+  .cuadre-section-title span {
+    font-size: 13px;
+  }
+
+  .cuadre-lines {
+    margin: 12px 0 0 24px;
+    width: min(100%, 500px);
+    display: grid;
+    gap: 6px;
+  }
+
+  .cuadre-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 18px;
+    align-items: end;
+    font-size: 14px;
+  }
+
+  .cuadre-line-total {
+    margin-top: 4px;
+    font-weight: 800;
+  }
+
+  .cuadre-line-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cuadre-line-label span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cuadre-line-label::after {
+    content: "";
+    flex: 1 1 auto;
+    border-bottom: 1px dashed #444;
+    transform: translateY(-2px);
+  }
+
+  .cuadre-line-value {
+    min-width: 0;
+    text-align: right;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cuadre-line.is-cancelados .cuadre-line-value {
+    color: #d71717;
+  }
+
+  .cuadre-grand-total {
+    margin: 14px 0 0 auto;
+    width: min(100%, 500px);
+  }
+
+  .cuadre-summary-title {
+    margin-top: 20px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #0b35f0;
+    text-decoration: underline;
+  }
+
+  .cuadre-summary-table {
+    width: 100%;
+    margin-top: 4px;
+    border-collapse: collapse;
+    border: 2px solid #222;
+  }
+
+  .cuadre-summary-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cuadre-summary-table th,
+  .cuadre-summary-table td {
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .cuadre-summary-table th {
+    color: #0b35f0;
+    font-weight: 800;
+  }
+
+  .cuadre-summary-table td {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cuadre-signatures {
+    margin-top: 88px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 42px;
+  }
+
+  .cuadre-signature {
+    text-align: center;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #000000;
+  }
+
+  .cuadre-signature-line {
+    border-top: 2px solid #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .cuadre-empty-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  @media (max-width: 1100px) {
+    .cuadre-filter-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .cuadre-page {
+      gap: 14px;
+    }
+
+    .cuadre-filters {
+      padding: 14px;
+    }
+
+    .cuadre-filter-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cuadre-actions {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .cuadre-btn {
+      flex: 1 1 100%;
+      width: 100%;
+      padding: 10px 14px;
+    }
+
+    .cuadre-sheet {
+      padding: 14px 12px 18px;
+    }
+
+    .cuadre-title {
+      font-size: 15px;
+      letter-spacing: 0.16em;
+      padding-left: 0.16em;
+    }
+
+    .cuadre-range,
+    .cuadre-section-title {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .cuadre-lines {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .cuadre-line {
+      grid-template-columns: minmax(0, 1fr) 88px;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .cuadre-summary-table {
+      min-width: 520px;
+      white-space: nowrap;
+    }
+
+    .cuadre-summary-table th,
+    .cuadre-summary-table td {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .cuadre-signatures {
+      grid-template-columns: 1fr;
+      gap: 26px;
+      margin-top: 40px;
+    }
+  }
+
+  @media print {
+    body {
+      background: #ffffff !important;
+    }
+
+    .sidebar,
+    .topbar,
+    .cuadre-filters,
+    .page-title,
+    .page-subtitle,
+    .cuadre-error {
+      display: none !important;
+    }
+
+    .app-shell,
+    .content,
+    .main {
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: #ffffff !important;
+      min-height: 0 !important;
+    }
+
+    .cuadre-sheet {
+      max-width: none;
+      box-shadow: none;
+      page-break-after: always;
+      break-after: page;
+      margin: 0;
+    }
+
+    .cuadre-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cuadre-page">
+  <div>
+    <h2 class="page-title">Cuadre de caja</h2>
+    <p class="page-subtitle">Genera el cuadre diario por fecha, todas las terminales y usuarios, por terminal o por usuario.</p>
+  </div>
+
+  <form class="cuadre-filters" method="get">
+    <div class="cuadre-filters-header">
+      <div>
+        <h3>Filtros del informe</h3>
+        <p>Por defecto se usa la fecha del dia en curso. Puedes cambiar rango, terminal o usuario antes de generar.</p>
+      </div>
+      <div class="cuadre-actions">
+        <button type="submit" class="cuadre-btn is-primary">Generar informe</button>
+        <button type="button" class="cuadre-btn is-secondary" onclick="window.print()">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="cuadre-filter-grid">
+      <div class="cuadre-field">
+        <label for="cuadre_fecha_desde">Fecha desde</label>
+        <input id="cuadre_fecha_desde" type="date" name="fecha_desde" value="{{ cuadre_filters.fecha_desde }}" />
+      </div>
+      <div class="cuadre-field">
+        <label for="cuadre_fecha_hasta">Fecha hasta</label>
+        <input id="cuadre_fecha_hasta" type="date" name="fecha_hasta" value="{{ cuadre_filters.fecha_hasta }}" />
+      </div>
+      <div class="cuadre-field">
+        <label for="cuadre_modo">Modo del informe</label>
+        <select id="cuadre_modo" name="modo">
+          <option value="general" {% if cuadre_filters.modo == "general" %}selected{% endif %}>Todas las terminales y usuarios</option>
+          <option value="terminal" {% if cuadre_filters.modo == "terminal" %}selected{% endif %}>Detallado por terminal</option>
+          <option value="usuario" {% if cuadre_filters.modo == "usuario" %}selected{% endif %}>Detallado por usuario</option>
+        </select>
+      </div>
+      <div class="cuadre-field">
+        <label for="cuadre_terminal">Terminal</label>
+        <select id="cuadre_terminal" name="terminal">
+          <option value="">Todas las terminales</option>
+          {% for terminal in terminales_cuadre %}
+            <option value="{{ terminal.terminal }}" {% if cuadre_filters.terminal == terminal.terminal %}selected{% endif %}>{{ terminal.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="cuadre-field">
+        <label for="cuadre_usuario">Usuario</label>
+        <select id="cuadre_usuario" name="usuario">
+          <option value="">Todos los usuarios</option>
+          {% for usuario in usuarios_cuadre %}
+            <option value="{{ usuario.id }}" {% if cuadre_filters.usuario == usuario.id %}selected{% endif %}>{{ usuario.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </form>
+
+  {% if cuadre_error %}
+    <div class="cuadre-error">{{ cuadre_error }}</div>
+  {% endif %}
+
+  <div class="cuadre-report-list">
+    {% for report in cuadre_reports %}
+      <article class="cuadre-sheet">
+        <div class="cuadre-sheet-header">
+          <div class="cuadre-company">{{ empresa_nombre|default:"COMERCIAL ANITA" }}</div>
+          <div class="cuadre-title">CUADRE DE CAJA</div>
+          <div class="cuadre-range">
+            <span>Del {{ report.fecha_desde }} Al {{ report.fecha_hasta }}</span>
+            <strong>TASA: 0.0000</strong>
+          </div>
+          <div class="cuadre-divider"></div>
+          <div class="cuadre-report-name">INFORME DE TERMINAL: <strong>{{ report.label|upper }}</strong></div>
+        </div>
+
+        <section class="cuadre-section">
+          <div class="cuadre-section-title">
+            <strong>Detalle Recibos de Ingreso:</strong>
+            <span>Desde {{ report.desde_recibo|default:"-" }}</span>
+            <span>Hasta {{ report.hasta_recibo|default:"-" }}</span>
+          </div>
+
+          <div class="cuadre-lines">
+            <div class="cuadre-line">
+              <div class="cuadre-line-label"><span>Transferencia</span></div>
+              <div class="cuadre-line-value">{{ report.transferencia_fmt }}</div>
+            </div>
+            <div class="cuadre-line">
+              <div class="cuadre-line-label"><span>Efectivo</span></div>
+              <div class="cuadre-line-value">{{ report.efectivo_fmt }}</div>
+            </div>
+            <div class="cuadre-line">
+              <div class="cuadre-line-label"><span>Descuentos</span></div>
+              <div class="cuadre-line-value">{{ report.descuentos_fmt }}</div>
+            </div>
+            <div class="cuadre-line is-cancelados">
+              <div class="cuadre-line-label"><span>Cancelados</span></div>
+              <div class="cuadre-line-value">{{ report.cancelados_fmt }}</div>
+            </div>
+            <div class="cuadre-line cuadre-line-total">
+              <div class="cuadre-line-label"><span>Total recibos RD$</span></div>
+              <div class="cuadre-line-value">{{ report.total_recibos_fmt }}</div>
+            </div>
+            <div class="cuadre-line cuadre-line-total">
+              <div class="cuadre-line-label"><span>Total descuentos RD$</span></div>
+              <div class="cuadre-line-value">{{ report.total_descuentos_fmt }}</div>
+            </div>
+          </div>
+
+          <div class="cuadre-grand-total">
+            <div class="cuadre-line cuadre-line-total">
+              <div class="cuadre-line-label"><span>Total caja RD$</span></div>
+              <div class="cuadre-line-value">{{ report.total_caja_fmt }}</div>
+            </div>
+          </div>
+
+          {% if not report.desde_recibo and not report.hasta_recibo %}
+            <div class="cuadre-empty-note">No se encontraron recibos dentro del filtro seleccionado.</div>
+          {% endif %}
+        </section>
+
+        <div class="cuadre-summary-title">DETALLE DE TERMINAL:</div>
+        <div class="cuadre-summary-wrap">
+          <table class="cuadre-summary-table">
+            <thead>
+              <tr>
+                <th>Total Efectivo</th>
+                <th>Total Transf.</th>
+                <th>Total Descuento</th>
+                <th>Total Cancelados</th>
+                <th>Total Caja</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ report.efectivo_fmt }}</td>
+                <td>{{ report.transferencia_fmt }}</td>
+                <td>{{ report.total_descuentos_fmt }}</td>
+                <td>{{ report.cancelados_fmt }}</td>
+                <td>{{ report.total_caja_fmt }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cuadre-signatures">
+          <div class="cuadre-signature">
+            <div class="cuadre-signature-line"></div>
+            <div>CAJERO(A)</div>
+          </div>
+          <div class="cuadre-signature">
+            <div class="cuadre-signature-line"></div>
+            <div>REVISADO POR</div>
+          </div>
+          <div class="cuadre-signature">
+            <div class="cuadre-signature-line"></div>
+            <div>RECIBIDO POR</div>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

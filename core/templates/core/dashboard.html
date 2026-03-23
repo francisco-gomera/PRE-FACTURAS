@@ -10,6 +10,20 @@
 {% endif %}
 
 <div class="card-grid">
+  {% if visible_modules.caja %}
+  <div class="info-card">
+    <h3>Caja</h3>
+    <p>Cuentas por cobrar, cuadre diario y financiamiento.</p>
+    <a href="{% url 'caja:index' %}">Abrir modulo</a>
+  </div>
+  {% endif %}
+  {% if visible_modules.factura %}
+  <div class="info-card">
+    <h3>Factura</h3>
+    <p>Facturacion formal y preparacion para facturacion electronica DGII.</p>
+    <a href="{% url 'factura:index' %}">Abrir modulo</a>
+  </div>
+  {% endif %}
   {% if visible_modules.prefacturas %}
   <div class="info-card">
     <h3>Prefacturas</h3>
@@ -57,13 +71,6 @@
     <h3>Cartas</h3>
     <p>Cartas de aviso y cartas de saldo.</p>
     <a href="{% url 'cartas:index' %}">Abrir modulo</a>
-  </div>
-  {% endif %}
-  {% if visible_modules.factura %}
-  <div class="info-card">
-    <h3>Factura</h3>
-    <p>Facturacion formal y preparacion para facturacion electronica DGII.</p>
-    <a href="{% url 'factura:index' %}">Abrir modulo</a>
   </div>
   {% endif %}
   {% if visible_modules.ajustes %}

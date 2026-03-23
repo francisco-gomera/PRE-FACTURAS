@@ -1,0 +1,13 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<h2 class="page-title">{{ submodule_title }}</h2>
+<p class="page-subtitle">{{ submodule_description }}</p>
+
+<div class="info-card">
+  <h3>Modulo listo para desarrollar</h3>
+  <p>La estructura base ya esta creada y el acceso queda integrado al sistema.</p>
+  <p>A partir de aqui podemos agregar formularios, reportes, consultas SQL y flujos segun la necesidad del submodulo.</p>
+  <a href="{% url 'caja:index' %}">Volver a Caja</a>
+</div>
+{% endblock %}

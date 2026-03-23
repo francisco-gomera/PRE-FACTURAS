@@ -17,6 +17,7 @@ class Command(BaseCommand):
             ("cobros", "Cobros"),
             ("cartas", "Cartas"),
             ("factura", "Factura"),
+            ("caja", "Caja"),
         ]
         permisos_genericos = [
             ("ver", "Ver"),
@@ -56,6 +57,16 @@ class Command(BaseCommand):
                 ("ver_emision", "Ver Emision de Facturas"),
                 ("ver_electronica", "Ver Facturacion Electronica"),
                 ("ver_documentos", "Ver Documentos de Factura"),
+            ],
+            "caja": [
+                ("ver_cuentas_por_cobrar", "Ver Cuentas por Cobrar"),
+                ("cxc_nuevo", "Nuevo en Cuentas por Cobrar"),
+                ("cxc_buscar", "Buscar en Cuentas por Cobrar"),
+                ("cxc_imprimir", "Imprimir en Cuentas por Cobrar"),
+                ("cxc_cancelar", "Cancelar en Cuentas por Cobrar"),
+                ("cxc_cerrar_cuenta", "Cerrar Cuenta en Cuentas por Cobrar"),
+                ("ver_cuadre_caja", "Ver Cuadre de Caja"),
+                ("ver_financiamiento", "Ver Financiamiento"),
             ],
             "ajustes": [
                 ("ver_parametros", "Ver Parametros"),

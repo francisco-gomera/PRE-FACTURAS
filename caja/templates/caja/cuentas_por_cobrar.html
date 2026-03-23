@@ -1,0 +1,5429 @@
+{% extends "core/base.html" %}
+
+{% block head_extra %}
+<style>
+{% include "prefacturas_mod/prefacturas_theme_inline.css" %}
+</style>
+<style>
+  :root {
+    --cxc-active-blue-top: #1f7aed;
+    --cxc-active-blue-bottom: #125ec3;
+    --cxc-active-blue-border: #1a66ce;
+    --cxc-active-blue-shadow: rgba(18, 94, 195, 0.2);
+    --cxc-active-blue-shadow-hover: rgba(18, 94, 195, 0.26);
+  }
+
+  .content .main {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  #cxc_panel {
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    --cxc-panel-available-height: auto;
+  }
+
+  #cxc_panel .panel {
+    border-radius: 20px;
+    margin: 0;
+  }
+
+  #cxc_panel,
+  #cxc_panel * {
+    box-sizing: border-box;
+  }
+
+  .cxc-shell {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px;
+    background:
+      radial-gradient(700px 180px at 0% 0%, rgba(31, 122, 237, 0.12), transparent 55%),
+      radial-gradient(700px 220px at 100% 0%, rgba(12, 177, 191, 0.12), transparent 55%),
+      linear-gradient(180deg, #f9fbff, #eff5ff 46%, #eef4ff);
+    display: grid;
+    gap: 6px;
+    overflow-x: clip;
+  }
+
+  .cxc-mode-tabs,
+  .cxc-detail-tabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: -1px;
+  }
+
+  .cxc-mode-tabs .tab,
+  .cxc-detail-tabs .tab {
+    cursor: pointer;
+    height: 26px;
+    padding: 3px 10px;
+    font-size: 11px;
+  }
+
+  .cxc-tabpanel {
+    display: none;
+  }
+
+  .cxc-tabpanel.active {
+    display: block;
+  }
+
+  #cxc_top_panels,
+  #cxc_detail_panels,
+  .cxc-tabpanel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .cxc-header-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 176px;
+    gap: 5px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .cxc-card {
+    padding: 4px 6px;
+    min-width: 0;
+  }
+
+  .cxc-main-card {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .cxc-form-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px minmax(220px, 290px);
+    grid-template-areas: "fields search side";
+    gap: 6px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .cxc-fields,
+  .cxc-side-fields {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .cxc-fields {
+    grid-area: fields;
+  }
+
+  .cxc-side-fields {
+    grid-area: side;
+  }
+
+  .cxc-field-row,
+  .cxc-side-row {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .cxc-field-row label,
+  .cxc-side-row label,
+  .cxc-inline-grid label,
+  .cxc-comment-box label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #5c6f8b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cxc-field-row input,
+  .cxc-field-row select,
+  .cxc-side-row input,
+  .cxc-side-row select,
+  .cxc-inline-grid input,
+  .cxc-inline-grid select,
+  .cxc-comment-box textarea {
+    width: 100%;
+    min-width: 0;
+    height: 24px;
+    padding: 2px 8px;
+    background: #f8fbff;
+    border: 1px solid #d5e0f2;
+    border-radius: 10px;
+    font-size: 11.5px;
+    color: #1a2942;
+  }
+
+  .cxc-input-pick {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .cxc-input-pick button {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .cxc-comment-box textarea {
+    min-height: 58px;
+    height: auto;
+    resize: vertical;
+  }
+
+  .cxc-field-row input[readonly],
+  .cxc-side-row input[readonly] {
+    background: #eef4ff;
+  }
+
+  .cxc-search-trigger {
+    display: flex;
+    grid-area: search;
+    justify-content: center;
+    padding-top: 0;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .cxc-search-trigger button {
+    width: 22px;
+    height: 24px;
+    border-radius: 10px;
+    padding: 0;
+    font-size: 13px;
+    margin-top: 1px;
+  }
+
+  .cxc-inline-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+  }
+
+  .cxc-payment-layout {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cxc-payment-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cxc-payment-topbar label,
+  .cxc-payment-row label,
+  .cxc-importe-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #5c6f8b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cxc-payment-topbar input,
+  .cxc-payment-code,
+  .cxc-payment-desc,
+  .cxc-importe-input {
+    height: 24px;
+    border: 1px solid #d5e0f2;
+    border-radius: 10px;
+    background: #f8fbff;
+    color: #1a2942;
+    font-size: 11.5px;
+  }
+
+  .cxc-payment-topbar input,
+  .cxc-payment-code,
+  .cxc-payment-desc,
+  .cxc-importe-input {
+    padding: 2px 8px;
+  }
+
+  .cxc-payment-topbar input {
+    width: 110px;
+  }
+
+  .cxc-payment-methods {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: -1px;
+  }
+
+  .cxc-payment-method {
+    min-width: 88px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid #c7d7ee;
+    border-bottom-color: transparent;
+    background: linear-gradient(180deg, #ffffff, #edf4ff);
+    color: #2b5c98;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: none;
+  }
+
+  .cxc-payment-method.active {
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    border-color: var(--cxc-active-blue-border);
+    color: #ffffff;
+    box-shadow: 0 6px 12px var(--cxc-active-blue-shadow);
+  }
+
+  .cxc-payment-method:hover:not(:disabled):not(.active) {
+    box-shadow: 0 4px 10px rgba(32, 95, 172, 0.16);
+  }
+
+  .cxc-payment-method:disabled {
+    background: linear-gradient(180deg, #d8e2f1, #c8d5e8);
+    border-color: #bfd0e8;
+    color: #6f8199;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  .cxc-payment-board {
+    border: 1px solid #d2dfef;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.86);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cxc-payment-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+    align-items: start;
+  }
+
+  .cxc-payment-grid.is-transfer {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  }
+
+  .cxc-payment-rows {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .cxc-payment-rows[hidden] {
+    display: none;
+  }
+
+  .cxc-payment-row {
+    display: grid;
+    grid-template-columns: 120px 104px 24px minmax(0, 1fr);
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .cxc-payment-row[hidden] {
+    display: none;
+  }
+
+  .cxc-payment-row.is-compact {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .cxc-payment-row.is-compact .cxc-payment-code.is-short {
+    max-width: none;
+  }
+
+  .cxc-payment-code {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cxc-payment-code.is-short {
+    max-width: 110px;
+  }
+
+  .cxc-payment-spacer {
+    display: none;
+  }
+
+  .cxc-payment-desc {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    background: #eef4ff;
+  }
+
+  .cxc-importe-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cxc-importe-icon {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #46c86e, #2ea856);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 6px 12px rgba(46, 168, 86, 0.24);
+    cursor: pointer;
+  }
+
+  .cxc-importe-icon:hover:not(:disabled) {
+    filter: brightness(1.04);
+    box-shadow: 0 7px 14px rgba(46, 168, 86, 0.28);
+  }
+
+  .cxc-importe-icon:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .cxc-importe-row > span.cxc-importe-icon {
+    display: none;
+  }
+
+  .cxc-importe-input {
+    width: 132px;
+    text-align: right;
+    font-weight: 700;
+    background: #ffffff;
+  }
+
+  .cxc-hidden-legacy {
+    display: none;
+  }
+
+  .cxc-quick-card {
+    padding: 4px 6px;
+    display: grid;
+    gap: 3px;
+    align-content: start;
+    min-width: 0;
+  }
+
+  .cxc-quick-card h3 {
+    margin: 0 0 1px;
+    font-size: 12px;
+    color: #0f3f78;
+  }
+
+  .cxc-quick-button {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-align: left;
+    font-size: 11.5px;
+  }
+
+  .cxc-quick-button span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 12px;
+  }
+
+  .cxc-body-card {
+    padding: 8px;
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .cxc-grid-shell {
+    height: clamp(170px, 24vh, 230px);
+    overflow: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .cxc-grid-shell table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+    color: #20324d;
+    max-width: none;
+  }
+
+  .cxc-grid-shell th,
+  .cxc-grid-shell td {
+    border-bottom: 1px solid #d7e3f4;
+    border-right: 1px solid #d7e3f4;
+    padding: 0px 5px;
+    line-height: 1.15;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .cxc-grid-shell tbody td {
+    height: auto;
+    min-height: 0;
+    vertical-align: middle;
+  }
+
+  .cxc-grid-shell th:first-child,
+  .cxc-grid-shell td:first-child {
+    border-left: 1px solid #d7e3f4;
+  }
+
+  .cxc-grid-shell thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #fefeff, #edf3ff);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #56709a;
+  }
+
+  .cxc-grid-shell td input[type="checkbox"] {
+    margin: 0;
+    transform: scale(0.9);
+    transform-origin: center;
+  }
+
+  .cxc-grid-shell td input[type="number"] {
+    width: 100%;
+    min-width: 78px;
+    height: 16px;
+    padding: 0 4px;
+    margin: 0;
+    border: 1px solid #d5e0f2;
+    border-radius: 7px;
+    background: #f8fbff;
+    text-align: right;
+    font-size: 10.5px;
+    line-height: 1;
+    color: #1a2942;
+  }
+
+  .cxc-grid-shell td.cxc-pago-cell,
+  .cxc-grid-shell td.cxc-desc-cell {
+    padding: 0;
+  }
+
+  .cxc-grid-shell td.cxc-pago-cell input[type="number"],
+  .cxc-grid-shell td.cxc-desc-cell input[type="number"] {
+    display: block;
+    min-width: 0;
+    height: 16px;
+    min-height: 0;
+    padding: 0 4px;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-sizing: border-box;
+    background: #f8fbff;
+    line-height: 1;
+  }
+
+  .cxc-empty-row td {
+    height: 130px;
+    vertical-align: top;
+    color: #7f92b0;
+  }
+
+  .cxc-placeholder {
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    height: 100%;
+    min-height: 96px;
+    text-align: center;
+    color: #6b7c99;
+    font-size: 12px;
+  }
+
+  .cxc-bottom-grid {
+    display: grid;
+    grid-template-columns: minmax(300px, 0.98fr) minmax(320px, 1.02fr);
+    gap: 6px;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cxc-comment-box,
+  .cxc-summary-box {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid #d8e2f3;
+    border-radius: 14px;
+    padding: 7px 8px;
+    min-width: 0;
+  }
+
+  .cxc-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+    min-width: 0;
+  }
+
+  .cxc-summary-col {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .cxc-summary-row {
+    display: grid;
+    grid-template-columns: 1fr 102px;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .cxc-summary-row label,
+  .cxc-payment-pill label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #455a7c;
+    text-transform: uppercase;
+  }
+
+  .cxc-summary-row input {
+    width: 100%;
+    height: 24px;
+    padding: 2px 7px;
+    text-align: right;
+    border: 1px solid #d6e2f4;
+    border-radius: 8px;
+    background: #f8fbff;
+    font-weight: 700;
+    color: #16304d;
+    font-size: 11.5px;
+  }
+
+  .cxc-payment-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 1px;
+    padding: 4px 7px;
+    border-radius: 10px;
+    border: 1px dashed #c6d8f1;
+    background: #f7fbff;
+  }
+
+  .cxc-payment-pill-btn {
+    width: 100%;
+    min-width: 0;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid #c8d8ef;
+    background: linear-gradient(180deg, #f7fbff, #e7f0ff);
+    color: #597393;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: none;
+    cursor: pointer;
+  }
+
+  .cxc-payment-pill-btn.is-active {
+    border-color: #28944e;
+    background: linear-gradient(180deg, #46c86e, #2ea856);
+    color: #ffffff;
+    box-shadow: 0 6px 12px rgba(46, 168, 86, 0.24);
+  }
+
+  .cxc-payment-pill-btn:disabled {
+    border-color: #c8d8ef;
+    background: linear-gradient(180deg, #f7fbff, #e7f0ff);
+    color: #9aaac2;
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 1;
+  }
+
+  .cxc-payable {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #d7e3f4;
+    display: grid;
+    grid-template-columns: 1fr 102px;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .cxc-payable strong {
+    font-size: 11px;
+    color: #102c4a;
+    text-transform: uppercase;
+  }
+
+  .cxc-payable input {
+    height: 28px;
+    border-radius: 9px;
+    border: 1px solid #bcd0ed;
+    background: #ffffff;
+    text-align: right;
+    padding: 3px 8px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f3f78;
+  }
+
+  .cxc-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cxc-actions-left,
+  .cxc-actions-right {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .cxc-action {
+    min-width: 0;
+    flex: 1 1 104px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 14px;
+    border: 1px solid var(--cxc-active-blue-border);
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    box-shadow: 0 8px 16px var(--cxc-active-blue-shadow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .cxc-action:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 11px 20px var(--cxc-active-blue-shadow-hover);
+    filter: brightness(1.03);
+  }
+
+  .cxc-action:disabled {
+    background: linear-gradient(180deg, #d8e2f1, #c8d5e8);
+    border-color: #bfd0e8;
+    color: #6f8199;
+    box-shadow: none;
+    opacity: 1;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+
+  #btn_cxc_nuevo,
+  #btn_cxc_buscar,
+  #btn_cxc_cancel,
+  #btn_cxc_grabar {
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    color: #ffffff;
+    border-color: var(--cxc-active-blue-border);
+  }
+
+  #cxc_panel.cxc-state-idle #btn_cxc_nuevo,
+  #cxc_panel.cxc-state-idle #btn_cxc_buscar,
+  #cxc_panel.cxc-state-editing #btn_cxc_cancel,
+  #cxc_panel.cxc-state-editing #btn_cxc_grabar {
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    color: #ffffff;
+    border-color: var(--cxc-active-blue-border);
+    box-shadow: 0 8px 16px var(--cxc-active-blue-shadow);
+  }
+
+  #cxc_panel.cxc-state-idle #btn_cxc_cancel,
+  #cxc_panel.cxc-state-idle #btn_cxc_grabar,
+  #cxc_panel.cxc-state-editing #btn_cxc_nuevo,
+  #cxc_panel.cxc-state-editing #btn_cxc_buscar {
+    background: linear-gradient(180deg, #d8e2f1, #c8d5e8);
+    border-color: #bfd0e8;
+    color: #6f8199;
+    box-shadow: none;
+    filter: none;
+  }
+
+  #cxc_panel.cxc-state-idle #btn_cxc_cancel:hover,
+  #cxc_panel.cxc-state-idle #btn_cxc_grabar:hover,
+  #cxc_panel.cxc-state-editing #btn_cxc_nuevo:hover,
+  #cxc_panel.cxc-state-editing #btn_cxc_buscar:hover {
+    transform: none;
+    box-shadow: none;
+    filter: none;
+  }
+
+  #cxc_panel.cxc-state-viewing #btn_cxc_nuevo,
+  #cxc_panel.cxc-state-viewing #btn_cxc_buscar,
+  #cxc_panel.cxc-state-viewing #btn_cxc_cancel {
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    color: #ffffff;
+    border-color: var(--cxc-active-blue-border);
+    box-shadow: 0 8px 16px var(--cxc-active-blue-shadow);
+  }
+
+  #cxc_panel.cxc-state-viewing #btn_cxc_grabar {
+    background: linear-gradient(180deg, #d8e2f1, #c8d5e8);
+    border-color: #bfd0e8;
+    color: #6f8199;
+    box-shadow: none;
+    filter: none;
+  }
+
+  .cxc-action.is-muted {
+    background: #f4f7fc;
+    color: #8ea0bb;
+    border-color: #d8e3f2;
+  }
+
+  .cxc-action.is-danger {
+    background: linear-gradient(180deg, #eef4ff, #dce9ff);
+    color: #12365f;
+    border-color: #97b9e8;
+  }
+
+  #btn_cxc_select_all:not(:disabled),
+  #btn_cxc_unselect_all:not(:disabled) {
+    background: linear-gradient(180deg, #eef4ff, #dce9ff);
+    color: #12365f;
+    border-color: #97b9e8;
+  }
+
+  #btn_cxc_cerrar_cuenta:disabled {
+    background: #f4f7fc;
+    color: #8ea0bb;
+    border-color: #d8e3f2;
+    box-shadow: none;
+    opacity: 1;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+
+  #btn_cxc_cerrar_cuenta.is-active {
+    background: linear-gradient(180deg, #1f7a43, #165f34);
+    color: #ffffff;
+    border-color: #0f4d28;
+    box-shadow: 0 8px 16px rgba(15, 77, 40, 0.25);
+  }
+
+  .cxc-pick-btn {
+    background: linear-gradient(180deg, var(--cxc-active-blue-top), var(--cxc-active-blue-bottom));
+    color: #ffffff;
+    border: 1px solid var(--cxc-active-blue-border);
+    box-shadow: 0 8px 16px var(--cxc-active-blue-shadow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .cxc-pick-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 11px 20px var(--cxc-active-blue-shadow-hover);
+    filter: brightness(1.03);
+  }
+
+  .cxc-pick-btn:disabled {
+    background: linear-gradient(180deg, #d8e2f1, #c8d5e8);
+    border-color: #bfd0e8;
+    color: #6f8199;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+
+  .cxc-tab-copy {
+    min-height: 74px;
+    padding: 12px;
+    border: 1px dashed #c7d8f1;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #5f7393;
+    display: grid;
+    gap: 5px;
+    align-content: center;
+  }
+
+  .cxc-tab-copy h4 {
+    margin: 0;
+    color: #143a69;
+    font-size: 14px;
+  }
+
+  .cxc-card.is-disabled,
+  .cxc-quick-card.is-disabled {
+    opacity: 0.72;
+  }
+
+  @media (min-width: 901px) {
+    #cxc_panel,
+    .cxc-shell,
+    .cxc-header-grid,
+    .cxc-body-card,
+    #cxc_detail_panels,
+    #cxc_detail_panels > .cxc-tabpanel.active {
+      min-height: 0;
+    }
+
+    #cxc_panel {
+      height: var(--cxc-panel-available-height);
+    }
+
+    .cxc-shell {
+      height: 100%;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .cxc-body-card {
+      height: 100%;
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      align-content: start;
+    }
+
+    #cxc_detail_panels {
+      display: grid;
+      min-height: 0;
+    }
+
+    #cxc_detail_panels > .cxc-tabpanel.active {
+      display: grid;
+      min-height: 0;
+      align-content: start;
+    }
+
+    #cxc_detalle_tab.active,
+    #cxc_cobros_tab.active {
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .cxc-grid-shell {
+      height: 100%;
+      min-height: 0;
+    }
+  }
+
+  .cxc-body-card.is-disabled > .cxc-detail-tabs,
+  .cxc-body-card.is-disabled > #cxc_detail_panels,
+  .cxc-body-card.is-disabled > .cxc-bottom-grid {
+    opacity: 0.72;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 21, 46, 0.26);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .win-modal {
+    width: min(920px, 96vw);
+    border: 1px solid #c4d4ec;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #f8fbff, #eef4ff);
+    box-shadow: 0 24px 48px rgba(10, 45, 110, 0.18);
+    overflow: hidden;
+  }
+
+  #cxc_buscar_modal_backdrop .win-modal {
+    width: min(860px, 94vw);
+  }
+
+  .win-titlebar {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    background: linear-gradient(90deg, #0f3f78, #1f7aed);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .win-titlebar button {
+    width: 28px;
+    height: 22px;
+    min-width: 28px;
+    padding: 0;
+    border-radius: 8px;
+    line-height: 1;
+    font-size: 13px;
+  }
+
+  .win-body {
+    padding: 10px;
+  }
+
+  .cxc-print-modal {
+    width: min(560px, 94vw);
+  }
+
+  .cxc-print-body {
+    display: grid;
+    gap: 12px;
+  }
+
+  .cxc-print-copy {
+    margin: 0;
+    color: #4d6385;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+
+  .cxc-print-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.95fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .cxc-print-editor,
+  .cxc-print-meta,
+  .cxc-print-summary {
+    border: 1px solid #d4e0f3;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .cxc-print-editor,
+  .cxc-print-meta {
+    padding: 12px;
+  }
+
+  .cxc-print-editor label,
+  .cxc-print-meta h4,
+  .cxc-print-summary span {
+    font-size: 11px;
+    font-weight: 700;
+    color: #526987;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cxc-print-editor input {
+    width: 100%;
+    height: 38px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid #c7d7ee;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #16304d;
+    text-align: center;
+    font-size: 19px;
+    font-weight: 800;
+  }
+
+  .cxc-print-editor small {
+    display: block;
+    margin-top: 8px;
+    color: #6a7f9d;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .cxc-print-meta h4 {
+    margin: 0 0 10px;
+  }
+
+  .cxc-print-meta ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+  }
+
+  .cxc-print-meta li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #1b3554;
+  }
+
+  .cxc-print-meta li span {
+    font-size: 11px;
+    font-weight: 700;
+    color: #526987;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cxc-print-meta li strong {
+    color: #0f3f78;
+  }
+
+  .cxc-print-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+  }
+
+  .cxc-print-summary > div {
+    padding: 12px;
+    background: rgba(247, 251, 255, 0.95);
+    display: grid;
+    gap: 6px;
+  }
+
+  .cxc-print-summary strong {
+    font-size: 15px;
+    color: #103b68;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .cxc-print-note {
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #f8fbff, #eef4ff);
+    border: 1px dashed #bfd2ee;
+    color: #4b6485;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .cxc-print-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cxc-print-actions .cxc-action {
+    flex: 0 0 auto;
+    min-width: 148px;
+  }
+
+  .cxc-message-modal {
+    width: min(430px, 92vw);
+  }
+
+  .cxc-message-body {
+    display: grid;
+    gap: 14px;
+  }
+
+  .cxc-message-copy {
+    margin: 0;
+    color: #1b3554;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+
+  .cxc-message-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cxc-message-actions .cxc-action {
+    flex: 0 0 auto;
+    min-width: 132px;
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) 170px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .search-row label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #506685;
+    text-transform: uppercase;
+  }
+
+  .search-row input,
+  .search-row select {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+    padding: 4px 10px;
+    border-radius: 10px;
+    border: 1px solid #d4e0f3;
+    background: #f8fbff;
+    font-size: 12px;
+    color: #16304d;
+  }
+
+  .search-grid {
+    border: 1px solid #d2dff2;
+    border-radius: 14px;
+    background: #f8fbff;
+    min-height: 280px;
+    max-height: 360px;
+    overflow: auto;
+  }
+
+  .search-grid table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    font-size: 12px;
+    color: #20324d;
+  }
+
+  .search-grid th,
+  .search-grid td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #d7e3f4;
+    border-right: 1px solid #d7e3f4;
+    background: rgba(255, 255, 255, 0.94);
+    white-space: nowrap;
+  }
+
+  .search-grid th:first-child,
+  .search-grid td:first-child {
+    border-left: 1px solid #d7e3f4;
+  }
+
+  .search-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #ffffff, #edf3ff);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #56709a;
+  }
+
+  .result-empty {
+    text-align: center;
+    color: #6c7e99;
+    padding: 18px 12px;
+  }
+
+  .click-row {
+    cursor: pointer;
+  }
+
+  .click-row:hover td {
+    background: #eef5ff;
+  }
+
+  .cxc-history-row {
+    cursor: pointer;
+  }
+
+  .cxc-history-row.is-selected td {
+    background: #dcebff;
+    color: #123a67;
+  }
+
+  .cxc-mobile-history-actions {
+    display: none;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px dashed #c6d8f1;
+    border-radius: 14px;
+    background: #f7fbff;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .cxc-mobile-history-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    color: #29496d;
+    font-size: 12px;
+  }
+
+  .cxc-mobile-history-copy strong {
+    color: #123a67;
+    font-size: 12px;
+  }
+
+  .cxc-mobile-history-copy span {
+    color: #597393;
+    font-size: 11px;
+  }
+
+  .cxc-context-menu {
+    position: fixed;
+    z-index: 1100;
+    min-width: 112px;
+    padding: 6px;
+    border: 1px solid #bfd3ef;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff, #eef5ff);
+    box-shadow: 0 18px 34px rgba(15, 63, 120, 0.18);
+    display: none;
+  }
+
+  .cxc-context-menu.open {
+    display: block;
+  }
+
+  .cxc-context-menu button {
+    width: 100%;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid #c6d8f1;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #fefeff, #eaf3ff);
+    color: #113963;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .cxc-context-menu button:hover {
+    background: linear-gradient(180deg, #1f7aed, #125ec3);
+    border-color: #1a66ce;
+    color: #ffffff;
+  }
+
+  @media (max-width: 1200px) {
+    .cxc-header-grid,
+    .cxc-bottom-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-quick-card {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 900px) {
+    .cxc-form-layout {
+      grid-template-columns: minmax(0, 1fr) 30px;
+      grid-template-areas:
+        "fields search"
+        "side side";
+    }
+
+    .cxc-payment-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-search-trigger {
+      justify-content: flex-end;
+      padding-top: 0;
+    }
+
+    .cxc-inline-grid,
+    .cxc-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-quick-card {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-payment-row {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-importe-row {
+      justify-content: flex-start;
+    }
+
+    .search-row {
+      grid-template-columns: 1fr;
+    }
+
+    .search-grid table {
+      min-width: 0;
+      table-layout: fixed;
+    }
+
+    .search-grid th,
+    .search-grid td {
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .win-modal,
+    #cxc_buscar_modal_backdrop .win-modal {
+      width: 100vw;
+      max-width: 100vw;
+      height: 100dvh;
+      max-height: 100dvh;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .win-body {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .cxc-actions-left,
+    .cxc-actions-right {
+      width: 100%;
+    }
+
+    .cxc-action {
+      flex: 1 1 140px;
+    }
+
+    .cxc-print-layout,
+    .cxc-print-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-print-actions .cxc-action {
+      flex: 1 1 160px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .cxc-shell {
+      padding: 8px;
+    }
+
+    .cxc-card,
+    .cxc-body-card {
+      padding: 8px;
+    }
+
+    .cxc-field-row,
+    .cxc-side-row,
+    .cxc-summary-row,
+    .cxc-payable {
+      grid-template-columns: 1fr;
+    }
+
+    .cxc-grid-shell {
+      height: 240px;
+    }
+
+    .cxc-mobile-history-actions {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="cxc_panel" class="prefactura-page app">
+  <input id="cxc_csrf_token" type="hidden" value="{{ csrf_token }}">
+  <section class="panel cxc-shell">
+    <div class="cxc-mode-tabs" data-cxc-tabset data-panels="cxc_top_panels">
+      <button type="button" class="tab active" data-target="cxc_tab_cabecera">Cabecera</button>
+      <button type="button" class="tab" data-target="cxc_tab_medio_pago">Medio de Pago</button>
+    </div>
+
+    <div class="cxc-header-grid">
+      <div class="card cxc-card cxc-main-card">
+        <div id="cxc_top_panels">
+          <div id="cxc_tab_cabecera" class="cxc-tabpanel active">
+            <div class="cxc-form-layout">
+              <div class="cxc-fields">
+                <div class="cxc-field-row">
+                  <label for="cxc_cliente">Cliente</label>
+                  <input id="cxc_cliente" type="text" value="" readonly />
+                </div>
+                <div class="cxc-field-row">
+                  <label for="cxc_nombre">Nombre</label>
+                  <input id="cxc_nombre" type="text" value="" readonly />
+                </div>
+                <div class="cxc-field-row">
+                  <label for="cxc_apodo">Apodo</label>
+                  <input id="cxc_apodo" type="text" value="" readonly />
+                </div>
+                <div class="cxc-field-row">
+                  <label for="cxc_proyecto">Proyecto</label>
+                  <div class="cxc-input-pick">
+                    <input id="cxc_proyecto" type="text" value="" readonly />
+                    <button id="btn_cxc_proyecto_modal" type="button" class="cxc-pick-btn" title="Seleccionar proyecto">...</button>
+                  </div>
+                </div>
+                <div class="cxc-field-row">
+                  <label for="cxc_moneda">Moneda</label>
+                  <input id="cxc_moneda" type="text" value="RD$" readonly />
+                </div>
+              </div>
+
+              <div class="cxc-search-trigger">
+                <button id="btn_cxc_cliente_modal" type="button" class="cxc-pick-btn" title="Buscar cliente">...</button>
+              </div>
+
+              <div class="cxc-side-fields">
+                <div class="cxc-side-row">
+                  <label for="cxc_no">No.</label>
+                  <input id="cxc_no" type="text" value="" readonly />
+                </div>
+                <div class="cxc-side-row">
+                  <label for="cxc_fecha_cont">Fecha cont.</label>
+                  <input id="cxc_fecha_cont" type="date" />
+                </div>
+                <div class="cxc-side-row">
+                  <label for="cxc_fecha_venc">Fecha venc.</label>
+                  <input id="cxc_fecha_venc" type="date" />
+                </div>
+                <div class="cxc-side-row">
+                  <label for="cxc_fecha_aplic">Fecha aplic.</label>
+                  <input id="cxc_fecha_aplic" type="date" />
+                </div>
+                <div class="cxc-side-row">
+                  <label for="cxc_estado">Estado doc.</label>
+                  <input id="cxc_estado" type="text" value="Abierto" readonly />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="cxc_tab_medio_pago" class="cxc-tabpanel">
+            <div class="cxc-payment-layout">
+              <div class="cxc-payment-topbar">
+                <label for="cxc_moneda_pago">Moneda de pago</label>
+                <input id="cxc_moneda_pago" type="text" value="RD$" readonly />
+              </div>
+
+              <div class="cxc-payment-methods">
+                <button type="button" class="cxc-payment-method active" data-cxc-metodo="Efectivo">Efectivo</button>
+                <button type="button" class="cxc-payment-method" data-cxc-metodo="Transferencia">Transferencia</button>
+              </div>
+
+              <div class="cxc-payment-board">
+                <div class="cxc-payment-grid">
+                  <div class="cxc-payment-rows">
+                    <div class="cxc-payment-row">
+                      <label id="cxc_label_cuenta_principal" for="cxc_cuenta_caja">Cuenta de Caja</label>
+                      <input id="cxc_cuenta_caja" class="cxc-payment-code" type="text" value="" />
+                      <button id="btn_cxc_cuenta_caja_modal" type="button" class="cxc-pick-btn" title="Seleccionar cuenta de caja">...</button>
+                      <input id="cxc_cuenta_caja_desc" class="cxc-payment-desc" type="text" value="" readonly />
+                    </div>
+                    <div class="cxc-payment-row">
+                      <label for="cxc_cuenta_desc_ret">Cuenta Desc./Ret.</label>
+                      <input id="cxc_cuenta_desc_ret" class="cxc-payment-code" type="text" value="" />
+                      <button id="btn_cxc_cuenta_desc_ret_modal" type="button" class="cxc-pick-btn" title="Seleccionar cuenta de descuento o retencion">...</button>
+                      <input id="cxc_cuenta_desc_ret_desc" class="cxc-payment-desc" type="text" value="" readonly />
+                    </div>
+                  </div>
+
+                  <div class="cxc-payment-rows" data-cxc-only-method="Transferencia" hidden>
+                    <div class="cxc-payment-row is-compact">
+                      <label for="cxc_no_transferencia">No. Transf.</label>
+                      <input id="cxc_no_transferencia" class="cxc-payment-code is-short" type="text" value="" />
+                    </div>
+                    <div class="cxc-payment-row is-compact">
+                      <label for="cxc_cta_cliente_pago">No. Cta. cliente</label>
+                      <input id="cxc_cta_cliente_pago" class="cxc-payment-code is-short" type="text" value="" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cxc-importe-row">
+                  <span class="cxc-importe-icon" aria-hidden="true">✓</span>
+                  <button id="btn_cxc_importe_total" type="button" class="cxc-importe-icon" title="Cargar total al importe actual">✓</button>
+                  <label class="cxc-importe-label" for="cxc_importe_pago">Importe</label>
+                  <input id="cxc_importe_pago" class="cxc-importe-input" type="number" min="0" step="0.01" value="0.00" inputmode="decimal" autocomplete="off" />
+                </div>
+              </div>
+
+              <div class="cxc-hidden-legacy" aria-hidden="true">
+                <select id="cxc_metodo" tabindex="-1">
+                  <option selected>Efectivo</option>
+                  <option>Transferencia</option>
+                </select>
+                <input id="cxc_banco" type="text" value="" tabindex="-1" />
+                <input id="cxc_referencia_pago" type="text" value="" tabindex="-1" />
+                <input id="cxc_fecha_pago" type="date" value="" tabindex="-1" />
+                <input id="cxc_tasa" type="number" step="0.01" value="1.00" tabindex="-1" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="card cxc-quick-card">
+        <h3>Acceso directo</h3>
+        <button type="button" class="cxc-quick-button">
+          <strong>Financiamiento</strong>
+          <span>F</span>
+        </button>
+        <button type="button" class="cxc-quick-button">
+          <strong>Recibo de avance</strong>
+          <span>RA</span>
+        </button>
+        <button type="button" class="cxc-quick-button">
+          <strong>Comp. de documento</strong>
+          <span>CD</span>
+        </button>
+      </aside>
+    </div>
+
+    <div class="card cxc-body-card">
+      <div class="cxc-detail-tabs" data-cxc-tabset data-panels="cxc_detail_panels">
+        <button type="button" class="tab active" data-target="cxc_detalle_tab">Detalle</button>
+        <button type="button" class="tab" data-target="cxc_cobros_tab">Cobros anteriores</button>
+        <button type="button" class="tab" data-target="cxc_retencion_tab">Retencion</button>
+        <button type="button" class="tab" data-target="cxc_finanzas_tab">Finanzas</button>
+        <button type="button" class="tab" data-target="cxc_anexos_tab">Anexos</button>
+      </div>
+
+      <div id="cxc_detail_panels">
+        <div id="cxc_detalle_tab" class="cxc-tabpanel active">
+          <div class="grid-shell cxc-grid-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Seleccion</th>
+                  <th>TD.</th>
+                  <th>No.Doc.</th>
+                  <th>F.Cont.</th>
+                  <th>Monto Doc.</th>
+                  <th>Comentario Factura</th>
+                  <th>No. Cuota</th>
+                  <th>Cuota</th>
+                  <th>Balance doc.</th>
+                  <th>F.Venc.</th>
+                  <th>Venc.</th>
+                  <th>Dias</th>
+                  <th>Cargo</th>
+                  <th>% Desc.</th>
+                  <th>Desc./Avance</th>
+                  <th>Pago/Abono</th>
+                  <th>Balance pend.</th>
+                </tr>
+              </thead>
+              <tbody id="cxc_detalle_body">
+                <tr class="cxc-empty-row">
+                  <td colspan="17">
+                    <div class="cxc-placeholder">
+                      <strong>Area de detalle</strong>
+                      <span>Aqui se mostraran los documentos pendientes, cuotas y abonos del cliente.</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="cxc_cobros_tab" class="cxc-tabpanel">
+          <div class="grid-shell cxc-grid-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>No. Recibo</th>
+                  <th>Fecha Rec.</th>
+                  <th>TD.</th>
+                  <th>No. Factura</th>
+                  <th>Monto Fact.</th>
+                  <th>No. Cuota</th>
+                  <th>Cuota</th>
+                  <th>Saldo Pend.</th>
+                  <th>Fecha Venc.</th>
+                  <th>Mora</th>
+                  <th>Descuento</th>
+                  <th>Total Pago</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="cxc_cobros_anteriores_body">
+                <tr class="cxc-empty-row">
+                  <td colspan="13">
+                    <div class="cxc-placeholder">
+                      <strong>Cobros anteriores</strong>
+                      <span>Aqui se mostrara el historial de cobros del cliente.</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="cxc_mobile_history_actions" class="cxc-mobile-history-actions" hidden>
+            <div class="cxc-mobile-history-copy">
+              <strong id="cxc_mobile_history_selected">Ningun cobro seleccionado.</strong>
+              <span>En movil, toca un cobro del historial y usa este boton para imprimirlo.</span>
+            </div>
+            <button id="btn_cxc_mobile_history_print" type="button" class="cxc-action" disabled>Imprimir cobro seleccionado</button>
+          </div>
+        </div>
+
+        <div id="cxc_retencion_tab" class="cxc-tabpanel">
+          <div class="cxc-tab-copy">
+            <h4>Retencion</h4>
+            <div>Zona preparada para manejar descuentos fiscales, retenciones o ajustes documentales.</div>
+          </div>
+        </div>
+
+        <div id="cxc_finanzas_tab" class="cxc-tabpanel">
+          <div class="cxc-tab-copy">
+            <h4>Finanzas</h4>
+            <div>Vista inicial para relacionar cargos, avances, intereses y otros componentes financieros.</div>
+          </div>
+        </div>
+
+        <div id="cxc_anexos_tab" class="cxc-tabpanel">
+          <div class="cxc-tab-copy">
+            <h4>Anexos</h4>
+            <div>Area destinada a observaciones, soporte documental y archivos adjuntos del recibo.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cxc-bottom-grid">
+        <div class="cxc-comment-box">
+          <label for="cxc_comentario">Comentario</label>
+          <textarea id="cxc_comentario" placeholder="Observaciones del recibo, acuerdos de pago o notas internas."></textarea>
+        </div>
+
+        <div class="cxc-summary-box">
+          <div class="cxc-summary-grid">
+            <div class="cxc-summary-col">
+              <div class="cxc-summary-row">
+                <label for="cxc_total_mora">Total Mora</label>
+                <input id="cxc_total_mora" type="text" value=".00" readonly />
+              </div>
+              <div class="cxc-summary-row">
+                <label for="cxc_desc_avance">Desc./Avance</label>
+                <input id="cxc_desc_avance" type="text" value=".00" readonly />
+              </div>
+              <div class="cxc-payment-pill">
+                <button id="cxc_medio_pago" type="button" class="cxc-payment-pill-btn">Medio de Pago</button>
+              </div>
+            </div>
+
+            <div class="cxc-summary-col">
+              <div class="cxc-summary-row">
+                <label for="cxc_total_doc">Total Doc</label>
+                <input id="cxc_total_doc" type="text" value=".00" readonly />
+              </div>
+              <div class="cxc-summary-row">
+                <label for="cxc_total_ret">Total Ret</label>
+                <input id="cxc_total_ret" type="text" value=".00" readonly />
+              </div>
+              <div class="cxc-summary-row">
+                <label for="cxc_total_pago">Total Pago</label>
+                <input id="cxc_total_pago" type="text" value=".00" readonly />
+              </div>
+            </div>
+          </div>
+
+          <div class="cxc-payable">
+            <strong>Monto a pagar</strong>
+            <input id="cxc_monto_pagar" type="text" value=".00" readonly />
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar cxc-actions">
+        <div class="cxc-actions-left">
+          <button id="btn_cxc_nuevo" type="button" class="cxc-action">Nuevo</button>
+          <button id="btn_cxc_buscar" type="button" class="cxc-action">Buscar</button>
+          <button id="btn_cxc_cancel" type="button" class="cxc-action is-light">Cancelar</button>
+          <button id="btn_cxc_grabar" type="button" class="cxc-action is-light">Grabar</button>
+          <button id="btn_cxc_printer" type="button" class="cxc-action is-light">Imprimir</button>
+        </div>
+
+        <div class="cxc-actions-right">
+          <button id="btn_cxc_select_all" type="button" class="cxc-action is-muted">Seleccionar todo</button>
+          <button id="btn_cxc_unselect_all" type="button" class="cxc-action is-muted">Quitar seleccion</button>
+          <button id="btn_cxc_cerrar_cuenta" type="button" class="cxc-action is-danger">Cerrar cuenta</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="cxc_cobros_context_menu" class="cxc-context-menu" aria-hidden="true">
+  <button id="btn_cxc_cobros_context_print" type="button">Imprimir</button>
+</div>
+
+<div id="cxc_estado_context_menu" class="cxc-context-menu" aria-hidden="true">
+  <button id="btn_cxc_estado_context_cancel" type="button">Cancelar</button>
+</div>
+
+<div id="cxc_print_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal cxc-print-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_print_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_print_modal_title">Configuracion de impresion</span>
+      <button id="btn_close_cxc_print_modal" type="button">X</button>
+    </div>
+    <div class="win-body cxc-print-body">
+      <p class="cxc-print-copy">
+        Revisa la cantidad de hojas y la configuracion del recibo antes de abrir el cuadro de impresion del navegador.
+      </p>
+
+      <div class="cxc-print-layout">
+        <div class="cxc-print-editor">
+          <label for="cxc_print_modal_copies">Cantidad de hojas A4</label>
+          <input id="cxc_print_modal_copies" type="number" min="1" max="20" step="1" value="2" inputmode="numeric" />
+          <small>Cada hoja incluye un recibo completo. El valor predeterminado es 2 hojas.</small>
+        </div>
+
+        <div class="cxc-print-meta">
+          <h4>Configuracion del formato</h4>
+          <ul>
+            <li><span>Formato</span><strong>210 mm x 148.5 mm</strong></li>
+            <li><span>Orientacion</span><strong>Horizontal</strong></li>
+            <li><span>Tamano del recibo</span><strong>Hoja completa</strong></li>
+            <li><span>Posicion</span><strong>Ajustado al formato</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="cxc-print-summary">
+        <div>
+          <span>Recibo</span>
+          <strong id="cxc_print_modal_recibo">-</strong>
+        </div>
+        <div>
+          <span>Total de hojas</span>
+          <strong id="cxc_print_modal_total_hojas">2</strong>
+        </div>
+        <div>
+          <span>Total de recibos</span>
+          <strong id="cxc_print_modal_total_recibos">2</strong>
+        </div>
+      </div>
+
+      <div class="cxc-print-note">
+        Al continuar, se abrira la impresion del navegador. En moviles se abrira directamente el PDF del recibo para que uses las opciones del visor del navegador o del telefono.
+      </div>
+
+      <div class="cxc-print-actions">
+        <button id="btn_cxc_print_modal_cancel" type="button" class="cxc-action is-muted">Cancelar</button>
+        <button id="btn_cxc_print_modal_confirm" type="button" class="cxc-action">Continuar e imprimir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_alert_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal cxc-message-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_alert_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_alert_modal_title">Informacion</span>
+      <button id="btn_close_cxc_alert_modal" type="button">X</button>
+    </div>
+    <div class="win-body cxc-message-body">
+      <p id="cxc_alert_modal_message" class="cxc-message-copy"></p>
+      <div class="cxc-message-actions">
+        <button id="btn_cxc_alert_modal_ok" type="button" class="cxc-action">Entendido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_confirm_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal cxc-message-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_confirm_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_confirm_modal_title">Confirmacion</span>
+      <button id="btn_close_cxc_confirm_modal" type="button">X</button>
+    </div>
+    <div class="win-body cxc-message-body">
+      <p id="cxc_confirm_modal_message" class="cxc-message-copy"></p>
+      <div class="cxc-message-actions">
+        <button id="btn_cxc_confirm_modal_cancel" type="button" class="cxc-action is-muted">Cancelar</button>
+        <button id="btn_cxc_confirm_modal_ok" type="button" class="cxc-action is-danger">Continuar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_cliente_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_cliente_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_cliente_modal_title">Seleccionar cliente</span>
+      <button id="btn_close_cxc_cliente_modal" type="button">X</button>
+    </div>
+    <div class="win-body">
+      <div class="search-row">
+        <label for="cxc_cliente_search_input">Buscar</label>
+        <input id="cxc_cliente_search_input" type="text" placeholder="Codigo, Nombre, Apodo o Cedula/RNC" />
+        <select id="cxc_cliente_search_filter">
+          <option value="nombre" selected>Nombre</option>
+          <option value="codigo">Codigo (ID_SN)</option>
+          <option value="apodo">Apodo (CONTACTO)</option>
+          <option value="rnc">Cedula/RNC</option>
+        </select>
+      </div>
+      <div class="search-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Codigo (ID_SN)</th>
+              <th>Nombre (NOM_SOCIO)</th>
+              <th>Cedula/RNC (RNC_CED)</th>
+              <th>Apodo (CONTACTO)</th>
+              <th>Direccion</th>
+              <th>Telefono</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_cliente_results_body">
+            <tr><td colspan="6" class="result-empty">Ingrese un texto para buscar clientes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_buscar_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_buscar_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_buscar_modal_title">Buscar documento de cuentas por cobrar</span>
+      <button id="btn_close_cxc_buscar_modal" type="button">X</button>
+    </div>
+    <div class="win-body">
+      <div class="search-row">
+        <label for="cxc_buscar_input">Buscar</label>
+        <input id="cxc_buscar_input" type="text" placeholder="No. recibo, cliente o RNC/Ced." />
+        <select id="cxc_buscar_filter">
+          <option value="recibo" selected>No. recibo</option>
+          <option value="cliente">Cliente</option>
+          <option value="rnc">RNC/Ced.</option>
+        </select>
+      </div>
+      <div class="search-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>No. Recibo</th>
+              <th>RNC/Ced</th>
+              <th>F. Cont</th>
+              <th>Efectivo</th>
+              <th>Transferencia</th>
+              <th>Total Cobro</th>
+              <th>Estatus</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_buscar_results_body">
+            <tr><td colspan="8" class="result-empty">Aqui se mostraran los recibos ya registrados para consulta.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_proyecto_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_proyecto_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_proyecto_modal_title">Seleccionar proyecto</span>
+      <button id="btn_close_cxc_proyecto_modal" type="button">X</button>
+    </div>
+    <div class="win-body">
+      <div class="search-row">
+        <label for="cxc_proyecto_search_input">Buscar</label>
+        <input id="cxc_proyecto_search_input" type="text" placeholder="Codigo o descripcion del proyecto" />
+        <div></div>
+      </div>
+      <div class="search-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Codigo</th>
+              <th>Descripcion</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_proyecto_results_body">
+            <tr><td colspan="2" class="result-empty">Cargando proyectos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cxc_cuenta_desc_ret_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_cuenta_desc_ret_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_cuenta_desc_ret_modal_title">Seleccionar cuenta</span>
+      <button id="btn_close_cxc_cuenta_desc_ret_modal" type="button">X</button>
+    </div>
+    <div class="win-body">
+      <div class="search-row">
+        <label for="cxc_cuenta_desc_ret_search_input">Buscar</label>
+        <input id="cxc_cuenta_desc_ret_search_input" type="text" placeholder="Cuenta o nombre de cuenta" />
+        <div></div>
+      </div>
+      <div class="search-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Cuenta</th>
+              <th>Nombre cuenta</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_cuenta_desc_ret_results_body">
+            <tr><td colspan="2" class="result-empty">Cargando cuentas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const cxcPendientesUrl = "{% url 'caja:cuentas_por_cobrar_pendientes' %}";
+    const cxcBuscarRecibosUrl = "{% url 'caja:cuentas_por_cobrar_buscar' %}";
+    const cxcDetalleReciboUrl = "{% url 'caja:cuentas_por_cobrar_detalle' %}";
+    const cxcCobrosAnterioresUrl = "{% url 'caja:cuentas_por_cobrar_cobros_anteriores' %}";
+    const cxcGuardarUrl = "{% url 'caja:cuentas_por_cobrar_guardar' %}";
+    const cxcMarcarImpresoUrl = "{% url 'caja:cuentas_por_cobrar_marcar_impreso' %}";
+    const cxcCancelarUrl = "{% url 'caja:cuentas_por_cobrar_cancelar' %}";
+    const cxcPrintDataUrl = "{% url 'caja:cuentas_por_cobrar_print_data' %}";
+    const cxcPdfUrl = "{% url 'caja:cuentas_por_cobrar_pdf' %}";
+    const cxcCatalogoCuentasUrl = "{% url 'caja:catalogo_cuentas_detalle' %}";
+    const cxcCatalogoCuentasFinancUrl = "{% url 'caja:catalogo_cuentas_financ' %}";
+    const cxcPermissions = {
+      nuevo: {{ cxc_permissions.nuevo|yesno:"true,false" }},
+      buscar: {{ cxc_permissions.buscar|yesno:"true,false" }},
+      imprimir: {{ cxc_permissions.imprimir|yesno:"true,false" }},
+      cancelar: {{ cxc_permissions.cancelar|yesno:"true,false" }},
+      cerrar_cuenta: {{ cxc_permissions.cerrar_cuenta|yesno:"true,false" }},
+    };
+    const cxcPanel = document.getElementById("cxc_panel");
+    const cxcMainCard = cxcPanel.querySelector(".cxc-main-card");
+    const cxcQuickCard = cxcPanel.querySelector(".cxc-quick-card");
+    const cxcBodyCard = cxcPanel.querySelector(".cxc-body-card");
+    const topTabset = cxcPanel.querySelector(".cxc-mode-tabs[data-cxc-tabset]");
+    const headerTabButtons = Array.from(cxcPanel.querySelectorAll(".cxc-mode-tabs button"));
+    const detailTabButtons = Array.from(cxcPanel.querySelectorAll(".cxc-detail-tabs button"));
+    const cxcDetalleBody = document.getElementById("cxc_detalle_body");
+    const cxcCobrosAnterioresBody = document.getElementById("cxc_cobros_anteriores_body");
+    const cxcMobileHistoryActions = document.getElementById("cxc_mobile_history_actions");
+    const cxcMobileHistorySelected = document.getElementById("cxc_mobile_history_selected");
+    const btnCxcMobileHistoryPrint = document.getElementById("btn_cxc_mobile_history_print");
+    const cxcCobrosContextMenu = document.getElementById("cxc_cobros_context_menu");
+    const btnCxcCobrosContextPrint = document.getElementById("btn_cxc_cobros_context_print");
+    const cxcEstadoContextMenu = document.getElementById("cxc_estado_context_menu");
+    const btnCxcEstadoContextCancel = document.getElementById("btn_cxc_estado_context_cancel");
+    const btnCxcNuevo = document.getElementById("btn_cxc_nuevo");
+    const btnCxcBuscar = document.getElementById("btn_cxc_buscar");
+    const btnCxcCancel = document.getElementById("btn_cxc_cancel");
+    const btnCxcGrabar = document.getElementById("btn_cxc_grabar");
+    const btnCxcPrinter = document.getElementById("btn_cxc_printer");
+    const printModalBackdrop = document.getElementById("cxc_print_modal_backdrop");
+    const btnClosePrintModal = document.getElementById("btn_close_cxc_print_modal");
+    const btnCxcPrintModalCancel = document.getElementById("btn_cxc_print_modal_cancel");
+    const btnCxcPrintModalConfirm = document.getElementById("btn_cxc_print_modal_confirm");
+    const fieldCxcPrintModalCopies = document.getElementById("cxc_print_modal_copies");
+    const printModalRecibo = document.getElementById("cxc_print_modal_recibo");
+    const printModalTotalHojas = document.getElementById("cxc_print_modal_total_hojas");
+    const printModalTotalRecibos = document.getElementById("cxc_print_modal_total_recibos");
+    const alertModalBackdrop = document.getElementById("cxc_alert_modal_backdrop");
+    const btnCloseAlertModal = document.getElementById("btn_close_cxc_alert_modal");
+    const btnCxcAlertModalOk = document.getElementById("btn_cxc_alert_modal_ok");
+    const alertModalMessage = document.getElementById("cxc_alert_modal_message");
+    const confirmModalBackdrop = document.getElementById("cxc_confirm_modal_backdrop");
+    const btnCloseConfirmModal = document.getElementById("btn_close_cxc_confirm_modal");
+    const btnCxcConfirmModalCancel = document.getElementById("btn_cxc_confirm_modal_cancel");
+    const btnCxcConfirmModalOk = document.getElementById("btn_cxc_confirm_modal_ok");
+    const confirmModalMessage = document.getElementById("cxc_confirm_modal_message");
+    const btnCxcSelectAll = document.getElementById("btn_cxc_select_all");
+    const btnCxcUnselectAll = document.getElementById("btn_cxc_unselect_all");
+    const btnCxcCerrarCuenta = document.getElementById("btn_cxc_cerrar_cuenta");
+    const btnCxcClienteModal = document.getElementById("btn_cxc_cliente_modal");
+    const btnCxcProyectoModal = document.getElementById("btn_cxc_proyecto_modal");
+    const btnCxcCuentaCajaModal = document.getElementById("btn_cxc_cuenta_caja_modal");
+    const btnCxcCuentaDescRetModal = document.getElementById("btn_cxc_cuenta_desc_ret_modal");
+    const clienteModalBackdrop = document.getElementById("cxc_cliente_modal_backdrop");
+    const btnCloseClienteModal = document.getElementById("btn_close_cxc_cliente_modal");
+    const clienteSearchInput = document.getElementById("cxc_cliente_search_input");
+    const clienteSearchFilter = document.getElementById("cxc_cliente_search_filter");
+    const clienteResultsBody = document.getElementById("cxc_cliente_results_body");
+    const buscarModalBackdrop = document.getElementById("cxc_buscar_modal_backdrop");
+    const btnCloseBuscarModal = document.getElementById("btn_close_cxc_buscar_modal");
+    const buscarSearchInput = document.getElementById("cxc_buscar_input");
+    const buscarSearchFilter = document.getElementById("cxc_buscar_filter");
+    const buscarResultsBody = document.getElementById("cxc_buscar_results_body");
+    const proyectoModalBackdrop = document.getElementById("cxc_proyecto_modal_backdrop");
+    const btnCloseProyectoModal = document.getElementById("btn_close_cxc_proyecto_modal");
+    const proyectoSearchInput = document.getElementById("cxc_proyecto_search_input");
+    const proyectoResultsBody = document.getElementById("cxc_proyecto_results_body");
+    const cuentaDescRetModalBackdrop = document.getElementById("cxc_cuenta_desc_ret_modal_backdrop");
+    const cuentaDescRetModalTitle = document.getElementById("cxc_cuenta_desc_ret_modal_title");
+    const btnCloseCuentaDescRetModal = document.getElementById("btn_close_cxc_cuenta_desc_ret_modal");
+    const cuentaDescRetSearchInput = document.getElementById("cxc_cuenta_desc_ret_search_input");
+    const cuentaDescRetResultsBody = document.getElementById("cxc_cuenta_desc_ret_results_body");
+    const fieldCliente = document.getElementById("cxc_cliente");
+    const fieldNombre = document.getElementById("cxc_nombre");
+    const fieldApodo = document.getElementById("cxc_apodo");
+    const fieldProyecto = document.getElementById("cxc_proyecto");
+    const fieldMoneda = document.getElementById("cxc_moneda");
+    const fieldNo = document.getElementById("cxc_no");
+    const fieldFechaCont = document.getElementById("cxc_fecha_cont");
+    const fieldFechaVenc = document.getElementById("cxc_fecha_venc");
+    const fieldFechaAplic = document.getElementById("cxc_fecha_aplic");
+    const fieldEstado = document.getElementById("cxc_estado");
+    const fieldMetodo = document.getElementById("cxc_metodo");
+    const cxcPaymentGrid = cxcPanel.querySelector(".cxc-payment-grid");
+    const paymentMethodButtons = Array.from(cxcPanel.querySelectorAll("[data-cxc-metodo]"));
+    const paymentConditionalRows = Array.from(cxcPanel.querySelectorAll("[data-cxc-only-method]"));
+    const fieldCuentaPrincipalLabel = document.getElementById("cxc_label_cuenta_principal");
+    const fieldCuentaCaja = document.getElementById("cxc_cuenta_caja");
+    const fieldCuentaCajaDesc = document.getElementById("cxc_cuenta_caja_desc");
+    const fieldNoTransferencia = document.getElementById("cxc_no_transferencia");
+    const fieldCuentaClientePago = document.getElementById("cxc_cta_cliente_pago");
+    const fieldCuentaDescRet = document.getElementById("cxc_cuenta_desc_ret");
+    const fieldCuentaDescRetDesc = document.getElementById("cxc_cuenta_desc_ret_desc");
+    const btnCxcImporteTotal = document.getElementById("btn_cxc_importe_total");
+    const fieldImportePago = document.getElementById("cxc_importe_pago");
+    const fieldBanco = document.getElementById("cxc_banco");
+    const fieldReferenciaPago = document.getElementById("cxc_referencia_pago");
+    const fieldFechaPago = document.getElementById("cxc_fecha_pago");
+    const fieldMonedaPago = document.getElementById("cxc_moneda_pago");
+    const fieldTasa = document.getElementById("cxc_tasa");
+    const fieldComentario = document.getElementById("cxc_comentario");
+    const fieldMedioPago = document.getElementById("cxc_medio_pago");
+    const fieldTotalMora = document.getElementById("cxc_total_mora");
+    const fieldDescAvance = document.getElementById("cxc_desc_avance");
+    const fieldTotalDoc = document.getElementById("cxc_total_doc");
+    const fieldTotalRet = document.getElementById("cxc_total_ret");
+    const fieldTotalPago = document.getElementById("cxc_total_pago");
+    const fieldMontoPagar = document.getElementById("cxc_monto_pagar");
+
+    const fixedReadonlyIds = new Set([
+      "cxc_cliente",
+      "cxc_nombre",
+      "cxc_apodo",
+      "cxc_proyecto",
+      "cxc_moneda",
+      "cxc_no",
+      "cxc_estado",
+      "cxc_moneda_pago",
+      "cxc_cuenta_caja_desc",
+      "cxc_cuenta_desc_ret_desc",
+      "cxc_total_mora",
+      "cxc_desc_avance",
+      "cxc_total_doc",
+      "cxc_total_ret",
+      "cxc_total_pago",
+      "cxc_monto_pagar",
+    ]);
+
+    const headerControls = Array.from(cxcPanel.querySelectorAll(
+      ".cxc-mode-tabs button, .cxc-header-grid input, .cxc-header-grid select, .cxc-header-grid textarea, .cxc-header-grid button"
+    ));
+    const detailControls = Array.from(cxcPanel.querySelectorAll(
+      ".cxc-detail-tabs button, #cxc_detail_panels input, #cxc_detail_panels select, #cxc_detail_panels textarea, #cxc_detail_panels button, .cxc-bottom-grid input, .cxc-bottom-grid select, .cxc-bottom-grid textarea, .cxc-bottom-grid button"
+    ));
+
+    let cxcClienteSeleccionado = false;
+    let cxcDocumentoSeleccionado = false;
+    let cxcReadOnlyReceipt = false;
+    let cxcCloseMode = false;
+    let cxcCloseModeSourceRows = [];
+    let cxcCurrentReciboId = "";
+    let cxcPendingRows = [];
+    let cxcCobrosAnterioresRows = [];
+    let cxcLoadedSummary = null;
+    let cxcSelectedCobroAnteriorKey = "";
+    let cxcSelectedCobroAnterior = null;
+    let cxcLoadedPaymentAmounts = { Efectivo: 0, Transferencia: 0 };
+    let cxcPrintPendingReciboId = "";
+    let cxcPrintPendingReciboLabel = "";
+    let cxcResetAfterPrintModal = false;
+    let cxcCatalogoCuentas = [];
+    let cxcCuentaCatalogTarget = "desc_ret";
+    const cxcDefaultCuentaCaja = {
+      cuenta: "11010101",
+      nombre: "Caja General",
+    };
+    const cxcDefaultCuentaDescRet = {
+      cuenta: "41020102",
+      nombre: "Descuentos en Servicios",
+    };
+    let cxcPaymentAccountState = createCxcPaymentAccountState();
+    let clienteSearchDebounceTimer = null;
+    let buscarSearchDebounceTimer = null;
+    let proyectoSearchDebounceTimer = null;
+    let cuentaDescRetSearchDebounceTimer = null;
+    let modalOpenCount = 0;
+    let cxcAlertResolver = null;
+    let cxcConfirmResolver = null;
+    let cxcAlertOpen = false;
+    let cxcConfirmOpen = false;
+    let cxcLastAutoComentario = "";
+    let cxcComentarioManual = false;
+    const __nativeAlert = window.alert ? window.alert.bind(window) : null;
+    const __nativeConfirm = window.confirm ? window.confirm.bind(window) : null;
+
+    function hasCxcPermission(action) {
+      return Boolean(cxcPermissions?.[action]);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function fmtMoney(value) {
+      const num = Number(value || 0);
+      if (!Number.isFinite(num)) return "0.00";
+      return num.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function fmtEditableAmount(value) {
+      const num = Number(value || 0);
+      if (!Number.isFinite(num)) return "0.00";
+      return num.toFixed(2);
+    }
+
+    function parseAmount(value) {
+      if (value == null || value === "") return 0;
+      const normalized = String(value).replace(/,/g, "");
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function getCookie(name) {
+      const cookieValue = document.cookie
+        .split(";")
+        .map((cookie) => cookie.trim())
+        .find((cookie) => cookie.startsWith(`${name}=`));
+      return cookieValue ? decodeURIComponent(cookieValue.slice(name.length + 1)) : "";
+    }
+
+    function getCsrfToken() {
+      const templateToken = String(document.getElementById("cxc_csrf_token")?.value || "").trim();
+      if (templateToken && templateToken !== "NOTPROVIDED") {
+        return templateToken;
+      }
+      const cookieToken = String(getCookie("csrftoken") || "").trim();
+      return cookieToken.length >= 32 ? cookieToken : "";
+    }
+
+    function amountsMatch(left, right, tolerance = 0.01) {
+      return Math.abs(Number(left || 0) - Number(right || 0)) <= tolerance;
+    }
+
+    function getCxcCurrentPaymentMethod() {
+      return (fieldMetodo?.value || "").trim() === "Transferencia" ? "Transferencia" : "Efectivo";
+    }
+
+    function createCxcPaymentAccountState() {
+      return {
+        Efectivo: {
+          cuenta: cxcDefaultCuentaCaja.cuenta,
+          nombre: cxcDefaultCuentaCaja.nombre,
+        },
+        Transferencia: {
+          cuenta: cxcDefaultCuentaCaja.cuenta,
+          nombre: cxcDefaultCuentaCaja.nombre,
+        },
+      };
+    }
+
+    function getCxcPaymentAccount(method) {
+      const key = method === "Transferencia" ? "Transferencia" : "Efectivo";
+      if (!cxcPaymentAccountState || typeof cxcPaymentAccountState !== "object") {
+        cxcPaymentAccountState = createCxcPaymentAccountState();
+      }
+      if (!cxcPaymentAccountState[key]) {
+        cxcPaymentAccountState[key] = {
+          cuenta: cxcDefaultCuentaCaja.cuenta,
+          nombre: cxcDefaultCuentaCaja.nombre,
+        };
+      }
+      return cxcPaymentAccountState[key];
+    }
+
+    function setCxcPaymentAccount(method, cuenta, nombre) {
+      const account = getCxcPaymentAccount(method);
+      account.cuenta = (cuenta || "").trim();
+      account.nombre = (nombre || "").trim();
+    }
+
+    function syncCxcPaymentAccountFields() {
+      const account = getCxcPaymentAccount(getCxcCurrentPaymentMethod());
+      fieldCuentaCaja.value = account.cuenta || "";
+      fieldCuentaCajaDesc.value = account.nombre || "";
+    }
+
+    function updateCxcPaymentAccountFromFields() {
+      setCxcPaymentAccount(getCxcCurrentPaymentMethod(), fieldCuentaCaja.value || "", fieldCuentaCajaDesc.value || "");
+    }
+
+    function buildImageSrc(base64Value, imageType) {
+      if (!base64Value) return "";
+      const normalizedType = String(imageType || "").trim().toLowerCase();
+      if (normalizedType.startsWith("image/")) {
+        return `data:${normalizedType};base64,${base64Value}`;
+      }
+      if (normalizedType) {
+        return `data:image/${normalizedType};base64,${base64Value}`;
+      }
+      return `data:image/png;base64,${base64Value}`;
+    }
+
+    function lockPageScroll() {
+      modalOpenCount = Math.max(0, modalOpenCount + 1);
+      document.body.classList.add("modal-open");
+    }
+
+    function unlockPageScroll() {
+      modalOpenCount = Math.max(0, modalOpenCount - 1);
+      if (modalOpenCount === 0) {
+        document.body.classList.remove("modal-open");
+      }
+    }
+
+    function activateTabset(tabset, targetId) {
+      const buttons = Array.from(tabset.querySelectorAll("[data-target]"));
+      const panelsRootId = tabset.getAttribute("data-panels");
+      const panelsRoot = panelsRootId ? document.getElementById(panelsRootId) : null;
+      if (!buttons.length || !panelsRoot) return;
+      buttons.forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-target") === targetId);
+      });
+      panelsRoot.querySelectorAll(".cxc-tabpanel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === targetId);
+      });
+    }
+
+    function getCobroAnteriorKey(row) {
+      if (!row) return "";
+      return [
+        row.recibo_id || row.no_recibo || "",
+        row.no_factura || "",
+        row.no_cuota || "",
+        row.fecha_rec || "",
+      ].join("|");
+    }
+
+    function syncCxcMobileHistoryActions() {
+      if (!cxcMobileHistoryActions) return;
+      const mobileContext = isCxcMobilePrintContext();
+      cxcMobileHistoryActions.hidden = !mobileContext;
+      if (!mobileContext) return;
+
+      const reciboLabel = cxcSelectedCobroAnterior?.no_recibo || cxcSelectedCobroAnterior?.recibo_id || "";
+      if (cxcMobileHistorySelected) {
+        cxcMobileHistorySelected.textContent = reciboLabel
+          ? `Cobro seleccionado: ${reciboLabel}`
+          : "Ningun cobro seleccionado.";
+      }
+      if (btnCxcMobileHistoryPrint) {
+        btnCxcMobileHistoryPrint.disabled = !hasCxcPermission("imprimir") || !reciboLabel;
+      }
+    }
+
+    function syncCxcViewportLayout() {
+      if (!cxcPanel) return;
+      if (window.innerWidth <= 900) {
+        cxcPanel.style.removeProperty("--cxc-panel-available-height");
+        return;
+      }
+      const rect = cxcPanel.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const availableHeight = Math.max(Math.floor(viewportHeight - rect.top - 18), 0);
+      cxcPanel.style.setProperty("--cxc-panel-available-height", `${availableHeight}px`);
+    }
+
+    function hideCobrosContextMenu() {
+      if (!cxcCobrosContextMenu) return;
+      cxcCobrosContextMenu.classList.remove("open");
+      cxcCobrosContextMenu.setAttribute("aria-hidden", "true");
+      cxcCobrosContextMenu.style.left = "-9999px";
+      cxcCobrosContextMenu.style.top = "-9999px";
+    }
+
+    function hideEstadoContextMenu() {
+      if (!cxcEstadoContextMenu) return;
+      cxcEstadoContextMenu.classList.remove("open");
+      cxcEstadoContextMenu.setAttribute("aria-hidden", "true");
+      cxcEstadoContextMenu.style.left = "-9999px";
+      cxcEstadoContextMenu.style.top = "-9999px";
+    }
+
+    function closeCxcPrintModal() {
+      if (!printModalBackdrop?.classList.contains("open")) return;
+      const shouldResetAfterClose = cxcResetAfterPrintModal;
+      printModalBackdrop.classList.remove("open");
+      printModalBackdrop.setAttribute("aria-hidden", "true");
+      cxcPrintPendingReciboId = "";
+      cxcPrintPendingReciboLabel = "";
+      cxcResetAfterPrintModal = false;
+      unlockPageScroll();
+      if (shouldResetAfterClose) {
+        setCxcInitialState();
+      }
+    }
+
+    function syncCxcPrintModalSummary() {
+      const copies = normalizeCxcPrintCopies(fieldCxcPrintModalCopies?.value);
+      if (printModalRecibo) {
+        printModalRecibo.textContent = cxcPrintPendingReciboLabel || cxcPrintPendingReciboId || "-";
+      }
+      if (printModalTotalHojas) {
+        printModalTotalHojas.textContent = String(copies);
+      }
+      if (printModalTotalRecibos) {
+        printModalTotalRecibos.textContent = String(copies);
+      }
+    }
+
+    function openCxcPrintModal(reciboId, reciboLabel = "") {
+      if (!hasCxcPermission("imprimir")) {
+        window.alert("No tienes permiso para imprimir recibos de cuentas por cobrar.");
+        return;
+      }
+      if (!reciboId || !printModalBackdrop) {
+        window.alert("No se pudo identificar el recibo para imprimir.");
+        return;
+      }
+      cxcPrintPendingReciboId = String(reciboId);
+      cxcPrintPendingReciboLabel = String(reciboLabel || reciboId);
+      if (fieldCxcPrintModalCopies) {
+        fieldCxcPrintModalCopies.value = "2";
+      }
+      syncCxcPrintModalSummary();
+      printModalBackdrop.classList.add("open");
+      printModalBackdrop.setAttribute("aria-hidden", "false");
+      lockPageScroll();
+      fieldCxcPrintModalCopies?.focus();
+      fieldCxcPrintModalCopies?.select();
+    }
+
+    function closeCxcAlertModal() {
+      if (!alertModalBackdrop?.classList.contains("open")) return;
+      alertModalBackdrop.classList.remove("open");
+      alertModalBackdrop.setAttribute("aria-hidden", "true");
+      cxcAlertOpen = false;
+      unlockPageScroll();
+      if (cxcAlertResolver) {
+        const resolve = cxcAlertResolver;
+        cxcAlertResolver = null;
+        resolve();
+      }
+    }
+
+    function showCxcAlert(message) {
+      if (!alertModalBackdrop || !alertModalMessage) {
+        if (__nativeAlert) __nativeAlert(message);
+        return Promise.resolve();
+      }
+      if (cxcAlertOpen) {
+        closeCxcAlertModal();
+      }
+      return new Promise((resolve) => {
+        alertModalMessage.textContent = String(message ?? "");
+        cxcAlertResolver = resolve;
+        alertModalBackdrop.classList.add("open");
+        alertModalBackdrop.setAttribute("aria-hidden", "false");
+        cxcAlertOpen = true;
+        lockPageScroll();
+        btnCxcAlertModalOk?.focus();
+      });
+    }
+
+    function closeCxcConfirmModal(result = false) {
+      if (!confirmModalBackdrop?.classList.contains("open")) return;
+      confirmModalBackdrop.classList.remove("open");
+      confirmModalBackdrop.setAttribute("aria-hidden", "true");
+      cxcConfirmOpen = false;
+      unlockPageScroll();
+      if (cxcConfirmResolver) {
+        const resolve = cxcConfirmResolver;
+        cxcConfirmResolver = null;
+        resolve(!!result);
+      }
+    }
+
+    function showCxcConfirm(message) {
+      if (!confirmModalBackdrop || !confirmModalMessage) {
+        return Promise.resolve(__nativeConfirm ? __nativeConfirm(message) : false);
+      }
+      if (cxcConfirmOpen) {
+        closeCxcConfirmModal(false);
+      }
+      return new Promise((resolve) => {
+        confirmModalMessage.textContent = String(message ?? "");
+        cxcConfirmResolver = resolve;
+        confirmModalBackdrop.classList.add("open");
+        confirmModalBackdrop.setAttribute("aria-hidden", "false");
+        cxcConfirmOpen = true;
+        lockPageScroll();
+        btnCxcConfirmModalOk?.focus();
+      });
+    }
+
+    const __customAlert = (message) => {
+      void showCxcAlert(message);
+    };
+    window.alert = __customAlert;
+    globalThis.alert = __customAlert;
+
+    function selectCobroAnteriorRow(rowData) {
+      cxcSelectedCobroAnterior = rowData || null;
+      cxcSelectedCobroAnteriorKey = getCobroAnteriorKey(rowData);
+      cxcCobrosAnterioresBody.querySelectorAll("tr.cxc-history-row").forEach((rowEl) => {
+        rowEl.classList.toggle("is-selected", rowEl.dataset.rowKey === cxcSelectedCobroAnteriorKey);
+      });
+      syncCxcMobileHistoryActions();
+    }
+
+    function showCobrosContextMenu(event, rowData) {
+      if (!cxcCobrosContextMenu || !hasCxcPermission("imprimir")) return;
+      selectCobroAnteriorRow(rowData);
+      const menuWidth = 128;
+      const menuHeight = 44;
+      const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+      const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+      cxcCobrosContextMenu.style.left = `${Math.max(8, left)}px`;
+      cxcCobrosContextMenu.style.top = `${Math.max(8, top)}px`;
+      cxcCobrosContextMenu.classList.add("open");
+      cxcCobrosContextMenu.setAttribute("aria-hidden", "false");
+    }
+
+    function showEstadoContextMenu(event) {
+      if (!cxcEstadoContextMenu) return;
+      const menuWidth = 128;
+      const menuHeight = 44;
+      const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+      const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+      cxcEstadoContextMenu.style.left = `${Math.max(8, left)}px`;
+      cxcEstadoContextMenu.style.top = `${Math.max(8, top)}px`;
+      cxcEstadoContextMenu.classList.add("open");
+      cxcEstadoContextMenu.setAttribute("aria-hidden", "false");
+    }
+
+    function normalizeCxcPrintCopies(value) {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isFinite(parsed)) return 2;
+      return Math.min(20, Math.max(1, parsed));
+    }
+
+    function getCxcPrintCopies() {
+      const normalized = normalizeCxcPrintCopies(fieldCxcPrintModalCopies?.value);
+      if (fieldCxcPrintModalCopies) {
+        fieldCxcPrintModalCopies.value = String(normalized);
+      }
+      return normalized;
+    }
+
+    function buildCxcReceiptHtml(printData, copyCount = 2, options = {}) {
+      const empresa = printData?.empresa || {};
+      const cliente = printData?.cliente || {};
+      const documento = printData?.documento || {};
+      const detalle = Array.isArray(printData?.detalle) ? printData.detalle : [];
+      const metodosPago = Array.isArray(printData?.metodos_pago) ? printData.metodos_pago : [];
+      const copies = normalizeCxcPrintCopies(copyCount);
+      const standaloneActions = Boolean(options?.standaloneActions);
+      const receiptNumber = String(documento.no_recibo || "").trim();
+      const documentTitle = receiptNumber ? `Recibo de ingreso ${receiptNumber}` : "Recibo de ingreso";
+      const logoSrc = buildImageSrc(empresa.logo_b64, empresa.logo_tipo);
+      const comentarioHtml = escapeHtml(documento.comentario || "").replace(/\n/g, "<br>");
+      const isCancelledReceipt = String(documento.estado || "").trim().toUpperCase() === "CANCELADO";
+      const metodoPagoHtml = metodosPago.map((item) => `
+        <div class="payment-line">
+          <span>${escapeHtml(item.label || "")} ---&gt;</span>
+          <strong>${fmtMoney(item.amount)}</strong>
+        </div>
+      `).join("");
+      const balanceFacturasMap = new Map();
+      detalle.forEach((item) => {
+        const noFactura = String(item.no_factura || "").trim();
+        if (!noFactura) return;
+        const existing = balanceFacturasMap.get(noFactura) || {
+          balanceTotalFactura: 0,
+          montoAplicado: 0,
+          balanceDetalle: 0,
+        };
+        existing.balanceTotalFactura = Math.max(
+          Number(existing.balanceTotalFactura || 0),
+          Number(item.balance_total_factura || 0)
+        );
+        existing.montoAplicado += Number(item.monto_aplicado || 0);
+        existing.balanceDetalle += Number(item.balance_pendiente || 0);
+        balanceFacturasMap.set(noFactura, existing);
+      });
+      const balanceFacturasHtml = Array.from(balanceFacturasMap.entries()).map(([noFactura, summary]) => {
+        const balanceTotalFactura = Number(summary?.balanceTotalFactura || 0);
+        const balanceDetalle = Number(summary?.balanceDetalle || 0);
+        const balancePendiente = balanceTotalFactura > 0
+          ? Math.max(balanceTotalFactura, 0)
+          : Math.max(balanceDetalle, 0);
+        return `
+        <div class="paid-balance-line">
+          <span>#${escapeHtml(noFactura)}</span>
+          <strong>RD$ ${fmtMoney(balancePendiente)}</strong>
+        </div>
+      `;
+      }).join("");
+
+      const rowsHtml = detalle.map((item) => `
+        <tr>
+          <td>${escapeHtml(item.td || "")}</td>
+          <td>${escapeHtml(item.no_factura || "")}</td>
+          <td style="text-align:center;">${escapeHtml(item.no_cuota || "")}</td>
+          <td>${escapeHtml(item.fecha_cont || "")}</td>
+          <td>${escapeHtml(item.fecha_venc || "")}</td>
+          <td class="num">${fmtMoney(item.balance_fact)}</td>
+          <td class="num">${fmtMoney(item.mora)}</td>
+          <td class="num">${fmtMoney(item.descuento)}</td>
+          <td class="num">${fmtMoney(item.monto_aplicado)}</td>
+          <td class="num">${fmtMoney(item.balance_pendiente)}</td>
+        </tr>
+      `).join("");
+
+      const receiptInnerHtml = `
+        <div class="receipt">
+          <div class="header">
+            <div class="logo-box">
+              ${logoSrc ? `<img src="${logoSrc}" alt="Logo empresa" />` : ""}
+            </div>
+            <div class="company-meta">
+              <h1 class="company-name">${escapeHtml(empresa.nombre || "")}</h1>
+              <div class="company-line">${escapeHtml(empresa.direccion || "")}</div>
+              <div class="company-line">Telefono: ${escapeHtml([empresa.tel1, empresa.tel2].filter(Boolean).join("  "))} ${empresa.email ? `&nbsp;&nbsp; E-Mail: ${escapeHtml(empresa.email)}` : ""}</div>
+              <div class="company-rnc">RNC: ${escapeHtml(empresa.rnc || "")}</div>
+              <div class="sector-badge">${escapeHtml(cliente.sector || "")}</div>
+              ${isCancelledReceipt ? `<div class="cancelled-badge">CANCELADO</div>` : ""}
+            </div>
+          </div>
+
+          <div class="title">RECIBO DE INGRESO</div>
+
+          <div class="info-grid">
+            <div class="info-block">
+              <div class="info-row"><strong>Hemos recibido de</strong><span>:</span><span>${escapeHtml(cliente.nombre || "")}</span></div>
+              <div class="info-row"><strong>Codigo</strong><span>:</span><span>${escapeHtml(cliente.codigo || "")}</span></div>
+              <div class="info-row"><strong>RNC/Ced.</strong><span>:</span><span>${escapeHtml(cliente.rnc_ced || "")}</span></div>
+              <div class="info-row"><strong>La suma de</strong><span>:</span><span>${escapeHtml(documento.suma_letras || "")}</span></div>
+              <div class="info-row"><strong>Moneda de pago</strong><span>:</span><span>${escapeHtml(documento.moneda_pago || "RD$")}</span></div>
+              <div class="info-row"><strong>Monto en RD$</strong><span>:</span><span>${fmtMoney(documento.monto_rd)}</span></div>
+            </div>
+
+            <div class="info-block info-right">
+              <div class="info-row"><strong>No. Recibo</strong><span>:</span><span style="color:#001c9c;">${escapeHtml(documento.no_recibo || "")}</span></div>
+              <div class="info-row"><strong>Fecha cont.</strong><span>:</span><span>${escapeHtml(documento.fecha_cont || "")}</span></div>
+              <div class="info-row"><strong>Moneda Doc</strong><span>:</span><span>${escapeHtml(documento.moneda_doc || "RD$")}</span></div>
+              <div class="info-row"><strong>Tasa pago</strong><span>:</span><span>${fmtMoney(documento.tasa_pago || 1)}</span></div>
+            </div>
+          </div>
+
+          <table class="receipt-table">
+            <colgroup>
+              <col style="width: 6%;" />
+              <col style="width: 13%;" />
+              <col style="width: 7%;" />
+              <col style="width: 10%;" />
+              <col style="width: 10%;" />
+              <col style="width: 11%;" />
+              <col style="width: 7%;" />
+              <col style="width: 9%;" />
+              <col style="width: 13%;" />
+              <col style="width: 14%;" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>TDN.</th>
+                <th>Factura No.</th>
+                <th>No. cuota</th>
+                <th>Fecha cont.</th>
+                <th>Fecha venc</th>
+                <th>Balance fact</th>
+                <th>Mora</th>
+                <th>Descuento</th>
+                <th>Monto aplicado</th>
+                <th>Bce. pendiente</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || `<tr><td colspan="10">Sin lineas de detalle.</td></tr>`}
+            </tbody>
+          </table>
+
+          <div class="comment-payment">
+            <div class="comment-box">
+              <strong>Comentario:</strong><br />
+              <span>${comentarioHtml || "&nbsp;"}</span>
+            </div>
+            <div class="payment-summary">
+              ${metodoPagoHtml}
+            </div>
+          </div>
+
+          <div class="totals-grid">
+            <div class="balance-stack">
+              <div class="paid-balance-box">
+                <div class="paid-balance-title">Balance de Fact. pagadas</div>
+                ${balanceFacturasHtml || `<div class="paid-balance-empty">Sin facturas aplicadas.</div>`}
+              </div>
+              <div class="balance-box">Balance Total del Cliente: RD$ ${fmtMoney(printData.balance_rd)}</div>
+            </div>
+            <div class="total-box">
+              <div class="line">
+                <span>Total Recibo---&gt; RD$</span>
+                <span></span>
+                <span class="total-amount">${fmtMoney(printData.total_recibo)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="end-line">Fin del documento</div>
+
+          <div class="signatures">
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div>${escapeHtml(printData.usuario_nombre || "")}</div>
+              <div>Realizado por</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div>&nbsp;</div>
+              <div>Recibido por</div>
+            </div>
+          </div>
+
+          <div class="footer-meta">
+            <div>Page 1 of 1</div>
+            <div class="center">Registrado por: ${escapeHtml(printData.usuario_nombre || "")}</div>
+            <div class="right">${escapeHtml(printData.impreso_fecha || "")} ${escapeHtml(printData.impreso_hora || "")}</div>
+          </div>
+        </div>
+      `;
+
+      const pagesHtml = Array.from({ length: copies }, () => `
+        <section class="print-sheet">
+          ${receiptInnerHtml}
+        </section>
+      `).join("");
+      const standaloneConfig = JSON.stringify({
+        noRecibo: receiptNumber,
+        reciboId: String(options?.reciboId || receiptNumber || ""),
+        markPrintedUrl: String(options?.markPrintedUrl || ""),
+        csrfToken: String(options?.csrfToken || ""),
+        pdfUrl: String(options?.pdfUrl || ""),
+        copyCount: normalizeCxcPrintCopies(options?.copyCount || copies),
+      });
+      const standaloneToolbarHtml = standaloneActions ? `
+          <div class="screen-toolbar" data-receipt-screen-only>
+            <div class="screen-toolbar-title">${escapeHtml(documentTitle)}</div>
+            <div class="screen-toolbar-actions">
+              <button type="button" id="cxc_receipt_screen_print">Imprimir</button>
+              <button type="button" id="cxc_receipt_screen_share">Compartir PDF</button>
+              <button type="button" id="cxc_receipt_screen_download">Descargar PDF</button>
+            </div>
+            <div class="screen-toolbar-note" id="cxc_receipt_screen_note">
+              En movil, usa "Compartir PDF" para enviar el recibo. El boton compartir del navegador suele enviar solo la URL.
+            </div>
+          </div>
+      ` : "";
+      const standaloneScript = standaloneActions ? `
+          <script data-receipt-script>
+            (function () {
+              const config = ${standaloneConfig};
+              const printButton = document.getElementById("cxc_receipt_screen_print");
+              const shareButton = document.getElementById("cxc_receipt_screen_share");
+              const downloadButton = document.getElementById("cxc_receipt_screen_download");
+              const note = document.getElementById("cxc_receipt_screen_note");
+              let hasMarkedPrinted = false;
+              let pdfBlobPromise = null;
+
+              function getDefaultNoteText() {
+                return 'En movil, usa "Compartir PDF" para enviar el recibo. El boton compartir del navegador suele enviar solo la URL.';
+              }
+
+              function sanitizeFilename(value) {
+                return String(value || "recibo")
+                  .replace(/[\\\\/:*?\"<>|]+/g, "-")
+                  .replace(/\\s+/g, " ")
+                  .trim() || "recibo";
+              }
+
+              function buildPdfFileName() {
+                return "Recibo-" + sanitizeFilename(config.noRecibo || "ingreso") + ".pdf";
+              }
+
+              function setScreenBusyState(isBusy, message = "") {
+                if (printButton) {
+                  printButton.disabled = isBusy;
+                }
+                if (shareButton) {
+                  shareButton.disabled = isBusy;
+                }
+                if (downloadButton) {
+                  downloadButton.disabled = isBusy;
+                }
+                if (note && message) {
+                  note.textContent = message;
+                }
+              }
+
+              async function fetchReceiptPdfBlob() {
+                if (!pdfBlobPromise) {
+                  pdfBlobPromise = (async () => {
+                    if (!config.pdfUrl || !config.reciboId) {
+                      throw new Error("pdf-url-unavailable");
+                    }
+                    const pdfUrl = new URL(config.pdfUrl, window.location.origin);
+                    pdfUrl.searchParams.set("recibo_id", config.reciboId);
+                    pdfUrl.searchParams.set("copies", String(Math.max(Number(config.copyCount || 1), 1)));
+                    const response = await fetch(pdfUrl.toString(), {
+                      headers: { "X-Requested-With": "XMLHttpRequest" },
+                      credentials: "same-origin",
+                    });
+                    if (!response.ok) {
+                      throw new Error("pdf-fetch-failed");
+                    }
+                    return await response.blob();
+                  })().catch((error) => {
+                    pdfBlobPromise = null;
+                    throw error;
+                  });
+                }
+                return await pdfBlobPromise;
+              }
+
+              async function downloadPdfDocument() {
+                const pdfBlob = await fetchReceiptPdfBlob();
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                const link = document.createElement("a");
+                link.href = blobUrl;
+                link.download = buildPdfFileName();
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+              }
+
+              async function markPrinted() {
+                if (hasMarkedPrinted || !config.markPrintedUrl || !config.reciboId || !config.csrfToken) {
+                  return;
+                }
+                hasMarkedPrinted = true;
+                try {
+                  await fetch(config.markPrintedUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "X-CSRFToken": config.csrfToken,
+                      "X-Requested-With": "XMLHttpRequest",
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify({ recibo_id: config.reciboId }),
+                  });
+                } catch (error) {
+                  hasMarkedPrinted = false;
+                }
+              }
+
+              async function shareStandaloneDocument() {
+                if (!navigator.share) {
+                  await downloadPdfDocument();
+                  if (note) {
+                    note.textContent = "Tu navegador no permite compartir archivos desde aqui. El recibo PDF se descargo para que puedas compartirlo manualmente.";
+                  }
+                  return;
+                }
+
+                try {
+                  const pdfBlob = await fetchReceiptPdfBlob();
+                  if (typeof File !== "function") {
+                    throw new Error("file-constructor-unavailable");
+                  }
+                  const file = new File([pdfBlob], buildPdfFileName(), { type: "application/pdf" });
+                  const sharePayload = {
+                    title: config.noRecibo ? "Recibo de ingreso " + config.noRecibo : "Recibo de ingreso",
+                    text: config.noRecibo ? "Recibo de ingreso " + config.noRecibo : "Recibo de ingreso",
+                    files: [file],
+                  };
+                  if (navigator.canShare && !navigator.canShare({ files: sharePayload.files })) {
+                    throw new Error("files-not-supported");
+                  }
+                  await navigator.share(sharePayload);
+                } catch (error) {
+                  if (error && error.name === "AbortError") {
+                    return;
+                  }
+                  await downloadPdfDocument();
+                  if (note) {
+                    note.textContent = "No se pudo compartir el PDF directamente. El recibo se descargo como PDF para que puedas compartirlo desde tu telefono.";
+                  }
+                }
+              }
+
+              printButton?.addEventListener("click", async () => {
+                await markPrinted();
+                window.print();
+              });
+
+              shareButton?.addEventListener("click", async () => {
+                setScreenBusyState(true, "Preparando PDF para compartir...");
+                try {
+                  await shareStandaloneDocument();
+                } finally {
+                  setScreenBusyState(false, note?.textContent || getDefaultNoteText());
+                }
+              });
+
+              downloadButton?.addEventListener("click", async () => {
+                setScreenBusyState(true, "Preparando PDF para descargar...");
+                try {
+                  await downloadPdfDocument();
+                  if (note) {
+                    note.textContent = "El recibo se descargo como PDF.";
+                  }
+                } finally {
+                  setScreenBusyState(false, note?.textContent || getDefaultNoteText());
+                }
+              });
+            })();
+          <\/script>
+      ` : "";
+
+      return `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>${escapeHtml(documentTitle)}</title>
+          <style>
+            @page {
+              size: 210mm 148.5mm;
+              margin: 0;
+            }
+
+            html, body {
+              margin: 0;
+              padding: 0;
+              width: 210mm;
+              height: 148.5mm;
+              background: #ffffff;
+              color: #000000;
+              font-family: Arial, Helvetica, sans-serif;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              background: #ffffff;
+            }
+
+            .screen-toolbar {
+              display: none;
+            }
+
+            .screen-pages {
+              display: block;
+            }
+
+            .print-sheet {
+              width: 210mm;
+              height: 148.5mm;
+              padding: 6mm 14mm 0 6mm;
+              page-break-after: always;
+              break-after: page;
+              overflow: hidden;
+            }
+
+            .print-sheet:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+
+            .receipt {
+              width: 190mm;
+              max-width: 100%;
+              height: 140mm;
+              padding: 2.8mm 1.8mm 1.4mm 1.2mm;
+              margin: 0 auto 0 0;
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+            }
+
+            .header {
+              display: grid;
+              grid-template-columns: 33mm minmax(0, 1fr);
+              gap: 4mm;
+              align-items: start;
+            }
+
+            .logo-box {
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+            }
+
+            .logo-box img {
+              max-width: 24mm;
+              max-height: 24mm;
+              object-fit: contain;
+            }
+
+            .company-meta {
+              min-width: 0;
+            }
+
+            .company-name {
+              margin: 0;
+              font-size: 11.4pt;
+              color: #001c9c;
+              font-weight: 800;
+              text-transform: uppercase;
+            }
+
+            .company-line {
+              font-size: 7.7pt;
+              line-height: 1.14;
+            }
+
+            .company-rnc {
+              margin-top: 0.5mm;
+              font-size: 8.1pt;
+              font-weight: 800;
+            }
+
+            .sector-badge {
+              margin-top: 0.5mm;
+              text-align: right;
+              font-size: 8pt;
+              font-weight: 800;
+              color: #ff0000;
+              text-transform: uppercase;
+            }
+
+            .cancelled-badge {
+              margin-top: 0.7mm;
+              text-align: right;
+              font-size: 11.4pt;
+              font-weight: 900;
+              color: #c31212;
+              text-transform: uppercase;
+              letter-spacing: 1pt;
+            }
+
+            .title {
+              margin: 1.8mm 0 1.6mm;
+              text-align: center;
+              font-size: 12pt;
+              font-weight: 800;
+              letter-spacing: 2.3pt;
+            }
+
+            .info-grid {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) 44mm;
+              gap: 7mm;
+              align-items: start;
+            }
+
+            .info-block {
+              font-size: 8.1pt;
+              line-height: 1.2;
+            }
+
+            .info-row {
+              display: grid;
+              grid-template-columns: auto 2.6mm 1fr;
+              gap: 0.4mm;
+              align-items: baseline;
+            }
+
+            .info-row strong {
+              font-weight: 800;
+            }
+
+            .info-right .info-row {
+              grid-template-columns: auto 2.6mm auto;
+              justify-content: end;
+            }
+
+            .receipt-table {
+              width: 100%;
+              margin-top: 1.8mm;
+              border-collapse: collapse;
+              table-layout: fixed;
+              font-size: 6.4pt;
+            }
+
+            .receipt-table thead th {
+              padding: 0.75mm 0.45mm;
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+              text-align: left;
+              font-weight: 800;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+              line-height: 1.08;
+            }
+
+            .receipt-table tbody td {
+              padding: 0.8mm 0.45mm;
+              border-bottom: 1px solid #d7d7d7;
+              font-size: 7pt;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+              line-height: 1.08;
+            }
+
+            .receipt-table .num {
+              text-align: right;
+              white-space: nowrap;
+            }
+
+            .comment-payment {
+              margin-top: 1.8mm;
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) 44mm;
+              gap: 8mm;
+              align-items: start;
+            }
+
+            .comment-box {
+              font-size: 7.5pt;
+              line-height: 1.18;
+            }
+
+            .comment-box strong {
+              display: inline-block;
+              margin-bottom: 0.3mm;
+            }
+
+            .payment-summary {
+              font-size: 7.5pt;
+              padding-top: 1.2mm;
+            }
+
+            .payment-line {
+              display: flex;
+              justify-content: space-between;
+              gap: 2.4mm;
+              margin-bottom: 0.5mm;
+            }
+
+            .totals-grid {
+              margin-top: 2mm;
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) 54mm;
+              gap: 7mm;
+              align-items: end;
+            }
+
+            .balance-stack {
+              display: grid;
+              gap: 1.2mm;
+            }
+
+            .paid-balance-box {
+              padding: 1.1mm 1.5mm;
+              border: 1px solid #000;
+              font-size: 8pt;
+              line-height: 1.2;
+            }
+
+            .paid-balance-title {
+              margin-bottom: 0.7mm;
+              font-weight: 800;
+            }
+
+            .paid-balance-line {
+              display: flex;
+              justify-content: space-between;
+              gap: 2.2mm;
+              margin-bottom: 0.45mm;
+              font-size: 7.6pt;
+            }
+
+            .paid-balance-line:last-child {
+              margin-bottom: 0;
+            }
+
+            .paid-balance-empty {
+              font-size: 7.4pt;
+            }
+
+            .balance-box {
+              font-size: 8.3pt;
+              font-weight: 800;
+            }
+
+            .total-box {
+              justify-self: end;
+              width: 100%;
+              font-size: 8.3pt;
+              font-weight: 800;
+              text-align: right;
+            }
+
+            .total-box .line {
+              display: grid;
+              grid-template-columns: auto auto 1fr;
+              gap: 1mm;
+              align-items: center;
+            }
+
+            .total-amount {
+              min-width: 25mm;
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+              text-align: right;
+              padding: 0.45mm 0.7mm;
+            }
+
+            .end-line {
+              margin: 3mm auto 0;
+              width: 82%;
+              text-align: center;
+              font-size: 7.2pt;
+              position: relative;
+            }
+
+            .end-line::before,
+            .end-line::after {
+              content: "";
+              position: absolute;
+              top: 50%;
+              width: 38%;
+              border-top: 1px dashed #333;
+            }
+
+            .end-line::before {
+              left: 0;
+            }
+
+            .end-line::after {
+              right: 0;
+            }
+
+            .signatures {
+              margin-top: auto;
+              padding-top: 8mm;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 16mm;
+              align-items: start;
+            }
+
+            .signature-box {
+              text-align: center;
+              font-size: 7.2pt;
+            }
+
+            .signature-line {
+              width: 40mm;
+              margin: 0 auto 1mm;
+              border-top: 1px solid #000;
+              height: 0;
+            }
+
+            .footer-meta {
+              margin-top: 2mm;
+              padding-top: 0.8mm;
+              border-top: 1px solid #000;
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 3mm;
+              align-items: center;
+              font-size: 6.2pt;
+            }
+
+            .footer-meta .center {
+              text-align: center;
+            }
+
+            .footer-meta .right {
+              text-align: right;
+            }
+
+            @media screen {
+              html,
+              body {
+                width: auto;
+                height: auto;
+                min-height: 100%;
+                background: #eef3f8;
+              }
+
+              body {
+                min-height: 100vh;
+                padding: 12px;
+              }
+
+              .screen-toolbar {
+                display: block;
+                position: sticky;
+                top: 0;
+                z-index: 20;
+                max-width: 210mm;
+                margin: 0 auto 12px;
+                padding: 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 14px;
+                background: #ffffff;
+                box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+              }
+
+              .screen-toolbar-title {
+                font-size: 15px;
+                font-weight: 800;
+                color: #0f172a;
+              }
+
+              .screen-toolbar-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-top: 10px;
+              }
+
+              .screen-toolbar-actions button {
+                border: 0;
+                border-radius: 10px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: 700;
+                color: #ffffff;
+                background: #0f4c81;
+              }
+
+              .screen-toolbar-actions button#cxc_receipt_screen_share {
+                background: #15803d;
+              }
+
+              .screen-toolbar-actions button#cxc_receipt_screen_download {
+                background: #475569;
+              }
+
+              .screen-toolbar-note {
+                margin-top: 10px;
+                font-size: 12px;
+                line-height: 1.4;
+                color: #475569;
+              }
+
+              .screen-pages {
+                display: grid;
+                gap: 12px;
+              }
+
+              .print-sheet {
+                margin: 0 auto;
+                background: #ffffff;
+                box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+              }
+            }
+
+            @media print {
+              html,
+              body {
+                width: 210mm;
+                height: 148.5mm;
+                background: #ffffff;
+              }
+
+              body {
+                padding: 0;
+              }
+
+              .screen-toolbar {
+                display: none !important;
+              }
+
+              .screen-pages {
+                display: block;
+              }
+
+              .print-sheet {
+                margin: 0;
+                box-shadow: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${standaloneToolbarHtml}
+          <main class="screen-pages">
+            ${pagesHtml}
+          </main>
+          ${standaloneScript}
+        </body>
+        </html>
+      `;
+    }
+
+    function isCxcMobilePrintContext() {
+      const ua = navigator.userAgent || "";
+      if (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean") {
+        return navigator.userAgentData.mobile;
+      }
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    }
+
+    async function printCxcReceipt(reciboId, copyCount = getCxcPrintCopies()) {
+      if (!reciboId) {
+        window.alert("No se pudo identificar el recibo para imprimir.");
+        return;
+      }
+
+      const normalizedCopies = normalizeCxcPrintCopies(copyCount);
+      const markPrinted = async () => {
+        try {
+          await fetch(cxcMarcarImpresoUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCsrfToken(),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ recibo_id: reciboId }),
+          });
+        } catch (error) {
+          // La impresion no debe fallar por no poder marcar el recibo.
+        }
+      };
+
+      if (isCxcMobilePrintContext()) {
+        const pdfUrl = new URL(cxcPdfUrl, window.location.origin);
+        pdfUrl.searchParams.set("recibo_id", String(reciboId || "").trim());
+        pdfUrl.searchParams.set("copies", String(normalizedCopies));
+        const mobilePdfWindow = window.open(pdfUrl.toString(), "_blank");
+        if (!mobilePdfWindow) {
+          window.alert("El navegador bloqueo la apertura del PDF. Permite ventanas emergentes e intenta de nuevo.");
+          return;
+        }
+        void markPrinted();
+        try {
+          mobilePdfWindow.focus();
+        } catch (error) {
+          // Si el navegador no permite enfocar, el PDF igual queda abierto.
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(`${cxcPrintDataUrl}?recibo_id=${encodeURIComponent(reciboId)}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!res.ok) {
+          window.alert("No se pudo cargar el recibo para imprimir.");
+          return;
+        }
+        const data = await res.json();
+        const html = buildCxcReceiptHtml(data.print_data || {}, normalizedCopies);
+
+        const printFrame = document.createElement("iframe");
+        printFrame.setAttribute("aria-hidden", "true");
+        printFrame.style.position = "fixed";
+        printFrame.style.right = "0";
+        printFrame.style.bottom = "0";
+        printFrame.style.width = "0";
+        printFrame.style.height = "0";
+        printFrame.style.border = "0";
+        printFrame.style.opacity = "0";
+        printFrame.style.pointerEvents = "none";
+        document.body.appendChild(printFrame);
+
+        const frameDoc = printFrame.contentWindow?.document;
+        if (!frameDoc || !printFrame.contentWindow) {
+          printFrame.remove();
+          window.alert("No se pudo preparar la impresion.");
+          return;
+        }
+
+        frameDoc.open();
+        frameDoc.write(html);
+        frameDoc.close();
+
+        let hasPrinted = false;
+        const cleanup = () => {
+          setTimeout(() => printFrame.remove(), 250);
+        };
+        const triggerPrint = () => {
+          if (hasPrinted) return;
+          hasPrinted = true;
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+          void markPrinted();
+        };
+
+        printFrame.onload = () => {
+          setTimeout(triggerPrint, 150);
+        };
+        printFrame.contentWindow.onafterprint = cleanup;
+        setTimeout(triggerPrint, 1000);
+      } catch (error) {
+        window.alert("Error de conexion preparando la impresion.");
+      }
+    }
+
+    function setControlsInteractive(controls, enabled) {
+      controls.forEach((control) => {
+        if (!control) return;
+        if (control.tagName === "BUTTON") {
+          control.disabled = !enabled;
+          return;
+        }
+        if (control.tagName === "SELECT") {
+          control.disabled = !enabled;
+          return;
+        }
+        if (control.tagName === "TEXTAREA") {
+          control.disabled = !enabled;
+          control.readOnly = !enabled;
+          return;
+        }
+        if (control.type === "checkbox") {
+          control.disabled = !enabled;
+          return;
+        }
+        const isFixedReadonly = fixedReadonlyIds.has(control.id);
+        control.disabled = !enabled;
+        control.readOnly = isFixedReadonly || !enabled;
+      });
+    }
+
+    function markCardDisabled(card, disabled) {
+      card?.classList.toggle("is-disabled", disabled);
+    }
+
+    function syncCxcPrinterAvailability() {
+      const canPrint = hasCxcPermission("imprimir") && Boolean(String(cxcCurrentReciboId || "").trim());
+      if (btnCxcPrinter) {
+        btnCxcPrinter.disabled = !canPrint;
+      }
+    }
+
+    function setCxcMedioPagoIndicator(hasPaymentAmount) {
+      if (!fieldMedioPago) return;
+      const active = Boolean(hasPaymentAmount);
+      fieldMedioPago.textContent = "Medio de Pago";
+      fieldMedioPago.disabled = !active;
+      fieldMedioPago.classList.toggle("is-active", active);
+      fieldMedioPago.setAttribute("aria-pressed", active ? "true" : "false");
+      fieldMedioPago.title = active ? "Hay monto en pago o abono pendiente de distribuir en medio de pago." : "No hay monto en pago o abono.";
+    }
+
+    function focusCxcImporteField() {
+      if (!fieldImportePago || fieldImportePago.disabled) return;
+      fieldImportePago.focus();
+      fieldImportePago.select();
+    }
+
+    function openCxcPaymentMethodTab(method = "Efectivo", focusImporte = false) {
+      if (topTabset) {
+        activateTabset(topTabset, "cxc_tab_medio_pago");
+      }
+      fieldMetodo.value = method === "Transferencia" ? "Transferencia" : "Efectivo";
+      syncPaymentMethodButtons();
+      if (focusImporte) {
+        setTimeout(focusCxcImporteField, 0);
+      }
+    }
+
+    function assignFullCxcPaymentToCurrentMethod() {
+      const totalPayment = Math.max(parseAmount(fieldMontoPagar?.value || 0), 0);
+      const currentMethod = getCxcCurrentPaymentMethod();
+      const otherMethod = currentMethod === "Transferencia" ? "Efectivo" : "Transferencia";
+      const otherAmount = Math.max(Number(cxcLoadedPaymentAmounts[otherMethod] || 0), 0);
+      const otherHasFullTotal = otherAmount >= Math.max(totalPayment - 0.01, 0);
+
+      if (otherHasFullTotal) {
+        cxcLoadedPaymentAmounts[otherMethod] = 0;
+        cxcLoadedPaymentAmounts[currentMethod] = totalPayment;
+      } else {
+        cxcLoadedPaymentAmounts[otherMethod] = otherAmount;
+        cxcLoadedPaymentAmounts[currentMethod] = Math.max(totalPayment - otherAmount, 0);
+      }
+
+      syncPaymentMethodButtons();
+      focusCxcImporteField();
+    }
+
+    function setCxcActionVisualState(mode) {
+      cxcPanel.classList.remove("cxc-state-idle", "cxc-state-editing", "cxc-state-viewing");
+      const normalizedMode = ["editing", "viewing"].includes(mode) ? mode : "idle";
+      cxcPanel.classList.add(`cxc-state-${normalizedMode}`);
+    }
+
+    function syncPaymentMethodButtons(options = {}) {
+      const preserveImporteInput = Boolean(options.preserveImporteInput);
+      const current = getCxcCurrentPaymentMethod();
+      paymentMethodButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.cxcMetodo === current);
+      });
+      paymentConditionalRows.forEach((row) => {
+        row.hidden = row.dataset.cxcOnlyMethod !== current;
+      });
+      cxcPaymentGrid?.classList.toggle("is-transfer", current === "Transferencia");
+      if (fieldCuentaPrincipalLabel) {
+        fieldCuentaPrincipalLabel.textContent = current === "Transferencia" ? "Cta. Banco/Caja" : "Cuenta de Caja";
+      }
+      syncCxcPaymentAccountFields();
+      if (fieldImportePago && !(preserveImporteInput && document.activeElement === fieldImportePago)) {
+        fieldImportePago.value = fmtEditableAmount(cxcLoadedPaymentAmounts[current] || 0);
+      }
+      fieldTotalPago.value = fmtMoney((cxcLoadedPaymentAmounts.Efectivo || 0) + (cxcLoadedPaymentAmounts.Transferencia || 0));
+    }
+
+    function syncCxcPaymentAmountsForDocumentTotal(documentTotal) {
+      const safeDocumentTotal = Math.max(Number(documentTotal || 0), 0);
+      if (safeDocumentTotal <= 0.0001) {
+        cxcLoadedPaymentAmounts.Efectivo = 0;
+        cxcLoadedPaymentAmounts.Transferencia = 0;
+      }
+      syncPaymentMethodButtons({ preserveImporteInput: document.activeElement === fieldImportePago });
+    }
+
+    function buildCxcFacturasComment(rows = cxcPendingRows) {
+      const documentosUnicos = [];
+      const docsVistos = new Set();
+      (Array.isArray(rows) ? rows : []).forEach((row) => {
+        if (!row || row.selected === false) return;
+        const montoAplicado = Math.max(Number(row.pago_abono || 0), 0) + Math.max(Number(row.desc_avance || 0), 0);
+        if (montoAplicado <= 0.0001) return;
+        const doc = String(row.no_doc || "").trim();
+        if (!doc || docsVistos.has(doc)) return;
+        docsVistos.add(doc);
+        documentosUnicos.push(doc);
+      });
+      const documentos = documentosUnicos.map((doc) => `#${doc},`).join("");
+      if (!documentos) return "";
+      const prefijo = cxcCloseMode ? "Cierre de Cuenta Factura(s): " : "Pago/abono Factura(s): ";
+      return `${prefijo}${documentos}`;
+    }
+
+    function buildCxcCloseModeDetailRows() {
+      const selectedDocs = new Set(
+        cxcPendingRows
+          .filter((row) => row && row.selected !== false && Math.max(Number(row.desc_avance || 0), 0) > 0.0001)
+          .map((row) => String(row.no_doc || "").trim())
+          .filter(Boolean)
+      );
+      if (!selectedDocs.size) return [];
+      return (Array.isArray(cxcCloseModeSourceRows) ? cxcCloseModeSourceRows : [])
+        .filter((row) => selectedDocs.has(String(row?.no_doc || "").trim()))
+        .map((row) => {
+          const balanceDoc = Math.max(Number(row?.balance_doc || 0), 0);
+          return {
+            ...row,
+            selected: true,
+            pago_abono: 0,
+            desc_avance: balanceDoc,
+            porc_desc: balanceDoc > 0.0001 ? 100 : 0,
+            balance_pend: 0,
+          };
+        });
+    }
+
+    function syncCxcAutoComentario(rows = cxcPendingRows, options = {}) {
+      if (!fieldComentario || cxcReadOnlyReceipt) return;
+      const force = Boolean(options.force);
+      const autoComentario = buildCxcFacturasComment(rows);
+      const currentValue = String(fieldComentario.value || "").trim();
+      const canOverwrite = force || !cxcComentarioManual || !currentValue || currentValue === cxcLastAutoComentario;
+      if (canOverwrite) {
+        fieldComentario.value = autoComentario;
+        cxcComentarioManual = false;
+      }
+      cxcLastAutoComentario = autoComentario;
+    }
+
+    function getEmptyDetailHtml(message = "Aqui se mostraran los documentos pendientes, cuotas y abonos del cliente.") {
+      return `
+        <tr class="cxc-empty-row">
+          <td colspan="17">
+            <div class="cxc-placeholder">
+              <strong>Area de detalle</strong>
+              <span>${escapeHtml(message)}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function getEmptyCobrosAnterioresHtml(message = "Aqui se mostrara el historial de cobros del cliente.") {
+      return `
+        <tr class="cxc-empty-row">
+          <td colspan="13">
+            <div class="cxc-placeholder">
+              <strong>Cobros anteriores</strong>
+              <span>${escapeHtml(message)}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function syncCxcTotals(rows = cxcPendingRows) {
+      if (cxcReadOnlyReceipt && cxcLoadedSummary) {
+        const totalDoc = Number(cxcLoadedSummary.total_doc || 0);
+        const totalCargo = Number(cxcLoadedSummary.total_mora || 0);
+        const totalDesc = Number(cxcLoadedSummary.desc_avance || 0);
+        const totalRet = Number(cxcLoadedSummary.total_ret || 0);
+        const totalPago = Number(cxcLoadedSummary.total_pago || 0);
+        const montoPagar = Number(cxcLoadedSummary.monto_pagar || Math.max(totalDoc + totalCargo - totalDesc - totalRet, 0));
+
+        fieldTotalDoc.value = fmtMoney(totalDoc);
+        fieldTotalMora.value = fmtMoney(totalCargo);
+        fieldDescAvance.value = fmtMoney(totalDesc);
+        fieldTotalRet.value = fmtMoney(totalRet);
+        fieldTotalPago.value = fmtMoney(totalPago);
+        fieldMontoPagar.value = fmtMoney(montoPagar);
+        setCxcMedioPagoIndicator(totalDoc > 0.0001);
+        syncPaymentMethodButtons();
+        return;
+      }
+
+      const activeRows = rows.filter((row) => row && row.selected !== false);
+
+      let totalDoc = 0;
+      let totalCargo = 0;
+      let totalDesc = 0;
+      let totalRet = 0;
+      const totalPago = 0;
+
+      activeRows.forEach((row) => {
+        totalDoc += Number(row.pago_abono || 0);
+        totalCargo += Number(row.cargo || 0);
+        totalDesc += Number(row.desc_avance || 0);
+        totalRet += Number(row.total_ret || 0);
+      });
+
+      fieldTotalDoc.value = fmtMoney(totalDoc);
+      fieldTotalMora.value = fmtMoney(totalCargo);
+      fieldDescAvance.value = fmtMoney(totalDesc);
+      fieldTotalRet.value = fmtMoney(totalRet);
+      const montoPagar = Math.max(totalDoc + totalCargo - totalDesc - totalRet, 0);
+      fieldMontoPagar.value = fmtMoney(montoPagar);
+      syncCxcAutoComentario(rows);
+      setCxcMedioPagoIndicator(totalDoc > 0.0001);
+      syncCxcPaymentAmountsForDocumentTotal(montoPagar);
+    }
+
+    function getCxcFacturaGroups() {
+      const grouped = new Map();
+      cxcPendingRows.forEach((row, idx) => {
+        const key = row.no_doc || `row-${idx}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push({ row, idx });
+      });
+      return grouped;
+    }
+
+    function getCxcFacturaItemsForRow(idx) {
+      const row = cxcPendingRows[idx];
+      if (!row) return [];
+      const key = row.no_doc || `row-${idx}`;
+      const grouped = getCxcFacturaGroups();
+      return grouped.get(key) || [];
+    }
+
+    function cloneCxcRows(rows) {
+      return JSON.parse(JSON.stringify(Array.isArray(rows) ? rows : []));
+    }
+
+    function buildCxcCloseModeRows(rows = []) {
+      const grouped = new Map();
+      (Array.isArray(rows) ? rows : []).forEach((row, idx) => {
+        const key = String(row?.no_doc || `row-${idx}`).trim() || `row-${idx}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, []);
+        }
+        grouped.get(key).push(row);
+      });
+
+      return Array.from(grouped.values()).map((items) => {
+        const first = items[0] || {};
+        const balanceFactura = items.reduce((sum, row) => sum + Math.max(parseAmount(row?.balance_doc), 0), 0);
+        const cuotaFactura = items.reduce((sum, row) => sum + Math.max(parseAmount(row?.cuota), 0), 0);
+        const moraFactura = items.reduce((sum, row) => sum + Math.max(parseAmount(row?.cargo), 0), 0);
+        const diasFactura = items.reduce((max, row) => Math.max(max, Number(row?.dias || 0)), 0);
+
+        return {
+          ...first,
+          no_cuota: "",
+          cuota: cuotaFactura > 0.0001 ? cuotaFactura : balanceFactura,
+          balance_doc: balanceFactura,
+          balance_total_factura: balanceFactura,
+          cargo: moraFactura,
+          dias: diasFactura,
+          venc: diasFactura > 0 ? "*" : "",
+          porc_desc: 0,
+          desc_avance: 0,
+          pago_abono: 0,
+          balance_pend: balanceFactura,
+          selected: false,
+          tiene_financiamiento: items.some((row) => Boolean(row?.tiene_financiamiento)),
+          cxc_close_mode_group: true,
+        };
+      });
+    }
+
+    function applyCxcCloseModeSelection(row, selected) {
+      if (!row) return;
+      const balanceDoc = Math.max(parseAmount(row.balance_doc), 0);
+      row.selected = Boolean(selected);
+      row.pago_abono = 0;
+      row.desc_avance = row.selected ? balanceDoc : 0;
+      row.porc_desc = row.selected && balanceDoc > 0.0001 ? 100 : 0;
+      row.balance_pend = row.selected ? 0 : balanceDoc;
+    }
+
+    function syncCxcCloseButtonState() {
+      if (!btnCxcCerrarCuenta) return;
+      btnCxcCerrarCuenta.classList.toggle("is-active", cxcCloseMode);
+      btnCxcCerrarCuenta.setAttribute("aria-pressed", cxcCloseMode ? "true" : "false");
+      btnCxcCerrarCuenta.title = cxcCloseMode
+        ? "Modo cierre de cuenta activo."
+        : "Activar cierre de cuenta.";
+    }
+
+    function setCxcCloseModeActive(active) {
+      const shouldActivate = Boolean(active) && !cxcReadOnlyReceipt;
+      if (!shouldActivate) {
+        cxcCloseMode = false;
+        if (cxcCloseModeSourceRows.length) {
+          cxcPendingRows = cloneCxcRows(cxcCloseModeSourceRows);
+        }
+        cxcCloseModeSourceRows = [];
+        syncCxcCloseButtonState();
+        renderCxcDetalleRows(cxcPendingRows);
+        return;
+      }
+
+      cxcCloseModeSourceRows = cloneCxcRows(cxcPendingRows);
+      cxcCloseMode = true;
+      cxcPendingRows = buildCxcCloseModeRows(cxcCloseModeSourceRows);
+      syncCxcCloseButtonState();
+      renderCxcDetalleRows(cxcPendingRows);
+    }
+
+    function getCxcRowBalance(row) {
+      const value = Number(row?.balance_doc || 0);
+      return Number.isFinite(value) ? Math.max(value, 0) : 0;
+    }
+
+    function getCxcRowRemainingAfterPago(row) {
+      return Math.max(getCxcRowBalance(row) - Math.max(Number(row?.pago_abono || 0), 0), 0);
+    }
+
+    function getCxcDiscountBase(row) {
+      const cuota = Math.max(parseAmount(row?.cuota), 0);
+      if (cuota > 0.0001) {
+        return cuota;
+      }
+      return getCxcRowBalance(row);
+    }
+
+    function syncCxcDiscountState(row) {
+      if (!row) return;
+      const rowBalance = getCxcRowBalance(row);
+      if (row.selected === false) {
+        row.desc_avance = 0;
+        row.porc_desc = 0;
+        row.balance_pend = rowBalance;
+        return;
+      }
+      const remainingAfterPago = getCxcRowRemainingAfterPago(row);
+      const normalizedDesc = Math.max(Math.min(parseAmount(row.desc_avance), remainingAfterPago), 0);
+      const discountBase = getCxcDiscountBase(row);
+      const remainingAfterDiscount = Math.max(remainingAfterPago - normalizedDesc, 0);
+      row.desc_avance = normalizedDesc;
+      row.porc_desc = discountBase > 0.0001 ? (normalizedDesc / discountBase) * 100 : 0;
+      row.balance_pend = remainingAfterDiscount;
+    }
+
+    function getCxcFacturaBalance(items) {
+      const explicit = Number(items[0]?.row?.balance_total_factura || 0);
+      if (Number.isFinite(explicit) && explicit > 0) {
+        return explicit;
+      }
+      return items.reduce((sum, { row }) => sum + getCxcRowBalance(row), 0);
+    }
+
+    function isCxcFinancedGroup(items) {
+      return items.some(({ row }) => Boolean(row?.tiene_financiamiento));
+    }
+
+    function applyCxcSequentialPayments(items, totalDesired) {
+      let remaining = Math.max(Math.min(Number(totalDesired || 0), getCxcFacturaBalance(items)), 0);
+      items.forEach(({ row }) => {
+        const rowBalance = getCxcRowBalance(row);
+        const applied = Math.min(rowBalance, remaining);
+        row.pago_abono = applied;
+        row.selected = applied > 0;
+        syncCxcDiscountState(row);
+        remaining = Math.max(remaining - applied, 0);
+      });
+    }
+
+    function normalizeCxcPaymentsByFactura() {
+      const grouped = getCxcFacturaGroups();
+
+      grouped.forEach((items) => {
+        if (isCxcFinancedGroup(items)) {
+          let totalDesired = 0;
+          let foundUnselected = false;
+
+          items.forEach(({ row }) => {
+            const rowBalance = getCxcRowBalance(row);
+            if (foundUnselected || row.selected === false) {
+              foundUnselected = true;
+              row.selected = false;
+              row.pago_abono = 0;
+              syncCxcDiscountState(row);
+              return;
+            }
+            totalDesired += Math.max(Number(row.pago_abono || 0), 0);
+          });
+
+          applyCxcSequentialPayments(items, totalDesired);
+          return;
+        }
+
+        let remainingFactura = getCxcFacturaBalance(items);
+        items.forEach(({ row }) => {
+          const rowBalance = getCxcRowBalance(row);
+          if (row.selected === false) {
+            row.pago_abono = 0;
+            syncCxcDiscountState(row);
+            return;
+          }
+          const descAplicado = Math.max(Number(row.desc_avance || 0), 0);
+          const maxAllowed = Math.max(Math.min(Math.max(rowBalance - descAplicado, 0), remainingFactura - descAplicado), 0);
+          const normalizedPago = Math.max(Math.min(Number(row.pago_abono || 0), maxAllowed), 0);
+          row.pago_abono = normalizedPago;
+          syncCxcDiscountState(row);
+          remainingFactura = Math.max(remainingFactura - normalizedPago - Math.max(Number(row.desc_avance || 0), 0), 0);
+        });
+      });
+    }
+
+    function updatePagoAbonoForRow(idx, rawValue) {
+      const row = cxcPendingRows[idx];
+      if (!row) return;
+
+      const desired = Math.max(parseAmount(rawValue), 0);
+      const items = getCxcFacturaItemsForRow(idx);
+
+      if (isCxcFinancedGroup(items)) {
+        const itemIndex = items.findIndex((item) => item.idx === idx);
+        if (itemIndex === -1) return;
+        const totalBefore = items.slice(0, itemIndex).reduce((sum, item) => {
+          return sum + Math.max(Number(item.row.pago_abono || 0), 0);
+        }, 0);
+        const totalDesired = Math.min(totalBefore + desired, getCxcFacturaBalance(items));
+        applyCxcSequentialPayments(items, totalDesired);
+        return;
+      }
+
+      const rowBalance = getCxcRowBalance(row);
+      const facturaBalance = Number(row.balance_total_factura || rowBalance);
+      const currentDoc = row.no_doc || `row-${idx}`;
+      let otherApplied = 0;
+
+      cxcPendingRows.forEach((item, itemIdx) => {
+        if (itemIdx === idx) return;
+        if ((item.no_doc || `row-${itemIdx}`) !== currentDoc) return;
+        if (item.selected === false) return;
+        otherApplied += Math.max(Number(item.pago_abono || 0), 0) + Math.max(Number(item.desc_avance || 0), 0);
+      });
+
+      const currentDesc = Math.max(Number(row.desc_avance || 0), 0);
+      const maxAllowed = Math.max(Math.min(Math.max(rowBalance - currentDesc, 0), facturaBalance - otherApplied - currentDesc), 0);
+      const normalizedPago = Math.max(Math.min(desired, maxAllowed), 0);
+      row.pago_abono = normalizedPago;
+      syncCxcDiscountState(row);
+    }
+
+    function updateDescAvanceForRow(idx, rawValue) {
+      const row = cxcPendingRows[idx];
+      if (!row) return;
+      let desired = Math.max(parseAmount(rawValue), 0);
+      const items = getCxcFacturaItemsForRow(idx);
+      if (!isCxcFinancedGroup(items)) {
+        const rowBalance = getCxcRowBalance(row);
+        const facturaBalance = Number(row.balance_total_factura || rowBalance);
+        const currentDoc = row.no_doc || `row-${idx}`;
+        let otherApplied = 0;
+        cxcPendingRows.forEach((item, itemIdx) => {
+          if (itemIdx === idx) return;
+          if ((item.no_doc || `row-${itemIdx}`) !== currentDoc) return;
+          if (item.selected === false) return;
+          otherApplied += Math.max(Number(item.pago_abono || 0), 0) + Math.max(Number(item.desc_avance || 0), 0);
+        });
+        const maxAllowed = Math.max(
+          Math.min(
+            Math.max(rowBalance - Math.max(Number(row.pago_abono || 0), 0), 0),
+            facturaBalance - otherApplied - Math.max(Number(row.pago_abono || 0), 0)
+          ),
+          0
+        );
+        desired = Math.min(desired, maxAllowed);
+      }
+      row.desc_avance = desired;
+      syncCxcDiscountState(row);
+    }
+
+    function isCxcDetailInputDisabled(row, idx, facturaGroups) {
+      if (cxcReadOnlyReceipt || cxcCloseMode) {
+        return true;
+      }
+      const groupKey = row.no_doc || `row-${idx}`;
+      const facturaItems = facturaGroups.get(groupKey) || [];
+      if (!isCxcFinancedGroup(facturaItems)) {
+        return row.selected === false;
+      }
+      const itemIndex = facturaItems.findIndex((item) => item.idx === idx);
+      const hasPendingBefore = facturaItems.slice(0, itemIndex).some((item) => Number(item.row.balance_pend || 0) > 0.0001);
+      return row.selected === false || hasPendingBefore;
+    }
+
+    function renderCxcDetalleRows(rows) {
+      cxcPendingRows = Array.isArray(rows) ? rows : [];
+      syncCxcCloseButtonState();
+      if (!cxcPendingRows.length) {
+        cxcDetalleBody.innerHTML = getEmptyDetailHtml(
+          cxcReadOnlyReceipt
+            ? "Este recibo no tiene lineas de detalle registradas."
+            : "No hay facturas pendientes de pago para este cliente."
+        );
+        syncCxcTotals([]);
+        return;
+      }
+
+      if (cxcReadOnlyReceipt) {
+        cxcPendingRows.forEach((row) => {
+          if (typeof row.selected === "undefined") {
+            row.selected = true;
+          }
+          row.balance_doc = parseAmount(row.balance_doc);
+          row.pago_abono = parseAmount(row.pago_abono);
+          row.desc_avance = parseAmount(row.desc_avance);
+          row.porc_desc = parseAmount(row.porc_desc);
+          row.balance_pend = row.balance_pend == null ? Math.max(row.balance_doc - row.pago_abono, 0) : parseAmount(row.balance_pend);
+        });
+      } else if (!cxcCloseMode) {
+        cxcPendingRows.forEach((row, idx) => {
+          if (typeof row.selected === "undefined") {
+            row.selected = idx === 0;
+          }
+          row.balance_doc = parseAmount(row.balance_doc);
+          row.pago_abono = parseAmount(row.pago_abono);
+          row.desc_avance = parseAmount(row.desc_avance);
+          row.porc_desc = parseAmount(row.porc_desc);
+        });
+        normalizeCxcPaymentsByFactura();
+      } else {
+        cxcPendingRows.forEach((row) => {
+          row.balance_doc = parseAmount(row.balance_doc);
+          row.pago_abono = 0;
+          row.desc_avance = parseAmount(row.desc_avance);
+          row.porc_desc = parseAmount(row.porc_desc);
+          row.balance_pend = row.balance_pend == null ? Math.max(row.balance_doc - row.desc_avance, 0) : parseAmount(row.balance_pend);
+        });
+      }
+      const facturaGroups = getCxcFacturaGroups();
+      const detailReadOnly = cxcReadOnlyReceipt || cxcCloseMode;
+
+      cxcDetalleBody.innerHTML = cxcPendingRows.map((row, idx) => `
+        <tr>
+          <td><input type="checkbox" class="cxc-row-check" data-idx="${idx}" ${row.selected !== false ? "checked" : ""} ${cxcReadOnlyReceipt ? "disabled" : ""} /></td>
+          <td>${escapeHtml(row.td || "")}</td>
+          <td>${escapeHtml(row.no_doc || "")}</td>
+          <td>${escapeHtml(row.fecha_cont || "")}</td>
+          <td>${fmtMoney(row.monto_doc)}</td>
+          <td>${escapeHtml(row.comentario_factura || "")}</td>
+          <td>${escapeHtml(row.no_cuota || "")}</td>
+          <td>${fmtMoney(row.cuota)}</td>
+          <td>${fmtMoney(row.balance_doc)}</td>
+          <td>${escapeHtml(row.fecha_venc || "")}</td>
+          <td>${escapeHtml(row.venc || "")}</td>
+          <td>${escapeHtml(row.dias || 0)}</td>
+          <td>${fmtMoney(row.cargo)}</td>
+          <td>${fmtMoney(row.porc_desc)}</td>
+          <td class="${detailReadOnly ? "" : "cxc-desc-cell"}">${detailReadOnly
+            ? fmtMoney(row.desc_avance)
+            : `<input type="number" step="0.01" min="0" class="cxc-desc-input" data-idx="${idx}" value="${fmtEditableAmount(row.desc_avance || 0)}" ${isCxcDetailInputDisabled(row, idx, facturaGroups) ? "disabled" : ""} />`
+          }</td>
+          <td class="${detailReadOnly ? "" : "cxc-pago-cell"}">${detailReadOnly
+            ? fmtMoney(row.pago_abono)
+            : `<input type="number" step="0.01" min="0" class="cxc-pago-input" data-idx="${idx}" value="${Number(row.pago_abono || 0).toFixed(2)}" ${isCxcDetailInputDisabled(row, idx, facturaGroups) ? "disabled" : ""} />`
+          }</td>
+          <td>${fmtMoney(row.balance_pend)}</td>
+        </tr>
+      `).join("");
+
+      syncCxcTotals(cxcPendingRows);
+    }
+
+    function renderCxcCobrosAnterioresRows(rows) {
+      cxcCobrosAnterioresRows = Array.isArray(rows) ? rows : [];
+      if (!cxcCobrosAnterioresRows.length) {
+        cxcSelectedCobroAnterior = null;
+        cxcSelectedCobroAnteriorKey = "";
+        cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml("No hay cobros anteriores para este cliente.");
+        syncCxcMobileHistoryActions();
+        return;
+      }
+
+      cxcCobrosAnterioresBody.innerHTML = cxcCobrosAnterioresRows.map((row) => `
+        <tr class="cxc-history-row click-row ${getCobroAnteriorKey(row) === cxcSelectedCobroAnteriorKey ? "is-selected" : ""}" data-row-key="${escapeHtml(getCobroAnteriorKey(row))}" data-row="${encodeURIComponent(JSON.stringify(row))}">
+          <td>${escapeHtml(row.no_recibo || "")}</td>
+          <td>${escapeHtml(row.fecha_rec || "")}</td>
+          <td>${escapeHtml(row.td || "")}</td>
+          <td>${escapeHtml(row.no_factura || "")}</td>
+          <td>${fmtMoney(row.monto_fact)}</td>
+          <td>${escapeHtml(row.no_cuota || "")}</td>
+          <td>${fmtMoney(row.cuota)}</td>
+          <td>${fmtMoney(row.saldo_pend)}</td>
+          <td>${escapeHtml(row.fecha_venc || "")}</td>
+          <td>${fmtMoney(row.mora)}</td>
+          <td>${fmtMoney(row.descuento)}</td>
+          <td>${fmtMoney(row.total_pago)}</td>
+          <td>${escapeHtml(row.estado || "")}</td>
+        </tr>
+      `).join("");
+      syncCxcMobileHistoryActions();
+    }
+
+    async function loadCxcCobrosAnteriores(idSn, excludeReciboId = "") {
+      if (!hasCxcPermission("buscar")) {
+        cxcCobrosAnterioresRows = [];
+        cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml("No tienes permiso para consultar cobros anteriores.");
+        syncCxcMobileHistoryActions();
+        return;
+      }
+      if (!idSn) {
+        cxcCobrosAnterioresRows = [];
+        cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml();
+        return;
+      }
+
+      const params = new URLSearchParams({ id_sn: idSn });
+      if (excludeReciboId) {
+        params.set("exclude_recibo_id", excludeReciboId);
+      }
+
+      cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml("Cargando cobros anteriores...");
+      try {
+        const res = await fetch(`${cxcCobrosAnterioresUrl}?${params.toString()}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!res.ok) {
+          cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml("No se pudieron cargar los cobros anteriores.");
+          return;
+        }
+        const data = await res.json();
+        renderCxcCobrosAnterioresRows(Array.isArray(data.results) ? data.results : []);
+      } catch (error) {
+        cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml("Error de conexion cargando cobros anteriores.");
+      }
+    }
+
+    async function loadCxcPendientes(idSn) {
+      cxcReadOnlyReceipt = false;
+      cxcCloseMode = false;
+      cxcCloseModeSourceRows = [];
+      cxcLoadedSummary = null;
+      if (!hasCxcPermission("nuevo")) {
+        renderCxcDetalleRows([]);
+        window.alert("No tienes permiso para crear nuevos pagos en cuentas por cobrar.");
+        return;
+      }
+      if (!idSn) {
+        renderCxcDetalleRows([]);
+        return;
+      }
+
+      cxcDetalleBody.innerHTML = getEmptyDetailHtml("Cargando facturas pendientes...");
+      try {
+        const res = await fetch(`${cxcPendientesUrl}?id_sn=${encodeURIComponent(idSn)}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!res.ok) {
+          renderCxcDetalleRows([]);
+          window.alert("No se pudieron cargar las facturas pendientes del cliente.");
+          return;
+        }
+        const data = await res.json();
+        renderCxcDetalleRows(data.results || []);
+      } catch (error) {
+        renderCxcDetalleRows([]);
+        window.alert("Error de conexion cargando las facturas pendientes.");
+      }
+    }
+
+    function getCxcActivePaymentRows() {
+      if (cxcCloseMode) {
+        return buildCxcCloseModeDetailRows();
+      }
+      return cxcPendingRows.filter((row) => {
+        if (!row || row.selected === false) return false;
+        return Math.max(Number(row.pago_abono || 0), 0) > 0.0001 || Math.max(Number(row.desc_avance || 0), 0) > 0.0001;
+      });
+    }
+
+    function buildCxcSavePayload() {
+      const idSn = (fieldCliente.value || "").trim();
+      if (!idSn) {
+        window.alert("Debes seleccionar un cliente antes de grabar.");
+        return null;
+      }
+
+      const activeRows = getCxcActivePaymentRows();
+      if (!activeRows.length) {
+        window.alert("No puedes grabar si no tiene pagos pendientes seleccionados.");
+        return null;
+      }
+
+      const isCloseAccount = cxcCloseMode;
+      const totalDoc = activeRows.reduce((sum, row) => sum + Number(row.pago_abono || 0), 0);
+      const totalMora = activeRows.reduce((sum, row) => sum + Number(row.cargo || 0), 0);
+      const totalDesc = activeRows.reduce((sum, row) => sum + Number(row.desc_avance || 0), 0);
+      const totalRet = activeRows.reduce((sum, row) => sum + Number(row.total_ret || 0), 0);
+      const totalAplicado = totalDoc + totalDesc;
+      const expectedTotal = isCloseAccount ? 0 : Math.max(totalDoc + totalMora - totalDesc - totalRet, 0);
+      const receiptTotal = isCloseAccount ? totalDesc : totalDoc;
+      const efectivo = Math.max(Number(cxcLoadedPaymentAmounts.Efectivo || 0), 0);
+      const transferencia = Math.max(Number(cxcLoadedPaymentAmounts.Transferencia || 0), 0);
+      const totalAsignado = efectivo + transferencia;
+      const montoPagar = parseAmount(fieldMontoPagar.value);
+      const currentMethod = getCxcCurrentPaymentMethod();
+      const currentAccount = getCxcPaymentAccount(currentMethod);
+      const efectivoAccount = getCxcPaymentAccount("Efectivo");
+      const transferenciaAccount = getCxcPaymentAccount("Transferencia");
+
+      if (totalAplicado <= 0.0001) {
+        window.alert("No puedes grabar si el monto de pago no es mayor a 0.");
+        return null;
+      }
+
+      if (!isCloseAccount && !amountsMatch(montoPagar, expectedTotal)) {
+        window.alert("El monto total del pago no coincide con el detalle seleccionado.");
+        return null;
+      }
+
+      if (!isCloseAccount && totalAsignado <= 0.0001) {
+        window.alert("Debes asignar un importe mayor a 0 en los metodos de pago.");
+        return null;
+      }
+
+      if (!isCloseAccount && !amountsMatch(totalAsignado, expectedTotal)) {
+        window.alert("El importe asignado en medio de pago debe ser igual al monto total del pago del documento.");
+        return null;
+      }
+
+      return {
+        id_sn: idSn,
+        nombre: (fieldNombre.value || "").trim(),
+        apodo: (fieldApodo.value || "").trim(),
+        proyecto: (fieldProyecto.value || "").trim(),
+        fecha_cont: fieldFechaCont.value || "",
+        fecha_venc: fieldFechaVenc.value || "",
+        fecha_aplic: fieldFechaAplic.value || "",
+        fecha_pago: fieldFechaPago.value || fieldFechaCont.value || "",
+        estado: (fieldEstado.value || "Abierto").trim(),
+        moneda: "RD$",
+        moneda_pago: "RD$",
+        tasa_pago: parseAmount(fieldTasa.value || 1),
+        metodo: isCloseAccount ? "Cierre de Cuenta" : currentMethod,
+        cerrar_cuenta: isCloseAccount,
+        cuenta_caja: currentAccount.cuenta || "",
+        cuenta_caja_desc: currentAccount.nombre || "",
+        cuenta_efectivo: efectivoAccount.cuenta || "",
+        cuenta_efectivo_desc: efectivoAccount.nombre || "",
+        cuenta_transferencia: transferenciaAccount.cuenta || "",
+        cuenta_transferencia_desc: transferenciaAccount.nombre || "",
+        no_transferencia: (fieldNoTransferencia.value || "").trim(),
+        cuenta_cliente_pago: (fieldCuentaClientePago.value || "").trim(),
+        cuenta_desc_ret: (fieldCuentaDescRet.value || "").trim(),
+        cuenta_desc_ret_desc: (fieldCuentaDescRetDesc.value || "").trim(),
+        comentario: fieldComentario.value || "",
+        efectivo: isCloseAccount ? 0 : efectivo,
+        transferencia: isCloseAccount ? 0 : transferencia,
+        medio_pago: !isCloseAccount && efectivo > 0.0001 && transferencia > 0.0001,
+        total_doc: receiptTotal,
+        total_mora: totalMora,
+        desc_avance: totalDesc,
+        total_ret: totalRet,
+        total_pago: isCloseAccount ? 0 : totalAsignado,
+        monto_pagar: expectedTotal,
+        detail: activeRows.map((row) => ({
+          td: row.td || "",
+          no_doc: row.no_doc || "",
+          fecha_cont: row.fecha_cont || "",
+          monto_doc: Number(row.monto_doc || 0),
+          comentario_factura: row.comentario_factura || "",
+          no_cuota: row.no_cuota || "",
+          cuota: Number(row.cuota || 0),
+          balance_doc: Number(row.balance_doc || 0),
+          balance_total_factura: Number(row.balance_total_factura || 0),
+          fecha_venc: row.fecha_venc || "",
+          venc: row.venc || "",
+          dias: Number(row.dias || 0),
+          cargo: Number(row.cargo || 0),
+          porc_desc: Number(row.porc_desc || 0),
+          desc_avance: Number(row.desc_avance || 0),
+          pago_abono: Number(row.pago_abono || 0),
+          balance_pend: Number(row.balance_pend || 0),
+          total_ret: Number(row.total_ret || 0),
+          tiene_financiamiento: Boolean(row.tiene_financiamiento),
+        })),
+      };
+    }
+
+    async function saveCxcReceipt() {
+      if (!hasCxcPermission("nuevo")) {
+        window.alert("No tienes permiso para grabar pagos en cuentas por cobrar.");
+        return;
+      }
+      const payload = buildCxcSavePayload();
+      if (!payload) return;
+
+      btnCxcGrabar.disabled = true;
+      try {
+        const res = await fetch(cxcGuardarUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken(),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          window.alert(data.detail || "No se pudo grabar el recibo.");
+          return;
+        }
+        if (data.recibo_id) {
+          cxcCurrentReciboId = String(data.recibo_id || "");
+          if (!fieldNo.value && data.no_recibo) {
+            fieldNo.value = String(data.no_recibo);
+          }
+          syncCxcPrinterAvailability();
+          const record = await loadCxcRecibo(data.recibo_id);
+          const modalReciboId = record?.header?.recibo_id || record?.header?.no || data.recibo_id;
+          const modalReciboLabel = record?.header?.no || data.no_recibo || modalReciboId;
+          if (modalReciboId) {
+            cxcResetAfterPrintModal = true;
+            openCxcPrintModal(modalReciboId, modalReciboLabel);
+          }
+        } else {
+          window.alert("El recibo se grabo, pero no se pudo recargar automaticamente.");
+        }
+      } catch (error) {
+        window.alert("Error de conexion grabando el recibo.");
+      } finally {
+        if (!cxcReadOnlyReceipt) {
+          btnCxcGrabar.disabled = false;
+        }
+      }
+    }
+
+    function resetCxcValues() {
+      cxcReadOnlyReceipt = false;
+      cxcCloseMode = false;
+      cxcCloseModeSourceRows = [];
+      cxcCurrentReciboId = "";
+      cxcLoadedSummary = null;
+      cxcSelectedCobroAnteriorKey = "";
+      cxcSelectedCobroAnterior = null;
+      fieldCliente.value = "";
+      fieldNombre.value = "";
+      fieldApodo.value = "";
+      fieldProyecto.value = "";
+      fieldMoneda.value = "RD$";
+      fieldNo.value = "";
+      fieldFechaCont.value = "";
+      fieldFechaVenc.value = "";
+      fieldFechaAplic.value = "";
+      fieldEstado.value = "";
+      fieldMetodo.value = "Efectivo";
+      cxcPaymentAccountState = createCxcPaymentAccountState();
+      fieldCuentaCaja.value = cxcDefaultCuentaCaja.cuenta;
+      fieldCuentaCajaDesc.value = cxcDefaultCuentaCaja.nombre;
+      fieldNoTransferencia.value = "";
+      fieldCuentaClientePago.value = "";
+      fieldCuentaDescRet.value = cxcDefaultCuentaDescRet.cuenta;
+      fieldCuentaDescRetDesc.value = cxcDefaultCuentaDescRet.nombre;
+      fieldBanco.value = "";
+      fieldReferenciaPago.value = "";
+      fieldFechaPago.value = "";
+      fieldMonedaPago.value = "RD$";
+      fieldTasa.value = "1.00";
+      fieldComentario.value = "";
+      cxcLastAutoComentario = "";
+      cxcComentarioManual = false;
+      setCxcMedioPagoIndicator(false);
+      fieldTotalMora.value = ".00";
+      fieldDescAvance.value = ".00";
+      fieldTotalDoc.value = ".00";
+      fieldTotalRet.value = ".00";
+      fieldTotalPago.value = ".00";
+      fieldMontoPagar.value = ".00";
+      fieldImportePago.value = "0.00";
+      cxcLoadedPaymentAmounts = { Efectivo: 0, Transferencia: 0 };
+      if (fieldCxcPrintModalCopies) {
+        fieldCxcPrintModalCopies.value = "2";
+      }
+      cxcPrintPendingReciboId = "";
+      cxcPrintPendingReciboLabel = "";
+      cxcPendingRows = [];
+      cxcCobrosAnterioresRows = [];
+      cxcDetalleBody.innerHTML = getEmptyDetailHtml();
+      cxcCobrosAnterioresBody.innerHTML = getEmptyCobrosAnterioresHtml();
+      syncCxcMobileHistoryActions();
+      hideCobrosContextMenu();
+      hideEstadoContextMenu();
+      document.querySelectorAll("[data-cxc-tabset]").forEach((tabset) => {
+        const firstButton = tabset.querySelector("[data-target]");
+        if (firstButton) {
+          activateTabset(tabset, firstButton.getAttribute("data-target"));
+        }
+      });
+      syncCxcCloseButtonState();
+      syncPaymentMethodButtons();
+    }
+
+    function updateCxcDependentAvailability() {
+      const enabled = cxcClienteSeleccionado || cxcDocumentoSeleccionado;
+      setControlsInteractive(detailControls, enabled);
+      [btnCxcSelectAll, btnCxcUnselectAll].forEach((button) => {
+        if (button) button.disabled = !enabled;
+      });
+      if (btnCxcCerrarCuenta) {
+        btnCxcCerrarCuenta.disabled = !enabled || !hasCxcPermission("cerrar_cuenta");
+      }
+      syncCxcCloseButtonState();
+      syncCxcPrinterAvailability();
+      markCardDisabled(cxcBodyCard, !enabled);
+    }
+
+    function enableCxcEditingShell() {
+      cxcReadOnlyReceipt = false;
+      setControlsInteractive(headerControls, true);
+      btnCxcNuevo.disabled = true;
+      btnCxcBuscar.disabled = true;
+      btnCxcCancel.disabled = false;
+      btnCxcGrabar.disabled = !hasCxcPermission("nuevo");
+      setCxcActionVisualState("editing");
+      markCardDisabled(cxcMainCard, false);
+      markCardDisabled(cxcQuickCard, false);
+      if (btnCxcCerrarCuenta) {
+        btnCxcCerrarCuenta.disabled = !hasCxcPermission("cerrar_cuenta");
+      }
+    }
+
+    function setCxcInitialState() {
+      resetCxcValues();
+      cxcClienteSeleccionado = false;
+      cxcDocumentoSeleccionado = false;
+      setControlsInteractive(headerControls, false);
+      setControlsInteractive(detailControls, false);
+      btnCxcNuevo.disabled = !hasCxcPermission("nuevo");
+      btnCxcBuscar.disabled = !hasCxcPermission("buscar");
+      btnCxcCancel.disabled = true;
+      btnCxcGrabar.disabled = true;
+      btnCxcSelectAll.disabled = true;
+      btnCxcUnselectAll.disabled = true;
+      btnCxcCerrarCuenta.disabled = true;
+      syncCxcPrinterAvailability();
+      setCxcActionVisualState("idle");
+      markCardDisabled(cxcMainCard, true);
+      markCardDisabled(cxcQuickCard, true);
+      markCardDisabled(cxcBodyCard, true);
+    }
+
+    function setCxcNewState(setTodayDates = true) {
+      if (!hasCxcPermission("nuevo")) {
+        window.alert("No tienes permiso para crear nuevos pagos en cuentas por cobrar.");
+        return;
+      }
+      resetCxcValues();
+      enableCxcEditingShell();
+      cxcClienteSeleccionado = false;
+      cxcDocumentoSeleccionado = false;
+      fieldEstado.value = "Abierto";
+      if (setTodayDates) {
+        const today = "{{ server_today_iso|default:''|escapejs }}";
+        fieldFechaCont.value = today;
+        fieldFechaVenc.value = today;
+        fieldFechaAplic.value = today;
+        fieldFechaPago.value = today;
+      }
+      updateCxcDependentAvailability();
+      openClienteModal();
+    }
+
+    function setCxcConsultState(record = {}) {
+      const header = record.header || {};
+      const summary = record.summary || {};
+      cxcReadOnlyReceipt = true;
+      cxcCloseMode = false;
+      cxcCloseModeSourceRows = [];
+      cxcCurrentReciboId = header.recibo_id || header.no || "";
+      cxcLoadedSummary = summary;
+
+      fieldCliente.value = header.cliente || "";
+      fieldNombre.value = header.nombre || "";
+      fieldApodo.value = header.apodo || "";
+      fieldProyecto.value = header.proyecto || "";
+      fieldMoneda.value = header.moneda || "RD$";
+      fieldNo.value = header.no || "";
+      fieldFechaCont.value = header.fecha_cont || "";
+      fieldFechaVenc.value = header.fecha_venc || "";
+      fieldFechaAplic.value = header.fecha_aplic || "";
+      fieldEstado.value = header.estado || "Abierto";
+      fieldMetodo.value = header.metodo || "Efectivo";
+      cxcPaymentAccountState = {
+        Efectivo: {
+          cuenta: header.cuenta_efectivo || header.cuenta_caja || cxcDefaultCuentaCaja.cuenta,
+          nombre: header.cuenta_efectivo_desc || header.cuenta_caja_desc || cxcDefaultCuentaCaja.nombre,
+        },
+        Transferencia: {
+          cuenta: header.cuenta_transferencia || header.cuenta_caja || cxcDefaultCuentaCaja.cuenta,
+          nombre: header.cuenta_transferencia_desc || header.cuenta_caja_desc || cxcDefaultCuentaCaja.nombre,
+        },
+      };
+      fieldCuentaCaja.value = "";
+      fieldCuentaCajaDesc.value = "";
+      fieldNoTransferencia.value = header.no_transferencia || "";
+      fieldCuentaClientePago.value = header.cuenta_cliente_pago || "";
+      fieldCuentaDescRet.value = header.cuenta_desc_ret || cxcDefaultCuentaDescRet.cuenta;
+      fieldCuentaDescRetDesc.value = header.cuenta_desc_ret_desc || "";
+      fieldComentario.value = header.comentario || "";
+      cxcLastAutoComentario = "";
+      cxcComentarioManual = false;
+      setCxcMedioPagoIndicator(Number(summary.total_doc || header.total_doc || 0) > 0.0001);
+      fieldMonedaPago.value = "RD$";
+      fieldBanco.value = header.cuenta_cliente_pago || "";
+      fieldReferenciaPago.value = header.no_transferencia || "";
+      fieldFechaPago.value = header.fecha_pago || header.fecha_cont || "";
+      cxcLoadedPaymentAmounts = {
+        Efectivo: Number(header.efectivo || 0),
+        Transferencia: Number(header.transferencia || 0),
+      };
+
+      setControlsInteractive(headerControls, false);
+      setControlsInteractive(detailControls, false);
+      setControlsInteractive(headerTabButtons, true);
+      setControlsInteractive(detailTabButtons, true);
+      paymentMethodButtons.forEach((button) => {
+        button.disabled = false;
+      });
+      fieldMonedaPago.disabled = false;
+      fieldMonedaPago.readOnly = true;
+
+      btnCxcNuevo.disabled = !hasCxcPermission("nuevo");
+      btnCxcBuscar.disabled = !hasCxcPermission("buscar");
+      btnCxcCancel.disabled = false;
+      btnCxcGrabar.disabled = true;
+      btnCxcSelectAll.disabled = true;
+      btnCxcUnselectAll.disabled = true;
+      btnCxcCerrarCuenta.disabled = true;
+      syncCxcPrinterAvailability();
+
+      setCxcActionVisualState("viewing");
+      markCardDisabled(cxcMainCard, false);
+      markCardDisabled(cxcQuickCard, true);
+      markCardDisabled(cxcBodyCard, false);
+
+      cxcClienteSeleccionado = true;
+      cxcDocumentoSeleccionado = true;
+      syncPaymentMethodButtons();
+      renderCxcDetalleRows(Array.isArray(record.detail) ? record.detail : []);
+      loadCxcCobrosAnteriores(header.cliente || "");
+    }
+
+    function openClienteModal() {
+      clienteModalBackdrop.classList.add("open");
+      clienteModalBackdrop.setAttribute("aria-hidden", "false");
+      lockPageScroll();
+      clienteSearchInput.value = "";
+      clienteSearchFilter.value = "nombre";
+      buscarClientes(true);
+      clienteSearchInput.focus();
+    }
+
+    function closeClienteModal() {
+      clienteModalBackdrop.classList.remove("open");
+      clienteModalBackdrop.setAttribute("aria-hidden", "true");
+      unlockPageScroll();
+    }
+
+    function openBuscarModal() {
+      if (!hasCxcPermission("buscar")) {
+        window.alert("No tienes permiso para buscar recibos de cuentas por cobrar.");
+        return;
+      }
+      buscarModalBackdrop.classList.add("open");
+      buscarModalBackdrop.setAttribute("aria-hidden", "false");
+      lockPageScroll();
+      buscarSearchInput.value = "";
+      buscarSearchFilter.value = "recibo";
+      buscarRecibos();
+      buscarSearchInput.focus();
+    }
+
+    function closeBuscarModal() {
+      buscarModalBackdrop.classList.remove("open");
+      buscarModalBackdrop.setAttribute("aria-hidden", "true");
+      unlockPageScroll();
+    }
+
+    function renderBuscarResults(rows) {
+      if (!rows.length) {
+        buscarResultsBody.innerHTML = "<tr><td colspan='8' class='result-empty'>No se encontraron recibos.</td></tr>";
+        return;
+      }
+      buscarResultsBody.innerHTML = rows.map((row) => {
+        const safeJson = encodeURIComponent(JSON.stringify(row));
+        return `
+          <tr class="click-row" data-row="${safeJson}">
+            <td>${escapeHtml(row.cliente_nombre || row.cliente || "")}</td>
+            <td>${escapeHtml(row.no_recibo || "")}</td>
+            <td>${escapeHtml(row.rnc_ced || "")}</td>
+            <td>${escapeHtml(row.fecha_cont || "")}</td>
+            <td style="text-align:right;">${fmtMoney(row.efectivo)}</td>
+            <td style="text-align:right;">${fmtMoney(row.transferencia)}</td>
+            <td style="text-align:right;">${fmtMoney(row.total_cobro)}</td>
+            <td>${escapeHtml(row.estatus || "")}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function buscarRecibos() {
+      const query = (buscarSearchInput.value || "").trim();
+      const filtro = buscarSearchFilter.value || "recibo";
+      const url = `${cxcBuscarRecibosUrl}?q=${encodeURIComponent(query)}&filtro=${encodeURIComponent(filtro)}`;
+      buscarResultsBody.innerHTML = "<tr><td colspan='8' class='result-empty'>Buscando recibos...</td></tr>";
+      try {
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        if (!res.ok) {
+          buscarResultsBody.innerHTML = "<tr><td colspan='8' class='result-empty'>No se pudo consultar los recibos.</td></tr>";
+          return;
+        }
+        const data = await res.json();
+        renderBuscarResults(Array.isArray(data.results) ? data.results : []);
+      } catch (error) {
+        buscarResultsBody.innerHTML = "<tr><td colspan='8' class='result-empty'>Error de conexion.</td></tr>";
+      }
+    }
+
+    async function loadCxcRecibo(reciboId) {
+      if (!reciboId) {
+        window.alert("No se pudo identificar el recibo seleccionado.");
+        return null;
+      }
+      try {
+        const res = await fetch(`${cxcDetalleReciboUrl}?recibo_id=${encodeURIComponent(reciboId)}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!res.ok) {
+          window.alert("No se pudo cargar el recibo seleccionado.");
+          return null;
+        }
+        const data = await res.json();
+        resetCxcValues();
+        setCxcConsultState(data.record || {});
+        closeBuscarModal();
+        return data.record || null;
+      } catch (error) {
+        window.alert("Error de conexion cargando el recibo.");
+        return null;
+      }
+    }
+
+    async function cancelCxcRecibo(reciboId, reciboLabel = "") {
+      if (!reciboId) {
+        window.alert("No se pudo identificar el recibo a cancelar.");
+        return false;
+      }
+      const safeLabel = String(reciboLabel || reciboId).trim() || String(reciboId);
+      const confirmed = await showCxcConfirm(`Se cancelara el recibo ${safeLabel}. Esta accion revertira los movimientos relacionados. Deseas continuar?`);
+      if (!confirmed) {
+        return false;
+      }
+
+      try {
+        const res = await fetch(cxcCancelarUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken(),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ recibo_id: reciboId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          window.alert(data.detail || "No se pudo cancelar el recibo.");
+          return false;
+        }
+        await loadCxcRecibo(reciboId);
+        if (buscarModalBackdrop?.classList.contains("open")) {
+          buscarRecibos();
+        }
+        window.alert(`El recibo ${safeLabel} fue cancelado correctamente.`);
+        return true;
+      } catch (error) {
+        window.alert("Error de conexion cancelando el recibo.");
+        return false;
+      }
+    }
+
+    function renderProyectoResults(rows) {
+      if (!rows.length) {
+        proyectoResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>No se encontraron registros.</td></tr>";
+        return;
+      }
+      proyectoResultsBody.innerHTML = rows.map((row) => {
+        const codigo = escapeHtml(String(row.codigo || ""));
+        const descripcion = escapeHtml(String(row.descripcion || ""));
+        return `<tr class="click-row" data-value="${codigo}"><td>${codigo}</td><td>${descripcion}</td></tr>`;
+      }).join("");
+    }
+
+    async function cargarProyectos(query = "") {
+      const url = `/proyectos/buscar/?q=${encodeURIComponent(query)}`;
+      proyectoResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>Cargando...</td></tr>";
+      try {
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        if (!res.ok) {
+          proyectoResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>No se pudo consultar.</td></tr>";
+          return;
+        }
+        const data = await res.json();
+        renderProyectoResults(Array.isArray(data.results) ? data.results : []);
+      } catch (error) {
+        proyectoResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>Error de conexion.</td></tr>";
+      }
+    }
+
+    function openProyectoModal() {
+      proyectoModalBackdrop.classList.add("open");
+      proyectoModalBackdrop.setAttribute("aria-hidden", "false");
+      lockPageScroll();
+      proyectoSearchInput.value = "";
+      cargarProyectos("");
+      proyectoSearchInput.focus();
+    }
+
+    function closeProyectoModal() {
+      proyectoModalBackdrop.classList.remove("open");
+      proyectoModalBackdrop.setAttribute("aria-hidden", "true");
+      unlockPageScroll();
+    }
+
+    function renderCuentaDescRetResults(rows) {
+      if (!rows.length) {
+        cuentaDescRetResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>No se encontraron cuentas.</td></tr>";
+        return;
+      }
+      cuentaDescRetResultsBody.innerHTML = rows.map((row) => {
+        const rawCuenta = String(row.num_cta || "");
+        const rawNombre = String(row.nombre_cta || "");
+        const numCta = escapeHtml(rawCuenta);
+        const nombreCta = escapeHtml(rawNombre);
+        return `<tr class="click-row" data-cuenta="${escapeHtml(rawCuenta)}" data-nombre="${encodeURIComponent(rawNombre)}"><td>${numCta}</td><td>${nombreCta}</td></tr>`;
+      }).join("");
+    }
+
+    function filterCuentaDescRetResults() {
+      const query = (cuentaDescRetSearchInput.value || "").trim().toLowerCase();
+      if (!query) {
+        renderCuentaDescRetResults(cxcCatalogoCuentas);
+        return;
+      }
+      renderCuentaDescRetResults(
+        cxcCatalogoCuentas.filter((row) => {
+          return String(row.num_cta || "").toLowerCase().includes(query)
+            || String(row.nombre_cta || "").toLowerCase().includes(query);
+        })
+      );
+    }
+
+    async function loadCuentaCatalogo(url) {
+      cuentaDescRetResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>Cargando cuentas...</td></tr>";
+      try {
+        const res = await fetch(url, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!res.ok) {
+          cuentaDescRetResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>No se pudo consultar el catalogo.</td></tr>";
+          return;
+        }
+        const data = await res.json();
+        cxcCatalogoCuentas = Array.isArray(data.results) ? data.results : [];
+        filterCuentaDescRetResults();
+      } catch (error) {
+        cuentaDescRetResultsBody.innerHTML = "<tr><td colspan='2' class='result-empty'>Error de conexion.</td></tr>";
+      }
+    }
+
+    function openCuentaCatalogModal(target) {
+      cxcCuentaCatalogTarget = target;
+      const isCuentaCaja = target === "cuenta_caja";
+      cuentaDescRetModalBackdrop.classList.add("open");
+      cuentaDescRetModalBackdrop.setAttribute("aria-hidden", "false");
+      lockPageScroll();
+      if (cuentaDescRetModalTitle) {
+        cuentaDescRetModalTitle.textContent = isCuentaCaja ? "Seleccionar cta. banco/caja" : "Seleccionar cuenta";
+      }
+      cuentaDescRetSearchInput.value = "";
+      loadCuentaCatalogo(isCuentaCaja ? cxcCatalogoCuentasFinancUrl : cxcCatalogoCuentasUrl);
+      cuentaDescRetSearchInput.focus();
+    }
+
+    function closeCuentaCatalogModal() {
+      cuentaDescRetModalBackdrop.classList.remove("open");
+      cuentaDescRetModalBackdrop.setAttribute("aria-hidden", "true");
+      unlockPageScroll();
+    }
+
+    function renderClienteResults(rows) {
+      if (!rows.length) {
+        clienteResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se encontraron clientes.</td></tr>";
+        return;
+      }
+      clienteResultsBody.innerHTML = rows.map((row) => {
+        const safeJson = encodeURIComponent(JSON.stringify(row));
+        const isBlocked = String(row.bloqueado || "").trim().toUpperCase() === "Y";
+        return `
+          <tr class="click-row" data-row="${safeJson}" ${isBlocked ? "title='Cliente bloqueado'" : ""}>
+            <td>${escapeHtml(row.id_sn)}</td>
+            <td>${escapeHtml(row.nom_socio)}</td>
+            <td>${escapeHtml(row.rnc_ced)}</td>
+            <td>${escapeHtml(row.contacto)}</td>
+            <td>${escapeHtml(row.dir_factura)}</td>
+            <td>${escapeHtml(row.tel1)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function buscarClientes(forceGenericByNombre = false) {
+      const q = clienteSearchInput.value.trim();
+      const filtro = forceGenericByNombre ? "nombre" : (clienteSearchFilter.value || "nombre");
+      if (forceGenericByNombre) {
+        clienteSearchFilter.value = "nombre";
+      }
+      const url = `/clientes/buscar/?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`;
+      clienteResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Buscando...</td></tr>";
+      try {
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        if (!res.ok) {
+          clienteResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se pudo consultar clientes.</td></tr>";
+          return;
+        }
+        const data = await res.json();
+        renderClienteResults(data.results || []);
+      } catch (error) {
+        clienteResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Error de conexion.</td></tr>";
+      }
+    }
+
+    function applyClienteSelection(data) {
+      fieldCliente.value = data.id_sn || "";
+      fieldNombre.value = data.nom_socio || "";
+      fieldApodo.value = data.contacto || "";
+      const isNewDoc = !(fieldNo.value || "").trim();
+      if (isNewDoc) {
+        cxcClienteSeleccionado = true;
+        cxcDocumentoSeleccionado = false;
+        updateCxcDependentAvailability();
+      }
+      closeClienteModal();
+      loadCxcPendientes(data.id_sn || "");
+      loadCxcCobrosAnteriores(data.id_sn || "");
+      btnCxcProyectoModal.focus();
+    }
+
+    document.querySelectorAll("[data-cxc-tabset]").forEach((tabset) => {
+      const firstButton = tabset.querySelector("[data-target]");
+      const buttons = Array.from(tabset.querySelectorAll("[data-target]"));
+      if (firstButton) {
+        activateTabset(tabset, firstButton.getAttribute("data-target"));
+      }
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          activateTabset(tabset, button.getAttribute("data-target"));
+        });
+      });
+    });
+
+    paymentMethodButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        fieldMetodo.value = button.dataset.cxcMetodo || "Efectivo";
+        syncPaymentMethodButtons();
+      });
+    });
+
+    fieldMedioPago?.addEventListener("click", () => {
+      if (fieldMedioPago.disabled) return;
+      const paymentTabActive = document.getElementById("cxc_tab_medio_pago")?.classList.contains("active");
+      const targetMethod = paymentTabActive ? getCxcCurrentPaymentMethod() : "Efectivo";
+      openCxcPaymentMethodTab(targetMethod, true);
+    });
+
+    btnCxcImporteTotal?.addEventListener("click", () => {
+      if (btnCxcImporteTotal.disabled || cxcReadOnlyReceipt || fieldImportePago.disabled) return;
+      assignFullCxcPaymentToCurrentMethod();
+    });
+
+    fieldImportePago?.addEventListener("input", () => {
+      if (cxcReadOnlyReceipt || fieldImportePago.disabled) return;
+      const current = (fieldMetodo.value || "Efectivo").trim() === "Transferencia" ? "Transferencia" : "Efectivo";
+      cxcLoadedPaymentAmounts[current] = Math.max(parseAmount(fieldImportePago.value), 0);
+      syncPaymentMethodButtons({ preserveImporteInput: true });
+    });
+
+    fieldImportePago?.addEventListener("focus", () => {
+      if (fieldImportePago.disabled) return;
+      fieldImportePago.select();
+    });
+
+    fieldImportePago?.addEventListener("blur", () => {
+      syncPaymentMethodButtons();
+    });
+
+    fieldCuentaCaja?.addEventListener("input", () => {
+      updateCxcPaymentAccountFromFields();
+    });
+
+    fieldNoTransferencia?.addEventListener("input", () => {
+      fieldReferenciaPago.value = fieldNoTransferencia.value;
+    });
+
+    fieldCxcPrintModalCopies?.addEventListener("input", () => {
+      syncCxcPrintModalSummary();
+    });
+
+    fieldCxcPrintModalCopies?.addEventListener("blur", () => {
+      fieldCxcPrintModalCopies.value = String(getCxcPrintCopies());
+      syncCxcPrintModalSummary();
+    });
+
+    fieldCxcPrintModalCopies?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        btnCxcPrintModalConfirm?.click();
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeCxcPrintModal();
+      }
+    });
+
+    fieldCuentaClientePago?.addEventListener("input", () => {
+      fieldBanco.value = fieldCuentaClientePago.value;
+    });
+
+    btnCxcNuevo.addEventListener("click", () => setCxcNewState(true));
+    btnCxcBuscar.addEventListener("click", openBuscarModal);
+    btnCxcCancel.addEventListener("click", setCxcInitialState);
+    btnCxcPrinter.addEventListener("click", () => {
+      if (!cxcCurrentReciboId) {
+        window.alert("Debes cargar un recibo ya registrado para imprimirlo.");
+        return;
+      }
+      openCxcPrintModal(cxcCurrentReciboId, fieldNo.value || cxcCurrentReciboId);
+    });
+    btnCxcGrabar.addEventListener("click", () => {
+      if (cxcReadOnlyReceipt) {
+        window.alert("Los recibos ya registrados solo se pueden consultar. No se permite grabarlos nuevamente.");
+        return;
+      }
+      saveCxcReceipt();
+    });
+
+    btnCxcClienteModal.addEventListener("click", openClienteModal);
+    btnCxcProyectoModal.addEventListener("click", openProyectoModal);
+    btnCxcCuentaCajaModal.addEventListener("click", () => openCuentaCatalogModal("cuenta_caja"));
+    btnCxcCuentaDescRetModal.addEventListener("click", () => openCuentaCatalogModal("desc_ret"));
+    btnClosePrintModal?.addEventListener("click", closeCxcPrintModal);
+    btnCxcPrintModalCancel?.addEventListener("click", closeCxcPrintModal);
+    btnCloseAlertModal?.addEventListener("click", closeCxcAlertModal);
+    btnCxcAlertModalOk?.addEventListener("click", closeCxcAlertModal);
+    btnCloseConfirmModal?.addEventListener("click", () => closeCxcConfirmModal(false));
+    btnCxcConfirmModalCancel?.addEventListener("click", () => closeCxcConfirmModal(false));
+    btnCxcConfirmModalOk?.addEventListener("click", () => closeCxcConfirmModal(true));
+    btnCxcPrintModalConfirm?.addEventListener("click", () => {
+      const reciboId = cxcPrintPendingReciboId;
+      if (!reciboId) {
+        closeCxcPrintModal();
+        window.alert("No se pudo identificar el recibo para imprimir.");
+        return;
+      }
+      const copies = getCxcPrintCopies();
+      closeCxcPrintModal();
+      printCxcReceipt(reciboId, copies);
+    });
+    btnCloseClienteModal.addEventListener("click", closeClienteModal);
+    btnCloseBuscarModal.addEventListener("click", closeBuscarModal);
+    btnCloseProyectoModal.addEventListener("click", closeProyectoModal);
+    btnCloseCuentaDescRetModal.addEventListener("click", closeCuentaCatalogModal);
+    btnCxcCerrarCuenta.addEventListener("click", () => {
+      if (!hasCxcPermission("cerrar_cuenta")) {
+        window.alert("No tienes permiso para usar cerrar cuenta en cuentas por cobrar.");
+        return;
+      }
+      if (cxcReadOnlyReceipt) return;
+      if (!cxcPendingRows.length) {
+        window.alert("No hay documentos pendientes para cerrar.");
+        return;
+      }
+      setCxcCloseModeActive(!cxcCloseMode);
+    });
+    btnCxcSelectAll.addEventListener("click", () => {
+      cxcPendingRows.forEach((row) => {
+        if (cxcCloseMode) {
+          applyCxcCloseModeSelection(row, true);
+          return;
+        }
+        row.selected = true;
+        row.pago_abono = Number(row.balance_doc || 0);
+      });
+      renderCxcDetalleRows(cxcPendingRows);
+    });
+    btnCxcUnselectAll.addEventListener("click", () => {
+      cxcPendingRows.forEach((row) => {
+        if (cxcCloseMode) {
+          applyCxcCloseModeSelection(row, false);
+          return;
+        }
+        row.selected = false;
+        row.pago_abono = 0;
+        row.balance_pend = Number(row.balance_doc || 0);
+      });
+      renderCxcDetalleRows(cxcPendingRows);
+    });
+
+    clienteSearchFilter.addEventListener("change", () => buscarClientes(false));
+    clienteSearchInput.addEventListener("input", () => {
+      clearTimeout(clienteSearchDebounceTimer);
+      clienteSearchDebounceTimer = setTimeout(() => {
+        buscarClientes(false);
+      }, 220);
+    });
+    clienteSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        buscarClientes(false);
+      }
+      if (event.key === "Escape") {
+        closeClienteModal();
+      }
+    });
+
+    buscarSearchFilter.addEventListener("change", () => buscarRecibos());
+    buscarSearchInput.addEventListener("input", () => {
+      clearTimeout(buscarSearchDebounceTimer);
+      buscarSearchDebounceTimer = setTimeout(() => {
+        buscarRecibos();
+      }, 220);
+    });
+    buscarSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        buscarRecibos();
+      }
+      if (event.key === "Escape") {
+        closeBuscarModal();
+      }
+    });
+
+    proyectoSearchInput.addEventListener("input", () => {
+      clearTimeout(proyectoSearchDebounceTimer);
+      proyectoSearchDebounceTimer = setTimeout(() => {
+        cargarProyectos(proyectoSearchInput.value.trim());
+      }, 220);
+    });
+    proyectoSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        cargarProyectos(proyectoSearchInput.value.trim());
+      }
+      if (event.key === "Escape") {
+        closeProyectoModal();
+      }
+    });
+
+    cuentaDescRetSearchInput.addEventListener("input", () => {
+      clearTimeout(cuentaDescRetSearchDebounceTimer);
+      cuentaDescRetSearchDebounceTimer = setTimeout(() => {
+        filterCuentaDescRetResults();
+      }, 180);
+    });
+    cuentaDescRetSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        filterCuentaDescRetResults();
+      }
+      if (event.key === "Escape") {
+        closeCuentaCatalogModal();
+      }
+    });
+
+    fieldComentario?.addEventListener("input", () => {
+      if (cxcReadOnlyReceipt) return;
+      const currentValue = String(fieldComentario.value || "").trim();
+      cxcComentarioManual = currentValue !== "" && currentValue !== cxcLastAutoComentario;
+    });
+
+    clienteResultsBody.addEventListener("click", (event) => {
+      const row = event.target.closest("tr.click-row");
+      if (!row) return;
+      const data = JSON.parse(decodeURIComponent(row.dataset.row));
+      if (String(data.bloqueado || "").trim().toUpperCase() === "Y") {
+        window.alert("No se puede seleccionar este cliente porque esta bloqueado.");
+        return;
+      }
+      applyClienteSelection(data);
+    });
+
+    buscarResultsBody.addEventListener("click", (event) => {
+      const row = event.target.closest("tr.click-row");
+      if (!row) return;
+      const data = JSON.parse(decodeURIComponent(row.dataset.row));
+      loadCxcRecibo(data.recibo_id || data.no_recibo || "");
+    });
+
+    cxcCobrosAnterioresBody.addEventListener("click", (event) => {
+      const row = event.target.closest("tr.cxc-history-row");
+      if (!row) return;
+      hideCobrosContextMenu();
+      const data = JSON.parse(decodeURIComponent(row.dataset.row || "%7B%7D"));
+      selectCobroAnteriorRow(data);
+    });
+
+    cxcCobrosAnterioresBody.addEventListener("dblclick", (event) => {
+      const row = event.target.closest("tr.cxc-history-row");
+      if (!row) return;
+      hideCobrosContextMenu();
+      const data = JSON.parse(decodeURIComponent(row.dataset.row || "%7B%7D"));
+      selectCobroAnteriorRow(data);
+      loadCxcRecibo(data.recibo_id || data.no_recibo || "");
+    });
+
+    cxcCobrosAnterioresBody.addEventListener("contextmenu", (event) => {
+      const row = event.target.closest("tr.cxc-history-row");
+      if (!row) return;
+      event.preventDefault();
+      hideEstadoContextMenu();
+      const data = JSON.parse(decodeURIComponent(row.dataset.row || "%7B%7D"));
+      showCobrosContextMenu(event, data);
+    });
+
+    btnCxcCobrosContextPrint?.addEventListener("click", () => {
+      const reciboId = cxcSelectedCobroAnterior?.recibo_id || cxcSelectedCobroAnterior?.no_recibo || "";
+      hideCobrosContextMenu();
+      if (!reciboId) {
+        window.alert("Selecciona un recibo del historial para imprimir.");
+        return;
+      }
+      openCxcPrintModal(reciboId, cxcSelectedCobroAnterior?.no_recibo || reciboId);
+    });
+
+    btnCxcMobileHistoryPrint?.addEventListener("click", () => {
+      const reciboId = cxcSelectedCobroAnterior?.recibo_id || cxcSelectedCobroAnterior?.no_recibo || "";
+      if (!reciboId) {
+        window.alert("Selecciona un recibo del historial para imprimir.");
+        return;
+      }
+      openCxcPrintModal(reciboId, cxcSelectedCobroAnterior?.no_recibo || reciboId);
+    });
+
+    function openCxcCancelMenuFromReceipt(event) {
+      const estadoActual = (fieldEstado.value || "").trim().toUpperCase();
+      if (!hasCxcPermission("cancelar") || !cxcReadOnlyReceipt || !cxcCurrentReciboId || estadoActual !== "ABIERTO") {
+        hideEstadoContextMenu();
+        return;
+      }
+      event.preventDefault();
+      hideCobrosContextMenu();
+      showEstadoContextMenu(event);
+    }
+
+    fieldNo?.addEventListener("contextmenu", openCxcCancelMenuFromReceipt);
+    fieldEstado?.addEventListener("contextmenu", openCxcCancelMenuFromReceipt);
+
+    btnCxcEstadoContextCancel?.addEventListener("click", async () => {
+      const reciboId = String(cxcCurrentReciboId || "").trim();
+      const reciboLabel = String(fieldNo.value || cxcCurrentReciboId || "").trim();
+      hideEstadoContextMenu();
+      if (!hasCxcPermission("cancelar")) {
+        window.alert("No tienes permiso para cancelar recibos de cuentas por cobrar.");
+        return;
+      }
+      if (!reciboId) {
+        window.alert("No se pudo identificar el recibo a cancelar.");
+        return;
+      }
+      await cancelCxcRecibo(reciboId, reciboLabel);
+    });
+
+    cxcDetalleBody.addEventListener("change", (event) => {
+      if (cxcReadOnlyReceipt) return;
+      if (event.target.classList.contains("cxc-row-check")) {
+        const idx = Number.parseInt(event.target.dataset.idx || "-1", 10);
+        if (Number.isInteger(idx) && idx >= 0 && cxcPendingRows[idx]) {
+          if (cxcCloseMode) {
+            applyCxcCloseModeSelection(cxcPendingRows[idx], event.target.checked);
+            renderCxcDetalleRows(cxcPendingRows);
+            return;
+          }
+          const items = getCxcFacturaItemsForRow(idx);
+          if (isCxcFinancedGroup(items)) {
+            const itemIndex = items.findIndex((item) => item.idx === idx);
+            if (itemIndex !== -1) {
+              if (event.target.checked) {
+                items.slice(0, itemIndex + 1).forEach((item) => {
+                  item.row.selected = true;
+                  if (Number(item.row.pago_abono || 0) <= 0) {
+                    item.row.pago_abono = getCxcRowBalance(item.row);
+                  }
+                });
+              } else {
+                items.slice(itemIndex).forEach((item) => {
+                  item.row.selected = false;
+                  item.row.pago_abono = 0;
+                  item.row.balance_pend = getCxcRowBalance(item.row);
+                });
+              }
+            }
+          } else {
+            cxcPendingRows[idx].selected = event.target.checked;
+            cxcPendingRows[idx].pago_abono = event.target.checked ? Number(cxcPendingRows[idx].balance_doc || 0) : 0;
+          }
+        }
+        renderCxcDetalleRows(cxcPendingRows);
+        return;
+      }
+      if (event.target.classList.contains("cxc-desc-input")) {
+        const idx = Number.parseInt(event.target.dataset.idx || "-1", 10);
+        if (!Number.isInteger(idx) || idx < 0) return;
+        updateDescAvanceForRow(idx, event.target.value);
+        event.target.value = fmtEditableAmount(cxcPendingRows[idx].desc_avance || 0);
+        renderCxcDetalleRows(cxcPendingRows);
+        return;
+      }
+      if (!event.target.classList.contains("cxc-pago-input")) return;
+      const idx = Number.parseInt(event.target.dataset.idx || "-1", 10);
+      if (!Number.isInteger(idx) || idx < 0) return;
+      updatePagoAbonoForRow(idx, event.target.value);
+      event.target.value = Number(cxcPendingRows[idx].pago_abono || 0).toFixed(2);
+      renderCxcDetalleRows(cxcPendingRows);
+    });
+
+    cxcDetalleBody.addEventListener("input", (event) => {
+      if (cxcReadOnlyReceipt) return;
+      if (event.target.classList.contains("cxc-desc-input")) {
+        const idx = Number.parseInt(event.target.dataset.idx || "-1", 10);
+        if (!Number.isInteger(idx) || idx < 0) return;
+        updateDescAvanceForRow(idx, event.target.value);
+        const row = event.target.closest("tr");
+        if (row?.children?.[13]) {
+          row.children[13].textContent = fmtMoney(cxcPendingRows[idx].porc_desc);
+        }
+        if (row?.lastElementChild) {
+          row.lastElementChild.textContent = fmtMoney(cxcPendingRows[idx].balance_pend);
+        }
+        syncCxcTotals();
+        return;
+      }
+      if (!event.target.classList.contains("cxc-pago-input")) return;
+      const idx = Number.parseInt(event.target.dataset.idx || "-1", 10);
+      if (!Number.isInteger(idx) || idx < 0) return;
+      updatePagoAbonoForRow(idx, event.target.value);
+      const row = event.target.closest("tr");
+      if (row?.children?.[13]) {
+        row.children[13].textContent = fmtMoney(cxcPendingRows[idx].porc_desc);
+      }
+      if (row && row.lastElementChild) {
+        row.lastElementChild.textContent = fmtMoney(cxcPendingRows[idx].balance_pend);
+      }
+      const descInput = row?.querySelector(".cxc-desc-input");
+      if (descInput) {
+        descInput.value = fmtEditableAmount(cxcPendingRows[idx].desc_avance || 0);
+      }
+      syncCxcTotals();
+    });
+
+    proyectoResultsBody.addEventListener("click", (event) => {
+      const row = event.target.closest("tr.click-row");
+      if (!row) return;
+      fieldProyecto.value = row.dataset.value || "";
+      closeProyectoModal();
+    });
+
+    cuentaDescRetResultsBody.addEventListener("click", (event) => {
+      const row = event.target.closest("tr.click-row");
+      if (!row) return;
+      const cuenta = row.dataset.cuenta || "";
+      const nombre = decodeURIComponent(row.dataset.nombre || "");
+      if (cxcCuentaCatalogTarget === "cuenta_caja") {
+        setCxcPaymentAccount(getCxcCurrentPaymentMethod(), cuenta, nombre);
+        syncPaymentMethodButtons();
+      } else {
+        fieldCuentaDescRet.value = cuenta;
+        fieldCuentaDescRetDesc.value = nombre;
+      }
+      closeCuentaCatalogModal();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (cxcCobrosContextMenu?.contains(event.target) || cxcEstadoContextMenu?.contains(event.target)) return;
+      hideCobrosContextMenu();
+      hideEstadoContextMenu();
+    });
+
+    window.addEventListener("resize", syncCxcMobileHistoryActions);
+    window.addEventListener("resize", syncCxcViewportLayout);
+    syncCxcMobileHistoryActions();
+    syncCxcViewportLayout();
+
+    document.addEventListener("scroll", () => {
+      hideCobrosContextMenu();
+      hideEstadoContextMenu();
+    }, true);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        hideCobrosContextMenu();
+        hideEstadoContextMenu();
+        if (cxcConfirmOpen) {
+          closeCxcConfirmModal(false);
+          return;
+        }
+        if (cxcAlertOpen) {
+          closeCxcAlertModal();
+          return;
+        }
+        closeCxcPrintModal();
+      }
+    });
+
+    printModalBackdrop?.addEventListener("click", (event) => {
+      if (event.target === printModalBackdrop) {
+        closeCxcPrintModal();
+      }
+    });
+
+    alertModalBackdrop?.addEventListener("click", (event) => {
+      if (event.target === alertModalBackdrop) {
+        closeCxcAlertModal();
+      }
+    });
+
+    confirmModalBackdrop?.addEventListener("click", (event) => {
+      if (event.target === confirmModalBackdrop) {
+        closeCxcConfirmModal(false);
+      }
+    });
+
+    clienteModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === clienteModalBackdrop) return;
+    });
+
+    buscarModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === buscarModalBackdrop) return;
+    });
+
+    proyectoModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === proyectoModalBackdrop) return;
+    });
+
+    cuentaDescRetModalBackdrop.addEventListener("click", (event) => {
+      if (event.target === cuentaDescRetModalBackdrop) return;
+    });
+
+    if (btnCxcCobrosContextPrint) {
+      btnCxcCobrosContextPrint.disabled = !hasCxcPermission("imprimir");
+    }
+    if (btnCxcEstadoContextCancel) {
+      btnCxcEstadoContextCancel.disabled = !hasCxcPermission("cancelar");
+    }
+    setCxcInitialState();
+    syncCxcViewportLayout();
+  });
+</script>
+{% endblock %}

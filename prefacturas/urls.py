@@ -30,6 +30,7 @@ urlpatterns = [
     path('app/cobros/', include('cobros.urls')),
     path('app/cartas/', include('cartas.urls')),
     path('app/factura/', include('factura.urls')),
+    path('app/caja/', include('caja.urls')),
 ]
 
 if settings.DEBUG:

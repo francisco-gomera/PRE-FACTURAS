@@ -5,74 +5,224 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ page_title|default:"YEO SYSTEM 2.0" }}</title>
-  <link rel="stylesheet" href="{% static 'core/app.css' %}" />
+  <link rel="stylesheet" href="{% static 'core/app.css' %}?v=20260323a" />
   {% block head_extra %}{% endblock %}
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Menu principal">
       <div class="brand">
-        <div class="brand-title">YEO SYSTEM 2.0</div>
+        <div class="brand-title" data-short="YEO">YEO SYSTEM 2.0</div>
         <div class="brand-subtitle">{{ empresa_nombre|default:"COMERCIAL ANITA SRL" }}</div>
       </div>
       <nav class="nav">
-        <a href="{% url 'core:dashboard' %}" class="{% if active_nav == 'dashboard' %}active{% endif %}">
-          Panel <span>Inicio</span>
+        <a
+          href="{% url 'core:dashboard' %}"
+          class="{% if active_nav == 'dashboard' %}active{% endif %}"
+          title="Panel - Inicio"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Panel</span>
+              <span class="nav-meta">Inicio</span>
+            </span>
+          </span>
         </a>
-        {% if visible_modules.prefacturas %}
-        <a href="{% url 'prefacturas_mod:index' %}" class="{% if active_nav == 'prefacturas' %}active{% endif %}">
-          Prefacturas <span>Ventas</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.clientes %}
-        <a href="{% url 'clientes_mod:index' %}" class="{% if active_nav == 'clientes' %}active{% endif %}">
-          Clientes <span>CRM</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.inventario %}
-        <a href="{% url 'inventario:index' %}" class="{% if active_nav == 'inventario' %}active{% endif %}">
-          Inventario <span>Stock</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.reportes %}
-        <a href="{% url 'reportes:index' %}" class="{% if active_nav == 'reportes' %}active{% endif %}">
-          Reportes <span>Analisis</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.etiquetas %}
-        <a href="{% url 'etiquetas:index' %}" class="{% if active_nav == 'etiquetas' %}active{% endif %}">
-          Etiquetas <span>Impresion</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.cobros %}
-        <a href="{% url 'cobros:index' %}" class="{% if active_nav == 'cobros' %}active{% endif %}">
-          Cobros <span>Gestion</span>
-        </a>
-        {% endif %}
-        {% if visible_modules.cartas %}
-        <a href="{% url 'cartas:index' %}" class="{% if active_nav == 'cartas' %}active{% endif %}">
-          Cartas <span>Avisos</span>
+        {% if visible_modules.caja %}
+        <a
+          href="{% url 'caja:index' %}"
+          class="{% if active_nav == 'caja' %}active{% endif %}"
+          title="Caja - Gestion"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 8h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M4 10h16"/><path d="M8 6h8"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Caja</span>
+              <span class="nav-meta">Gestion</span>
+            </span>
+          </span>
         </a>
         {% endif %}
         {% if visible_modules.factura %}
-        <a href="{% url 'factura:index' %}" class="{% if active_nav == 'factura' %}active{% endif %}">
-          Factura <span>e-CF</span>
+        <a
+          href="{% url 'factura:index' %}"
+          class="{% if active_nav == 'factura' %}active{% endif %}"
+          title="Factura - e-CF"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Factura</span>
+              <span class="nav-meta">e-CF</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.prefacturas %}
+        <a
+          href="{% url 'prefacturas_mod:index' %}"
+          class="{% if active_nav == 'prefacturas' %}active{% endif %}"
+          title="Prefacturas - Ventas"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M9 11h6"/><path d="M9 15h6"/><path d="M9 19h4"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Prefacturas</span>
+              <span class="nav-meta">Ventas</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.clientes %}
+        <a
+          href="{% url 'clientes_mod:index' %}"
+          class="{% if active_nav == 'clientes' %}active{% endif %}"
+          title="Clientes - CRM"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M16 19a4 4 0 0 0-8 0"/><circle cx="12" cy="10" r="3"/><path d="M5 19a3 3 0 0 1 3-3"/><path d="M19 19a3 3 0 0 0-3-3"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Clientes</span>
+              <span class="nav-meta">CRM</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.inventario %}
+        <a
+          href="{% url 'inventario:index' %}"
+          class="{% if active_nav == 'inventario' %}active{% endif %}"
+          title="Inventario - Stock"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m12 3 8 4.5-8 4.5L4 7.5 12 3Z"/><path d="M4 7.5V16l8 5 8-5V7.5"/><path d="M12 12v9"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Inventario</span>
+              <span class="nav-meta">Stock</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.reportes %}
+        <a
+          href="{% url 'reportes:index' %}"
+          class="{% if active_nav == 'reportes' %}active{% endif %}"
+          title="Reportes - Analisis"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 19V9"/><path d="M12 19V5"/><path d="M19 19v-7"/><path d="M4 19h16"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Reportes</span>
+              <span class="nav-meta">Analisis</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.etiquetas %}
+        <a
+          href="{% url 'etiquetas:index' %}"
+          class="{% if active_nav == 'etiquetas' %}active{% endif %}"
+          title="Etiquetas - Impresion"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M10 4h8l2 2v8l-8 8-8-8 6-10Z"/><circle cx="15.5" cy="8.5" r="1"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Etiquetas</span>
+              <span class="nav-meta">Impresion</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.cobros %}
+        <a
+          href="{% url 'cobros:index' %}"
+          class="{% if active_nav == 'cobros' %}active{% endif %}"
+          title="Cobros - Gestion"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 8h16v8H4z"/><path d="M8 12h8"/><path d="M12 8V5"/><path d="M12 19v-3"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Cobros</span>
+              <span class="nav-meta">Gestion</span>
+            </span>
+          </span>
+        </a>
+        {% endif %}
+        {% if visible_modules.cartas %}
+        <a
+          href="{% url 'cartas:index' %}"
+          class="{% if active_nav == 'cartas' %}active{% endif %}"
+          title="Cartas - Avisos"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16v10H4z"/><path d="m4 8 8 6 8-6"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Cartas</span>
+              <span class="nav-meta">Avisos</span>
+            </span>
+          </span>
         </a>
         {% endif %}
         {% if visible_modules.ajustes %}
-        <a href="{% url 'ajustes:index' %}" class="{% if active_nav == 'ajustes' %}active{% endif %}">
-          Ajustes <span>Parametros</span>
+        <a
+          href="{% url 'ajustes:index' %}"
+          class="{% if active_nav == 'ajustes' %}active{% endif %}"
+          title="Ajustes - Parametros"
+        >
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M12 18v3"/><path d="m4.9 4.9 2.1 2.1"/><path d="m17 17 2.1 2.1"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="m4.9 19.1 2.1-2.1"/><path d="M17 7l2.1-2.1"/><circle cx="12" cy="12" r="4"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Ajustes</span>
+              <span class="nav-meta">Parametros</span>
+            </span>
+          </span>
         </a>
         {% endif %}
       </nav>
       <div class="sidebar-footer">
-        <a class="logout" href="{% url 'logout' %}">Cerrar sesion</a>
+        <a class="logout" href="{% url 'logout' %}" title="Cerrar sesion">
+          <span class="nav-item-main">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M14 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h10"/><path d="m17 8 4 4-4 4"/></svg>
+            </span>
+            <span class="nav-copy">
+              <span class="nav-label">Cerrar sesion</span>
+              <span class="nav-meta">Salir</span>
+            </span>
+          </span>
+        </a>
       </div>
     </aside>
 
     <section class="content">
       <header class="topbar">
         <button class="menu-toggle" id="menuToggle" type="button">Menu</button>
+        <button class="sidebar-collapse-toggle" id="sidebarCollapseToggle" type="button" aria-pressed="false">
+          Contraer menu
+        </button>
         <h1>{{ page_title|default:"Panel" }}</h1>
         <div class="user-chip">
           Usuario: <strong>{{ auth_payload.usuario_login }}</strong> |
@@ -85,6 +235,6 @@
     </section>
   </div>
   <div class="overlay" id="navOverlay" aria-hidden="true"></div>
-  <script src="{% static 'core/app.js' %}"></script>
+  <script src="{% static 'core/app.js' %}?v=20260323a"></script>
 </body>
 </html>
