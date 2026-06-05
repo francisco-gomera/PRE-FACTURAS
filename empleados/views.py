@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -21,8 +21,13 @@ from .models import (
     EmpleadoExperienciaLaboral,
     EmpleadoNomina,
     EmpleadoVacacionBalance,
+    EmpleadoVacacionDescuento,
     EmpleadoVacacionPlanificada,
+    NominaAdelanto,
+    NominaEntrada,
+    NominaPeriodo,
 )
+from .nomina_calc import generar_entrada as _generar_entrada_calc
 
 
 DATE_FIELDS = {"fecha_nacimiento"}
@@ -199,6 +204,12 @@ def _parse_int(value):
         return int(str(value or "").strip())
     except (TypeError, ValueError):
         return 0
+
+
+def _fmt_date(value):
+    if not value:
+        return ""
+    return value.strftime("%Y-%m-%d")
 
 
 def _get_vacation_balance(empleado, year=None, for_update=False):
@@ -1032,6 +1043,30 @@ def control_vacaciones_calendario(request):
     return JsonResponse({"aprobadas": aprobadas, "planificadas": planificadas})
 
 
+@require_http_methods(["GET"])
+def control_vacaciones_descuentos(request):
+    ctx, denied = _require_empleados_perm(request, "ver")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    empleado_id = _parse_int(request.GET.get("id_empleado"))
+    if not empleado_id:
+        return JsonResponse({"detail": "Debe indicar un empleado."}, status=400)
+    qs = EmpleadoVacacionDescuento.objects.filter(
+        empleado_id=empleado_id
+    ).order_by("-fecha_descuento", "-id_descuento")[:100]
+    results = []
+    for d in qs:
+        results.append({
+            "id_descuento": d.id_descuento,
+            "dias": d.dias,
+            "descripcion": d.descripcion or "",
+            "fecha_descuento": _fmt_date(d.fecha_descuento),
+            "fecha_dias_desde": _fmt_date(d.fecha_dias_desde),
+            "fecha_dias_hasta": _fmt_date(d.fecha_dias_hasta),
+        })
+    return JsonResponse({"results": results})
+
+
 @require_http_methods(["POST"])
 def control_vacaciones_descontar(request):
     ctx, denied = _require_empleados_perm(request, "editar")
@@ -1043,8 +1078,17 @@ def control_vacaciones_descontar(request):
         return JsonResponse({"detail": "JSON invalido."}, status=400)
     empleado_id = _parse_int(payload.get("id_empleado"))
     dias = _parse_int(payload.get("dias"))
+    descripcion = str(payload.get("descripcion") or "").strip()
+    fecha_dias_desde = _parse_date(payload.get("fecha_dias_desde"))
+    fecha_dias_hasta = _parse_date(payload.get("fecha_dias_hasta"))
     if not empleado_id or dias <= 0:
         return JsonResponse({"detail": "Debe indicar empleado y cantidad de dias valida."}, status=400)
+    if not descripcion:
+        return JsonResponse({"detail": "Debe indicar una descripcion del descuento."}, status=400)
+    if not fecha_dias_desde or not fecha_dias_hasta:
+        return JsonResponse({"detail": "Debe indicar las fechas de los dias descontados."}, status=400)
+    if fecha_dias_hasta < fecha_dias_desde:
+        return JsonResponse({"detail": "La fecha hasta no puede ser menor que desde."}, status=400)
     empleado = EmpleadoNomina.objects.filter(id_empleado=empleado_id).first()
     if not empleado:
         return JsonResponse({"detail": "Empleado no encontrado."}, status=404)
@@ -1056,6 +1100,14 @@ def control_vacaciones_descontar(request):
                 return JsonResponse({"detail": "Los dias a descontar superan los dias disponibles."}, status=400)
             balance.dias_disponibles = (balance.dias_disponibles or 0) - dias
             balance.save(update_fields=["dias_disponibles", "actualizado_en"])
+            EmpleadoVacacionDescuento.objects.create(
+                empleado=empleado,
+                dias=dias,
+                descripcion=descripcion,
+                fecha_descuento=timezone.localdate(),
+                fecha_dias_desde=fecha_dias_desde,
+                fecha_dias_hasta=fecha_dias_hasta,
+            )
     except Exception as exc:
         return JsonResponse({"detail": f"Error al descontar: {exc}"}, status=500)
     return JsonResponse({"ok": True, "dias_disponibles": balance.dias_disponibles})
@@ -1137,3 +1189,326 @@ def control_vacaciones_eliminar_plan(request):
     if not deleted:
         return JsonResponse({"detail": "Plan no encontrado."}, status=404)
     return JsonResponse({"ok": True})
+
+
+# ─── Control de Nómina ───────────────────────────────────────────────────
+
+def control_nomina(request):
+    ctx, denied = _require_empleados_perm(request, "ver")
+    if denied:
+        return denied
+    ctx["page_title"] = "Control de Nomina"
+    return render(request, "empleados/control_nomina.html", ctx)
+
+
+@require_http_methods(["GET"])
+def control_nomina_periodos(request):
+    ctx, denied = _require_empleados_perm(request, "ver")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    estatus = str(request.GET.get("estatus") or "").strip().upper()
+    qs = NominaPeriodo.objects.all()
+    if estatus:
+        qs = qs.filter(estatus=estatus)
+    qs = qs.order_by("-fecha_desde", "-id_periodo")[:100]
+    results = []
+    for p in qs:
+        count = p.entradas.count()
+        total_neto = p.entradas.aggregate(t=Sum("neto_pagar"))["t"] or 0
+        results.append({
+            "id_periodo": p.id_periodo,
+            "tipo": p.tipo,
+            "fecha_desde": _fmt_date(p.fecha_desde),
+            "fecha_hasta": _fmt_date(p.fecha_hasta),
+            "descripcion": p.descripcion or "",
+            "estatus": p.estatus,
+            "aplicar_afp": p.aplicar_afp,
+            "aplicar_sfs": p.aplicar_sfs,
+            "aplicar_srl": p.aplicar_srl,
+            "aplicar_isr": p.aplicar_isr,
+            "empleados": count,
+            "total_neto": str(total_neto),
+        })
+    return JsonResponse({"results": results})
+
+
+@require_http_methods(["POST"])
+def control_nomina_crear_periodo(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    tipo = str(payload.get("tipo") or "").strip().upper()
+    if tipo not in {NominaPeriodo.TIPO_SEMANAL, NominaPeriodo.TIPO_QUINCENAL, NominaPeriodo.TIPO_MENSUAL}:
+        return JsonResponse({"detail": "Tipo de periodo invalido."}, status=400)
+    fecha_desde = _parse_date(payload.get("fecha_desde"))
+    fecha_hasta = _parse_date(payload.get("fecha_hasta"))
+    if not fecha_desde or not fecha_hasta:
+        return JsonResponse({"detail": "Debe indicar las fechas del periodo."}, status=400)
+    if fecha_hasta < fecha_desde:
+        return JsonResponse({"detail": "Fecha hasta no puede ser menor que desde."}, status=400)
+    descripcion = str(payload.get("descripcion") or "").strip()[:120]
+    periodo = NominaPeriodo.objects.create(
+        tipo=tipo,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        descripcion=descripcion,
+        aplicar_afp=bool(payload.get("aplicar_afp")),
+        aplicar_sfs=bool(payload.get("aplicar_sfs")),
+        aplicar_srl=bool(payload.get("aplicar_srl")),
+        aplicar_isr=bool(payload.get("aplicar_isr")),
+    )
+    return JsonResponse({"ok": True, "id_periodo": periodo.id_periodo})
+
+
+@require_http_methods(["GET"])
+def control_nomina_detalle_periodo(request, periodo_id):
+    ctx, denied = _require_empleados_perm(request, "ver")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    periodo = NominaPeriodo.objects.filter(id_periodo=periodo_id).first()
+    if not periodo:
+        return JsonResponse({"detail": "Periodo no encontrado."}, status=404)
+    entradas = NominaEntrada.objects.filter(periodo=periodo).select_related("empleado").order_by("empleado__codigo")
+    items = []
+    for e in entradas:
+        items.append({
+            "id_entrada": e.id_entrada,
+            "id_empleado": e.empleado.id_empleado,
+            "codigo": e.empleado.codigo,
+            "nombre": f"{e.empleado.nombres} {e.empleado.apellidos}".strip(),
+            "departamento": e.empleado.departamento or "",
+            "salario_periodo": str(e.salario_periodo),
+            "dias_trabajados": str(e.dias_trabajados),
+            "horas_extras_35": str(e.horas_extras_35),
+            "monto_horas_extras_35": str(e.monto_horas_extras_35),
+            "horas_extras_100": str(e.horas_extras_100),
+            "monto_horas_extras_100": str(e.monto_horas_extras_100),
+            "bonificacion": str(e.bonificacion),
+            "bonificacion_desc": e.bonificacion_desc or "",
+            "comisiones": str(e.comisiones),
+            "vacaciones_pagadas": str(e.vacaciones_pagadas),
+            "regalia": str(e.regalia),
+            "otros_ingresos": str(e.otros_ingresos),
+            "otros_ingresos_desc": e.otros_ingresos_desc or "",
+            "afp_empleado": str(e.afp_empleado),
+            "afp_empleador": str(e.afp_empleador),
+            "sfs_empleado": str(e.sfs_empleado),
+            "sfs_empleador": str(e.sfs_empleador),
+            "srl_empleador": str(e.srl_empleador),
+            "isr_retencion": str(e.isr_retencion),
+            "adelanto": str(e.adelanto),
+            "prestamo_descuento": str(e.prestamo_descuento),
+            "otras_deducciones": str(e.otras_deducciones),
+            "otras_deducciones_desc": e.otras_deducciones_desc or "",
+            "total_ingresos": str(e.total_ingresos),
+            "total_deducciones_legales": str(e.total_deducciones_legales),
+            "total_otras_deducciones": str(e.total_otras_deducciones),
+            "neto_pagar": str(e.neto_pagar),
+            "notas": e.notas or "",
+        })
+    return JsonResponse({
+        "periodo": {
+            "id_periodo": periodo.id_periodo,
+            "tipo": periodo.tipo,
+            "fecha_desde": _fmt_date(periodo.fecha_desde),
+            "fecha_hasta": _fmt_date(periodo.fecha_hasta),
+            "descripcion": periodo.descripcion or "",
+            "estatus": periodo.estatus,
+            "aplicar_afp": periodo.aplicar_afp,
+            "aplicar_sfs": periodo.aplicar_sfs,
+            "aplicar_srl": periodo.aplicar_srl,
+            "aplicar_isr": periodo.aplicar_isr,
+        },
+        "entradas": items,
+    })
+
+
+@require_http_methods(["POST"])
+def control_nomina_generar(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    periodo_id = _parse_int(payload.get("id_periodo"))
+    periodo = NominaPeriodo.objects.filter(id_periodo=periodo_id).first()
+    if not periodo:
+        return JsonResponse({"detail": "Periodo no encontrado."}, status=404)
+    if periodo.estatus not in {NominaPeriodo.ESTATUS_BORRADOR, NominaPeriodo.ESTATUS_PROCESADA}:
+        return JsonResponse({"detail": "Solo se puede generar nomina en periodos borrador o procesados."}, status=400)
+    empleados = EmpleadoNomina.objects.filter(estado__iexact="Activo").order_by("codigo")
+    try:
+        with transaction.atomic():
+            # Eliminar entradas existentes para regenerar
+            NominaEntrada.objects.filter(periodo=periodo).delete()
+            for emp in empleados:
+                data = _generar_entrada_calc(emp, periodo)
+                # Buscar adelantos pendientes
+                adelantos_pendientes = NominaAdelanto.objects.filter(
+                    empleado=emp, descontado=False
+                )
+                total_adelanto = sum(a.monto for a in adelantos_pendientes)
+                if total_adelanto:
+                    data["adelanto"] = total_adelanto
+                    # Recalcular totales
+                    data["total_otras_deducciones"] = total_adelanto + data.get("prestamo_descuento", Decimal("0")) + data.get("otras_deducciones", Decimal("0"))
+                    data["neto_pagar"] = data["total_ingresos"] - data["total_deducciones_legales"] - data["total_otras_deducciones"]
+                NominaEntrada.objects.create(periodo=periodo, empleado=emp, **data)
+                # Marcar adelantos como descontados
+                if total_adelanto:
+                    adelantos_pendientes.update(descontado=True, periodo_descuento=periodo)
+            periodo.estatus = NominaPeriodo.ESTATUS_PROCESADA
+            periodo.save(update_fields=["estatus", "actualizado_en"])
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error al generar nomina: {exc}"}, status=500)
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def control_nomina_guardar_entrada(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    entrada_id = _parse_int(payload.get("id_entrada"))
+    entrada = NominaEntrada.objects.select_related("periodo", "empleado").filter(id_entrada=entrada_id).first()
+    if not entrada:
+        return JsonResponse({"detail": "Entrada no encontrada."}, status=404)
+    if entrada.periodo.estatus not in {NominaPeriodo.ESTATUS_BORRADOR, NominaPeriodo.ESTATUS_PROCESADA}:
+        return JsonResponse({"detail": "No se puede editar una nomina aprobada o pagada."}, status=400)
+    extras = {
+        "horas_extras_35": payload.get("horas_extras_35", 0),
+        "horas_extras_100": payload.get("horas_extras_100", 0),
+        "bonificacion": payload.get("bonificacion", 0),
+        "bonificacion_desc": payload.get("bonificacion_desc", ""),
+        "comisiones": payload.get("comisiones", 0),
+        "vacaciones_pagadas": payload.get("vacaciones_pagadas", 0),
+        "regalia": payload.get("regalia", 0),
+        "otros_ingresos": payload.get("otros_ingresos", 0),
+        "otros_ingresos_desc": payload.get("otros_ingresos_desc", ""),
+        "adelanto": payload.get("adelanto", 0),
+        "prestamo_descuento": payload.get("prestamo_descuento", 0),
+        "otras_deducciones": payload.get("otras_deducciones", 0),
+        "otras_deducciones_desc": payload.get("otras_deducciones_desc", ""),
+        "notas": payload.get("notas", ""),
+    }
+    data = _generar_entrada_calc(entrada.empleado, entrada.periodo, extras)
+    for field, value in data.items():
+        setattr(entrada, field, value)
+    entrada.save()
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def control_nomina_aprobar(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    periodo_id = _parse_int(payload.get("id_periodo"))
+    periodo = NominaPeriodo.objects.filter(id_periodo=periodo_id).first()
+    if not periodo:
+        return JsonResponse({"detail": "Periodo no encontrado."}, status=404)
+    if periodo.estatus != NominaPeriodo.ESTATUS_PROCESADA:
+        return JsonResponse({"detail": "Solo se puede aprobar una nomina procesada."}, status=400)
+    periodo.estatus = NominaPeriodo.ESTATUS_APROBADA
+    periodo.save(update_fields=["estatus", "actualizado_en"])
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def control_nomina_anular(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    periodo_id = _parse_int(payload.get("id_periodo"))
+    periodo = NominaPeriodo.objects.filter(id_periodo=periodo_id).first()
+    if not periodo:
+        return JsonResponse({"detail": "Periodo no encontrado."}, status=404)
+    if periodo.estatus == NominaPeriodo.ESTATUS_ANULADA:
+        return JsonResponse({"detail": "El periodo ya esta anulado."}, status=400)
+    with transaction.atomic():
+        # Devolver adelantos descontados
+        NominaAdelanto.objects.filter(periodo_descuento=periodo).update(descontado=False, periodo_descuento=None)
+        periodo.estatus = NominaPeriodo.ESTATUS_ANULADA
+        periodo.save(update_fields=["estatus", "actualizado_en"])
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def control_nomina_adelanto(request):
+    ctx, denied = _require_empleados_perm(request, "editar")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+    empleado_id = _parse_int(payload.get("id_empleado"))
+    monto = _parse_decimal(payload.get("monto"))
+    fecha = _parse_date(payload.get("fecha")) or timezone.localdate()
+    nota = str(payload.get("nota") or "").strip()[:200]
+    if not empleado_id:
+        return JsonResponse({"detail": "Debe seleccionar un empleado."}, status=400)
+    if not monto or monto <= 0:
+        return JsonResponse({"detail": "Debe indicar un monto valido."}, status=400)
+    empleado = EmpleadoNomina.objects.filter(id_empleado=empleado_id).first()
+    if not empleado:
+        return JsonResponse({"detail": "Empleado no encontrado."}, status=404)
+    adelanto = NominaAdelanto.objects.create(
+        empleado=empleado, monto=monto, fecha=fecha, nota=nota,
+    )
+    return JsonResponse({
+        "ok": True,
+        "adelanto": {
+            "id_adelanto": adelanto.id_adelanto,
+            "id_empleado": empleado.id_empleado,
+            "codigo": empleado.codigo,
+            "nombre": f"{empleado.nombres} {empleado.apellidos}".strip(),
+            "monto": str(adelanto.monto),
+            "fecha": _fmt_date(adelanto.fecha),
+            "descontado": adelanto.descontado,
+            "nota": adelanto.nota or "",
+        },
+    })
+
+
+@require_http_methods(["GET"])
+def control_nomina_adelantos_listar(request):
+    ctx, denied = _require_empleados_perm(request, "ver")
+    if denied:
+        return JsonResponse({"detail": "No tienes permiso."}, status=403)
+    pendientes = str(request.GET.get("pendientes") or "").strip() == "1"
+    qs = NominaAdelanto.objects.select_related("empleado").all()
+    if pendientes:
+        qs = qs.filter(descontado=False)
+    qs = qs.order_by("-fecha", "-id_adelanto")[:200]
+    results = []
+    for a in qs:
+        results.append({
+            "id_adelanto": a.id_adelanto,
+            "id_empleado": a.empleado.id_empleado,
+            "codigo": a.empleado.codigo,
+            "nombre": f"{a.empleado.nombres} {a.empleado.apellidos}".strip(),
+            "monto": str(a.monto),
+            "fecha": _fmt_date(a.fecha),
+            "descontado": a.descontado,
+            "nota": a.nota or "",
+        })
+    return JsonResponse({"results": results})

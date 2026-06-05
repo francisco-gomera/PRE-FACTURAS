@@ -39,6 +39,26 @@
   .tu-empty { padding:18px; color:#667892; border:1px dashed #c9d7ef; border-radius:12px; background:#f8fbff; }
   .tu-status { margin-top:8px; color:#5c6b84; font-size:.9rem; }
   .tu-toolbar .tu-status { align-self:center; margin-top:0; }
+  .tu-btn.refresh { background:#e6f7ee; color:#1a6b3a; border-color:#b3dfca; }
+  .tu-btn.refresh:hover { background:#d0f0de; }
+  .tu-modal-overlay { display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.55); backdrop-filter:blur(3px); align-items:center; justify-content:center; }
+  .tu-modal-overlay.is-visible { display:flex; }
+  .tu-modal { background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(15,23,42,.18); max-width:520px; width:90vw; padding:28px 26px 22px; animation:tuModalIn .22s ease-out; }
+  @keyframes tuModalIn { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+  .tu-modal h3 { margin:0 0 6px; color:#173d7a; font-size:1.1rem; }
+  .tu-modal p { margin:0 0 14px; color:#5c6b84; font-size:.92rem; line-height:1.5; }
+  .tu-modal-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .tu-modal-stat { padding:12px; border-radius:10px; text-align:center; }
+  .tu-modal-stat.update { background:#e6f7ee; border:1px solid #b3dfca; }
+  .tu-modal-stat.remove { background:#fff1f1; border:1px solid #efc0c0; }
+  .tu-modal-stat strong { display:block; font-size:1.6rem; color:#173d7a; }
+  .tu-modal-stat span { font-size:.82rem; color:#5c6b84; }
+  .tu-modal-removed { max-height:140px; overflow:auto; margin-bottom:16px; border:1px solid #edf2fb; border-radius:10px; }
+  .tu-modal-removed table { width:100%; border-collapse:collapse; font-size:.84rem; }
+  .tu-modal-removed th, .tu-modal-removed td { padding:6px 8px; text-align:left; border-bottom:1px solid #edf2fb; }
+  .tu-modal-removed th { background:#f8fbff; color:#3b5680; position:sticky; top:0; }
+  .tu-modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+  .tu-modal-actions button { min-width:100px; }
   @media (max-width: 1280px) {
     .tu-detail-layout { grid-template-columns:1fr; }
     .tu-selected-table-wrap { max-height:220px; }
@@ -111,6 +131,7 @@
     <p class="tu-sub">Cada campo se puede editar antes de generar el archivo.</p>
     <div class="tu-toolbar">
       <button id="tu_remove" type="button" class="tu-btn danger" disabled>Quitar cuenta seleccionada</button>
+      <button id="tu_refresh" type="button" class="tu-btn refresh" disabled>&#x21bb; Actualizar cuentas</button>
       <span id="tu_selected_count" class="tu-status">0 cuentas seleccionadas.</span>
     </div>
     <div class="tu-detail-layout">
@@ -138,6 +159,33 @@
   </section>
 </div>
 
+<div id="tu_confirm_modal" class="tu-modal-overlay">
+  <div class="tu-modal">
+    <h3>&#x21bb; Confirmar actualizacion de cuentas</h3>
+    <p id="tu_confirm_text">Se actualizaran los datos de las cuentas seleccionadas.</p>
+    <div class="tu-modal-stats">
+      <div class="tu-modal-stat update">
+        <strong id="tu_confirm_update_count">0</strong>
+        <span>Se actualizaran</span>
+      </div>
+      <div class="tu-modal-stat remove">
+        <strong id="tu_confirm_remove_count">0</strong>
+        <span>Se eliminaran</span>
+      </div>
+    </div>
+    <div id="tu_confirm_removed_wrap" class="tu-modal-removed" style="display:none;">
+      <table>
+        <thead><tr><th>Cuenta</th><th>Razon</th></tr></thead>
+        <tbody id="tu_confirm_removed_list"></tbody>
+      </table>
+    </div>
+    <div class="tu-modal-actions">
+      <button id="tu_confirm_cancel" type="button" class="tu-btn secondary">Cancelar</button>
+      <button id="tu_confirm_ok" type="button" class="tu-btn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 {{ transunion_fields|json_script:"tu-fields-data" }}
 <script>
   (function () {
@@ -145,6 +193,7 @@
     const urls = {
       cuentas: "{% url 'ajustes:reportes_transunion_cuentas' %}",
       generar: "{% url 'ajustes:reportes_transunion_generar' %}",
+      actualizar: "{% url 'ajustes:reportes_transunion_actualizar_cuentas' %}",
     };
     const csrfToken = "{{ csrf_token }}";
     const selected = new Map();
@@ -156,8 +205,18 @@
     const statusEl = document.getElementById("tu_status");
     const countEl = document.getElementById("tu_selected_count");
     const removeBtn = document.getElementById("tu_remove");
+    const refreshBtn = document.getElementById("tu_refresh");
     const searchInput = document.getElementById("tu_search");
     const corteInput = document.getElementById("tu_corte");
+    const confirmModal = document.getElementById("tu_confirm_modal");
+    const confirmText = document.getElementById("tu_confirm_text");
+    const confirmUpdateCount = document.getElementById("tu_confirm_update_count");
+    const confirmRemoveCount = document.getElementById("tu_confirm_remove_count");
+    const confirmRemovedWrap = document.getElementById("tu_confirm_removed_wrap");
+    const confirmRemovedList = document.getElementById("tu_confirm_removed_list");
+    const confirmCancel = document.getElementById("tu_confirm_cancel");
+    const confirmOk = document.getElementById("tu_confirm_ok");
+    let pendingRefreshData = null;
 
     function setStatus(text) {
       statusEl.textContent = text || "";
@@ -314,6 +373,7 @@
     function refreshCount() {
       countEl.textContent = `${selected.size} cuenta${selected.size === 1 ? "" : "s"} seleccionada${selected.size === 1 ? "" : "s"}.`;
       removeBtn.disabled = !activeKey || !selected.has(activeKey);
+      refreshBtn.disabled = selected.size === 0;
       renderSelectedList();
     }
 
@@ -482,6 +542,116 @@
       reader.onerror = () => setStatus("No se pudo leer el archivo seleccionado.");
       reader.readAsText(file, "utf-8");
     });
+
+    function showConfirmModal(data) {
+      pendingRefreshData = data;
+      const summary = data.summary || {};
+      confirmUpdateCount.textContent = String(summary.actualizadas || 0);
+      confirmRemoveCount.textContent = String(summary.eliminadas || 0);
+      const removed = data.removed || [];
+      if (removed.length > 0) {
+        confirmRemovedWrap.style.display = "";
+        confirmRemovedList.innerHTML = removed.map((item) => `
+          <tr>
+            <td>${escapeHtml(item.id_doc)}</td>
+            <td>${escapeHtml(item.reason)}</td>
+          </tr>
+        `).join("");
+      } else {
+        confirmRemovedWrap.style.display = "none";
+        confirmRemovedList.innerHTML = "";
+      }
+      let msg = `Se van a actualizar los datos de ${summary.actualizadas || 0} cuenta${(summary.actualizadas || 0) === 1 ? "" : "s"}`;
+      if ((summary.eliminadas || 0) > 0) {
+        msg += ` y se eliminaran ${summary.eliminadas} cuenta${summary.eliminadas === 1 ? "" : "s"} que estan saldadas o cerradas`;
+      }
+      msg += ".";
+      confirmText.textContent = msg;
+      confirmModal.classList.add("is-visible");
+    }
+
+    function hideConfirmModal() {
+      confirmModal.classList.remove("is-visible");
+      pendingRefreshData = null;
+    }
+
+    function applyRefreshData(data) {
+      const removedIds = new Set((data.removed || []).map((item) => String(item.id_doc || "")));
+      removedIds.forEach((docId) => {
+        if (docId && selected.has(docId)) {
+          selected.delete(docId);
+          if (activeKey === docId) activeKey = "";
+        }
+      });
+      (data.updated || []).forEach((item) => {
+        const docId = (item.source || {}).id_doc || (item.fields || {}).numero_cuenta;
+        if (docId && selected.has(docId)) {
+          selected.set(docId, JSON.parse(JSON.stringify(item)));
+        }
+      });
+      if (activeKey && !selected.has(activeKey)) activeKey = "";
+      renderSelectedList();
+      renderEditor();
+      const summary = data.summary || {};
+      let statusMsg = `Actualizacion completada: ${summary.actualizadas || 0} cuenta${(summary.actualizadas || 0) === 1 ? "" : "s"} actualizada${(summary.actualizadas || 0) === 1 ? "" : "s"}`;
+      if ((summary.eliminadas || 0) > 0) {
+        statusMsg += `, ${summary.eliminadas} eliminada${summary.eliminadas === 1 ? "" : "s"}`;
+      }
+      statusMsg += ".";
+      setStatus(statusMsg);
+    }
+
+    async function refreshAccounts() {
+      if (!selected.size) {
+        setStatus("No hay cuentas seleccionadas para actualizar.");
+        return;
+      }
+      const idDocs = Array.from(selected.keys());
+      refreshBtn.disabled = true;
+      setStatus("Consultando datos actualizados de las cuentas...");
+      try {
+        const response = await fetch(urls.actualizar, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken,
+          },
+          body: JSON.stringify({
+            id_docs: idDocs,
+            corte: corteInput.value || "",
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "No se pudo actualizar las cuentas.");
+        }
+        showConfirmModal(data);
+      } catch (error) {
+        setStatus(error.message || "Error al actualizar las cuentas.");
+      } finally {
+        refreshBtn.disabled = selected.size === 0;
+      }
+    }
+
+    refreshBtn.addEventListener("click", refreshAccounts);
+    confirmCancel.addEventListener("click", () => {
+      hideConfirmModal();
+      setStatus("Actualizacion cancelada.");
+    });
+    confirmOk.addEventListener("click", () => {
+      if (pendingRefreshData) {
+        applyRefreshData(pendingRefreshData);
+      }
+      hideConfirmModal();
+    });
+    confirmModal.addEventListener("click", (event) => {
+      if (event.target === confirmModal) {
+        hideConfirmModal();
+        setStatus("Actualizacion cancelada.");
+      }
+    });
+
     refreshCount();
   })();
 </script>

@@ -1,0 +1,711 @@
+{% extends "core/base.html" %}
+
+{% block head_extra %}
+<style>
+  .nm-page { display: grid; gap: 10px; padding-bottom: 60px; }
+  .nm-titlebar { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+
+  /* ── Tabs ── */
+  .nm-tabs { display: flex; gap: 4px; border-bottom: 2px solid #d6e1f1; margin-bottom: 10px; }
+  .nm-tab {
+    padding: 8px 16px; border: 1px solid #d6e1f1; border-bottom: none;
+    border-radius: 8px 8px 0 0; background: #f1f6fc; color: #334155;
+    font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
+  }
+  .nm-tab.is-active { background: #fff; color: #0f6edc; border-color: #0f6edc; }
+
+  /* ── Card ── */
+  .nm-card {
+    border: 1px solid #d6e1f1; border-radius: 8px; background: #fff; overflow: hidden;
+  }
+  .nm-card-head {
+    display: flex; gap: 8px; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: linear-gradient(180deg, #f1f6fc, #e8f0fb);
+    border-bottom: 1px solid #d6e1f1;
+  }
+  .nm-card-head h3 { margin: 0; color: #123b65; font-size: 14px; font-weight: 900; }
+
+  /* ── Table ── */
+  .nm-table-wrap { overflow-x: auto; }
+  .nm-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  .nm-table th, .nm-table td {
+    padding: 7px 8px; border-bottom: 1px solid #eef3fa;
+    text-align: left; font-size: 11px;
+  }
+  .nm-table th {
+    position: sticky; top: 0; background: #f8fbff; color: #334155;
+    font-size: 10px; font-weight: 800; text-transform: uppercase; z-index: 2;
+  }
+  .nm-table tbody tr { cursor: pointer; transition: background 0.12s; }
+  .nm-table tbody tr:hover { background: #eaf2ff; }
+  .nm-table .nm-col-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .nm-table .nm-col-neto { font-weight: 900; color: #059669; }
+  .nm-table tfoot td { font-weight: 900; border-top: 2px solid #0f6edc; background: #f8fbff; }
+
+  /* ── Estatus badges ── */
+  .nm-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+  }
+  .nm-badge.borrador { background: #fef3c7; color: #92400e; }
+  .nm-badge.procesada { background: #dbeafe; color: #1e40af; }
+  .nm-badge.aprobada { background: #d1fae5; color: #065f46; }
+  .nm-badge.pagada { background: #e0e7ff; color: #3730a3; }
+  .nm-badge.anulada { background: #fee2e2; color: #991b1b; }
+
+  /* ── Buttons ── */
+  .nm-btn {
+    min-width: 32px; height: 30px; border: 1px solid #bdd3ef; border-radius: 7px;
+    background: linear-gradient(180deg, #fff, #eef5ff); color: #123b65;
+    font-size: 12px; font-weight: 800; cursor: pointer; padding: 0 10px;
+  }
+  .nm-btn:hover { background: linear-gradient(180deg, #eef5ff, #dbeafe); }
+  .nm-btn.is-primary {
+    background: linear-gradient(180deg, #1a7aed, #0f5ec3); border-color: #1a66ce; color: #fff;
+  }
+  .nm-btn.is-primary:hover { background: linear-gradient(180deg, #2585f7, #1a6cd5); }
+  .nm-btn.is-danger { border-color: #fca5a5; color: #dc2626; }
+  .nm-btn.is-success { border-color: #86efac; color: #059669; }
+  .nm-btn-group { display: flex; gap: 6px; align-items: center; }
+
+  /* ── Periodo header ── */
+  .nm-periodo-info {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px; padding: 10px 14px; background: #fbfdff; border-bottom: 1px solid #e5edf6;
+  }
+  .nm-periodo-info .nm-info-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+  .nm-periodo-info .nm-info-val { font-size: 13px; font-weight: 700; color: #0f172a; }
+
+  /* ── Toggle row ── */
+  .nm-toggle-row {
+    display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 14px;
+    background: #f8fbff; border-bottom: 1px solid #e5edf6;
+  }
+  .nm-toggle { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #334155; }
+  .nm-toggle input[type=checkbox] { accent-color: #0f6edc; width: 14px; height: 14px; }
+  .nm-toggle .nm-off { color: #94a3b8; }
+
+  /* ── Modal ── */
+  .nm-backdrop {
+    position: fixed; inset: 0; z-index: 100; display: none;
+    align-items: center; justify-content: center; padding: 18px;
+    background: rgba(15, 23, 42, 0.38);
+  }
+  .nm-backdrop.open { display: flex; }
+  .nm-modal {
+    width: min(560px, 96vw); max-height: 86vh; border: 1px solid #cbd5e1;
+    border-radius: 10px; background: #fff; overflow: hidden;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .nm-modal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; background: linear-gradient(180deg, #f1f6fc, #e8f0fb);
+    border-bottom: 1px solid #d6e1f1;
+  }
+  .nm-modal-head h4 { margin: 0; color: #123b65; font-size: 14px; font-weight: 900; }
+  .nm-modal-close {
+    width: 28px; height: 28px; border: 1px solid #cbd5e1; border-radius: 6px;
+    background: #fff; color: #64748b; font-size: 16px; font-weight: 900; cursor: pointer;
+  }
+  .nm-modal-body { padding: 14px; overflow-y: auto; }
+  .nm-modal-footer {
+    display: flex; justify-content: flex-end; gap: 6px; padding: 10px 14px;
+    border-top: 1px solid #e5edf6; background: #fbfdff;
+  }
+
+  /* ── Form fields ── */
+  .nm-form-grid { display: grid; gap: 8px; }
+  .nm-field {
+    display: grid; grid-template-columns: 120px minmax(0, 1fr);
+    gap: 6px; align-items: center;
+  }
+  .nm-field label { font-size: 11px; font-weight: 800; color: #334155; }
+  .nm-field input, .nm-field select, .nm-field textarea {
+    width: 100%; height: 30px; border: 1px solid #cbd5e1; border-radius: 6px;
+    padding: 4px 8px; font: inherit; font-size: 12px; color: #0f172a; background: #fff;
+  }
+  .nm-field textarea { height: 50px; resize: vertical; }
+  .nm-section-title {
+    font-size: 11px; font-weight: 900; color: #0f6edc; text-transform: uppercase;
+    padding: 6px 0 2px; border-bottom: 1px solid #e5edf6; margin-top: 6px;
+  }
+
+  /* ── Footer ── */
+  .nm-footer {
+    position: sticky; bottom: 0; z-index: 20;
+    display: flex; justify-content: space-between; gap: 10px;
+    padding: 8px 10px; border: 1px solid #d6e1f1; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.97); box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  /* ── Panel visibility ── */
+  .nm-panel { display: none; }
+  .nm-panel.is-active { display: block; }
+
+  @media (max-width: 640px) {
+    .nm-periodo-info { grid-template-columns: 1fr 1fr; }
+    .nm-field { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="nm-page">
+  <div class="nm-titlebar">
+    <div>
+      <h2 class="page-title">Control de Nomina</h2>
+      <p class="page-subtitle">Periodos de pago, generacion de nomina, adelantos y deducciones.</p>
+    </div>
+  </div>
+
+  <div class="nm-tabs" role="tablist">
+    <button type="button" class="nm-tab is-active" data-nm-tab="periodos">Periodos</button>
+    <button type="button" class="nm-tab" data-nm-tab="detalle">Detalle Nomina</button>
+    <button type="button" class="nm-tab" data-nm-tab="adelantos">Adelantos</button>
+  </div>
+
+  <!-- ══ Tab 1: Periodos ══ -->
+  <div class="nm-panel is-active" id="nm_panel_periodos">
+    <div class="nm-card">
+      <div class="nm-card-head">
+        <h3>Periodos de Nomina</h3>
+        <button type="button" class="nm-btn is-primary" id="nm_nuevo_periodo">+ Nuevo Periodo</button>
+      </div>
+      <div class="nm-table-wrap">
+        <table class="nm-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Tipo</th><th>Descripcion</th><th>Desde</th><th>Hasta</th>
+              <th>Estatus</th><th>Deducciones</th><th class="nm-col-num">Empleados</th>
+              <th class="nm-col-num">Total Neto</th>
+            </tr>
+          </thead>
+          <tbody id="nm_periodos_body">
+            <tr><td colspan="9">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Tab 2: Detalle ══ -->
+  <div class="nm-panel" id="nm_panel_detalle">
+    <div class="nm-card">
+      <div class="nm-card-head">
+        <h3 id="nm_det_title">Detalle del Periodo</h3>
+        <div class="nm-btn-group" id="nm_det_actions"></div>
+      </div>
+      <div class="nm-periodo-info" id="nm_det_info"></div>
+      <div class="nm-toggle-row" id="nm_det_toggles"></div>
+      <div class="nm-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto;">
+        <table class="nm-table" id="nm_det_table">
+          <thead>
+            <tr>
+              <th>Cod.</th><th>Nombre</th><th class="nm-col-num">Salario</th>
+              <th class="nm-col-num">H.E.</th><th class="nm-col-num">Bono</th>
+              <th class="nm-col-num">Total Ing.</th>
+              <th class="nm-col-num">AFP</th><th class="nm-col-num">SFS</th>
+              <th class="nm-col-num">ISR</th>
+              <th class="nm-col-num">Adelanto</th><th class="nm-col-num">Otras Ded.</th>
+              <th class="nm-col-num nm-col-neto">Neto</th>
+            </tr>
+          </thead>
+          <tbody id="nm_det_body">
+            <tr><td colspan="12">Seleccione un periodo.</td></tr>
+          </tbody>
+          <tfoot id="nm_det_foot" style="display:none;">
+            <tr>
+              <td colspan="2"><strong>TOTALES</strong></td>
+              <td class="nm-col-num" id="nm_ft_salario"></td>
+              <td class="nm-col-num" id="nm_ft_he"></td>
+              <td class="nm-col-num" id="nm_ft_bono"></td>
+              <td class="nm-col-num" id="nm_ft_ingresos"></td>
+              <td class="nm-col-num" id="nm_ft_afp"></td>
+              <td class="nm-col-num" id="nm_ft_sfs"></td>
+              <td class="nm-col-num" id="nm_ft_isr"></td>
+              <td class="nm-col-num" id="nm_ft_adelanto"></td>
+              <td class="nm-col-num" id="nm_ft_otras"></td>
+              <td class="nm-col-num nm-col-neto" id="nm_ft_neto"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Tab 3: Adelantos ══ -->
+  <div class="nm-panel" id="nm_panel_adelantos">
+    <div class="nm-card">
+      <div class="nm-card-head">
+        <h3>Adelantos de Sueldo</h3>
+        <button type="button" class="nm-btn is-primary" id="nm_nuevo_adelanto">+ Registrar Adelanto</button>
+      </div>
+      <div class="nm-table-wrap">
+        <table class="nm-table">
+          <thead>
+            <tr>
+              <th>Codigo</th><th>Empleado</th><th class="nm-col-num">Monto</th>
+              <th>Fecha</th><th>Estatus</th><th>Nota</th>
+            </tr>
+          </thead>
+          <tbody id="nm_adelantos_body">
+            <tr><td colspan="6">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer class="nm-footer">
+    <div class="nm-btn-group">
+      <a href="{% url 'empleados:index' %}" class="nm-btn">Cerrar</a>
+    </div>
+  </footer>
+</div>
+
+<!-- ── Modal: Nuevo Periodo ── -->
+<div id="nm_periodo_backdrop" class="nm-backdrop">
+  <div class="nm-modal">
+    <div class="nm-modal-head">
+      <h4>Nuevo Periodo de Nomina</h4>
+      <button type="button" class="nm-modal-close" id="nm_periodo_close">&times;</button>
+    </div>
+    <div class="nm-modal-body">
+      <div class="nm-form-grid">
+        <div class="nm-field"><label>Tipo</label>
+          <select id="nm_per_tipo">
+            <option value="QUINCENAL">Quincenal</option>
+            <option value="MENSUAL">Mensual</option>
+            <option value="SEMANAL">Semanal</option>
+          </select>
+        </div>
+        <div class="nm-field"><label>Desde</label><input id="nm_per_desde" type="date" /></div>
+        <div class="nm-field"><label>Hasta</label><input id="nm_per_hasta" type="date" /></div>
+        <div class="nm-field"><label>Descripcion</label><input id="nm_per_desc" maxlength="120" placeholder="Ej: Quincena 1 - Junio 2026" /></div>
+        <div class="nm-section-title">Deducciones legales (opcional)</div>
+        <div class="nm-toggle-row" style="padding:0;">
+          <label class="nm-toggle"><input type="checkbox" id="nm_per_afp" /> AFP</label>
+          <label class="nm-toggle"><input type="checkbox" id="nm_per_sfs" /> SFS</label>
+          <label class="nm-toggle"><input type="checkbox" id="nm_per_srl" /> SRL</label>
+          <label class="nm-toggle"><input type="checkbox" id="nm_per_isr" /> ISR</label>
+        </div>
+      </div>
+    </div>
+    <div class="nm-modal-footer">
+      <button type="button" class="nm-btn" id="nm_periodo_cancel">Cancelar</button>
+      <button type="button" class="nm-btn is-primary" id="nm_periodo_save">Crear Periodo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Editar Entrada ── -->
+<div id="nm_entrada_backdrop" class="nm-backdrop">
+  <div class="nm-modal" style="width:min(620px,96vw);">
+    <div class="nm-modal-head">
+      <h4 id="nm_ent_title">Editar Entrada</h4>
+      <button type="button" class="nm-modal-close" id="nm_entrada_close">&times;</button>
+    </div>
+    <div class="nm-modal-body">
+      <div class="nm-form-grid">
+        <div class="nm-field"><label>Empleado</label><input id="nm_ent_emp" readonly /></div>
+        <div class="nm-field"><label>Salario periodo</label><input id="nm_ent_salario" readonly /></div>
+        <div class="nm-section-title">Ingresos adicionales</div>
+        <div class="nm-field"><label>H. Extras 35%</label><input id="nm_ent_he35" type="number" min="0" step="0.5" /></div>
+        <div class="nm-field"><label>H. Extras 100%</label><input id="nm_ent_he100" type="number" min="0" step="0.5" /></div>
+        <div class="nm-field"><label>Bonificacion</label><input id="nm_ent_bono" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Desc. Bono</label><input id="nm_ent_bono_desc" maxlength="120" /></div>
+        <div class="nm-field"><label>Comisiones</label><input id="nm_ent_comisiones" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Vac. pagadas</label><input id="nm_ent_vacpag" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Regalia</label><input id="nm_ent_regalia" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Otros ingresos</label><input id="nm_ent_otros_ing" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Desc. Otros</label><input id="nm_ent_otros_ing_desc" maxlength="120" /></div>
+        <div class="nm-section-title">Deducciones manuales</div>
+        <div class="nm-field"><label>Adelanto</label><input id="nm_ent_adelanto" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Prestamo</label><input id="nm_ent_prestamo" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Otras deduc.</label><input id="nm_ent_otras_ded" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Desc. Otras</label><input id="nm_ent_otras_ded_desc" maxlength="120" /></div>
+        <div class="nm-section-title">Notas</div>
+        <div class="nm-field"><label>Notas</label><textarea id="nm_ent_notas"></textarea></div>
+      </div>
+    </div>
+    <div class="nm-modal-footer">
+      <button type="button" class="nm-btn" id="nm_entrada_cancel">Cancelar</button>
+      <button type="button" class="nm-btn is-primary" id="nm_entrada_save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Nuevo Adelanto ── -->
+<div id="nm_adelanto_backdrop" class="nm-backdrop">
+  <div class="nm-modal" style="width:min(440px,96vw);">
+    <div class="nm-modal-head">
+      <h4>Registrar Adelanto</h4>
+      <button type="button" class="nm-modal-close" id="nm_adelanto_close">&times;</button>
+    </div>
+    <div class="nm-modal-body">
+      <div class="nm-form-grid">
+        <div class="nm-field"><label>Empleado</label><select id="nm_adel_emp"></select></div>
+        <div class="nm-field"><label>Monto</label><input id="nm_adel_monto" type="number" min="0" step="0.01" /></div>
+        <div class="nm-field"><label>Fecha</label><input id="nm_adel_fecha" type="date" /></div>
+        <div class="nm-field"><label>Nota</label><input id="nm_adel_nota" maxlength="200" /></div>
+      </div>
+    </div>
+    <div class="nm-modal-footer">
+      <button type="button" class="nm-btn" id="nm_adelanto_cancel">Cancelar</button>
+      <button type="button" class="nm-btn is-primary" id="nm_adelanto_save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
+
+  /* ── Helpers ── */
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function fmtMoney(v) { return parseFloat(v || 0).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(d) { return d || ""; }
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+  async function apiGet(url) {
+    const r = await fetch(url); const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || "Error"); return d;
+  }
+  async function apiPost(url, body) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || "Error"); return d;
+  }
+
+  /* ── Tab switching ── */
+  const tabs = document.querySelectorAll("[data-nm-tab]");
+  const panels = document.querySelectorAll(".nm-panel");
+  tabs.forEach(t => t.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.toggle("is-active", x === t));
+    panels.forEach(p => p.classList.toggle("is-active", p.id === "nm_panel_" + t.dataset.nmTab));
+  }));
+
+  /* ═══ Tab 1: Periodos ═══ */
+  const periodosBody = document.getElementById("nm_periodos_body");
+
+  function badgeClass(est) { return (est || "").toLowerCase(); }
+  function dedLabels(p) {
+    const arr = [];
+    if (p.aplicar_afp) arr.push("AFP");
+    if (p.aplicar_sfs) arr.push("SFS");
+    if (p.aplicar_srl) arr.push("SRL");
+    if (p.aplicar_isr) arr.push("ISR");
+    return arr.length ? arr.join(", ") : '<span class="nm-off">Ninguna</span>';
+  }
+
+  async function loadPeriodos() {
+    try {
+      const data = await apiGet("{% url 'empleados:control_nomina_periodos' %}");
+      const items = data.results || [];
+      if (!items.length) { periodosBody.innerHTML = '<tr><td colspan="9">No hay periodos creados.</td></tr>'; return; }
+      periodosBody.innerHTML = items.map(p => `<tr data-per-id="${p.id_periodo}">
+        <td>${p.id_periodo}</td>
+        <td>${esc(p.tipo)}</td>
+        <td>${esc(p.descripcion)}</td>
+        <td>${fmtDate(p.fecha_desde)}</td>
+        <td>${fmtDate(p.fecha_hasta)}</td>
+        <td><span class="nm-badge ${badgeClass(p.estatus)}">${esc(p.estatus)}</span></td>
+        <td>${dedLabels(p)}</td>
+        <td class="nm-col-num">${p.empleados}</td>
+        <td class="nm-col-num">${fmtMoney(p.total_neto)}</td>
+      </tr>`).join("");
+    } catch (e) { periodosBody.innerHTML = `<tr><td colspan="9">${esc(e.message)}</td></tr>`; }
+  }
+
+  periodosBody.addEventListener("click", (ev) => {
+    const row = ev.target.closest("tr[data-per-id]");
+    if (!row) return;
+    const id = parseInt(row.dataset.perId);
+    openDetalle(id);
+  });
+
+  /* ── Crear Periodo Modal ── */
+  const perBackdrop = document.getElementById("nm_periodo_backdrop");
+  document.getElementById("nm_nuevo_periodo").addEventListener("click", () => {
+    document.getElementById("nm_per_desde").value = todayStr();
+    document.getElementById("nm_per_hasta").value = "";
+    document.getElementById("nm_per_desc").value = "";
+    document.getElementById("nm_per_afp").checked = false;
+    document.getElementById("nm_per_sfs").checked = false;
+    document.getElementById("nm_per_srl").checked = false;
+    document.getElementById("nm_per_isr").checked = false;
+    perBackdrop.classList.add("open");
+  });
+  document.getElementById("nm_periodo_close").addEventListener("click", () => perBackdrop.classList.remove("open"));
+  document.getElementById("nm_periodo_cancel").addEventListener("click", () => perBackdrop.classList.remove("open"));
+  document.getElementById("nm_periodo_save").addEventListener("click", async () => {
+    try {
+      await apiPost("{% url 'empleados:control_nomina_crear_periodo' %}", {
+        tipo: document.getElementById("nm_per_tipo").value,
+        fecha_desde: document.getElementById("nm_per_desde").value,
+        fecha_hasta: document.getElementById("nm_per_hasta").value,
+        descripcion: document.getElementById("nm_per_desc").value,
+        aplicar_afp: document.getElementById("nm_per_afp").checked,
+        aplicar_sfs: document.getElementById("nm_per_sfs").checked,
+        aplicar_srl: document.getElementById("nm_per_srl").checked,
+        aplicar_isr: document.getElementById("nm_per_isr").checked,
+      });
+      perBackdrop.classList.remove("open");
+      loadPeriodos();
+    } catch (e) { alert(e.message); }
+  });
+
+  /* ═══ Tab 2: Detalle ═══ */
+  let currentPeriodoId = null;
+  let currentPeriodo = null;
+  let currentEntradas = [];
+  const detBody = document.getElementById("nm_det_body");
+  const detFoot = document.getElementById("nm_det_foot");
+  const detActions = document.getElementById("nm_det_actions");
+  const detInfo = document.getElementById("nm_det_info");
+  const detToggles = document.getElementById("nm_det_toggles");
+
+  async function openDetalle(id) {
+    // Switch to detalle tab
+    tabs.forEach(x => x.classList.toggle("is-active", x.dataset.nmTab === "detalle"));
+    panels.forEach(p => p.classList.toggle("is-active", p.id === "nm_panel_detalle"));
+    currentPeriodoId = id;
+    detBody.innerHTML = '<tr><td colspan="12">Cargando...</td></tr>';
+    detFoot.style.display = "none";
+    try {
+      const url = "{% url 'empleados:control_nomina_detalle_periodo' 0 %}".replace("/0/", "/" + id + "/");
+      const data = await apiGet(url);
+      currentPeriodo = data.periodo;
+      currentEntradas = data.entradas || [];
+      renderDetalle();
+    } catch (e) { detBody.innerHTML = `<tr><td colspan="12">${esc(e.message)}</td></tr>`; }
+  }
+
+  function renderDetalle() {
+    const p = currentPeriodo;
+    document.getElementById("nm_det_title").textContent = p.descripcion || `Periodo #${p.id_periodo}`;
+    detInfo.innerHTML = `
+      <div><div class="nm-info-label">Tipo</div><div class="nm-info-val">${esc(p.tipo)}</div></div>
+      <div><div class="nm-info-label">Desde</div><div class="nm-info-val">${fmtDate(p.fecha_desde)}</div></div>
+      <div><div class="nm-info-label">Hasta</div><div class="nm-info-val">${fmtDate(p.fecha_hasta)}</div></div>
+      <div><div class="nm-info-label">Estatus</div><div class="nm-info-val"><span class="nm-badge ${badgeClass(p.estatus)}">${esc(p.estatus)}</span></div></div>
+    `;
+    detToggles.innerHTML = `
+      <span class="nm-toggle ${p.aplicar_afp ? '' : 'nm-off'}">AFP: ${p.aplicar_afp ? '✓' : '✗'}</span>
+      <span class="nm-toggle ${p.aplicar_sfs ? '' : 'nm-off'}">SFS: ${p.aplicar_sfs ? '✓' : '✗'}</span>
+      <span class="nm-toggle ${p.aplicar_srl ? '' : 'nm-off'}">SRL: ${p.aplicar_srl ? '✓' : '✗'}</span>
+      <span class="nm-toggle ${p.aplicar_isr ? '' : 'nm-off'}">ISR: ${p.aplicar_isr ? '✓' : '✗'}</span>
+    `;
+    const editable = p.estatus === "BORRADOR" || p.estatus === "PROCESADA";
+    let actionsHtml = "";
+    if (p.estatus === "BORRADOR") {
+      actionsHtml += `<button type="button" class="nm-btn is-primary" id="nm_btn_generar">Generar Nomina</button>`;
+    } else if (p.estatus === "PROCESADA") {
+      actionsHtml += `<button type="button" class="nm-btn is-primary" id="nm_btn_generar">Regenerar</button>`;
+      actionsHtml += `<button type="button" class="nm-btn is-success" id="nm_btn_aprobar">Aprobar</button>`;
+    }
+    if (p.estatus !== "ANULADA") {
+      actionsHtml += `<button type="button" class="nm-btn is-danger" id="nm_btn_anular">Anular</button>`;
+    }
+    detActions.innerHTML = actionsHtml;
+
+    // Wire action buttons
+    const btnGen = document.getElementById("nm_btn_generar");
+    if (btnGen) btnGen.addEventListener("click", generarNomina);
+    const btnApr = document.getElementById("nm_btn_aprobar");
+    if (btnApr) btnApr.addEventListener("click", aprobarNomina);
+    const btnAnu = document.getElementById("nm_btn_anular");
+    if (btnAnu) btnAnu.addEventListener("click", anularNomina);
+
+    if (!currentEntradas.length) {
+      detBody.innerHTML = '<tr><td colspan="12">No hay entradas. Genere la nomina.</td></tr>';
+      detFoot.style.display = "none";
+      return;
+    }
+
+    // Render rows
+    let totals = { sal: 0, he: 0, bono: 0, ing: 0, afp: 0, sfs: 0, isr: 0, adel: 0, otras: 0, neto: 0 };
+    detBody.innerHTML = currentEntradas.map(e => {
+      const he = parseFloat(e.monto_horas_extras_35) + parseFloat(e.monto_horas_extras_100);
+      totals.sal += parseFloat(e.salario_periodo);
+      totals.he += he;
+      totals.bono += parseFloat(e.bonificacion);
+      totals.ing += parseFloat(e.total_ingresos);
+      totals.afp += parseFloat(e.afp_empleado);
+      totals.sfs += parseFloat(e.sfs_empleado);
+      totals.isr += parseFloat(e.isr_retencion);
+      totals.adel += parseFloat(e.adelanto);
+      totals.otras += parseFloat(e.otras_deducciones) + parseFloat(e.prestamo_descuento);
+      totals.neto += parseFloat(e.neto_pagar);
+      return `<tr data-ent-id="${e.id_entrada}">
+        <td>${esc(e.codigo)}</td>
+        <td>${esc(e.nombre)}</td>
+        <td class="nm-col-num">${fmtMoney(e.salario_periodo)}</td>
+        <td class="nm-col-num">${fmtMoney(he)}</td>
+        <td class="nm-col-num">${fmtMoney(e.bonificacion)}</td>
+        <td class="nm-col-num">${fmtMoney(e.total_ingresos)}</td>
+        <td class="nm-col-num">${fmtMoney(e.afp_empleado)}</td>
+        <td class="nm-col-num">${fmtMoney(e.sfs_empleado)}</td>
+        <td class="nm-col-num">${fmtMoney(e.isr_retencion)}</td>
+        <td class="nm-col-num">${fmtMoney(e.adelanto)}</td>
+        <td class="nm-col-num">${fmtMoney(parseFloat(e.otras_deducciones) + parseFloat(e.prestamo_descuento))}</td>
+        <td class="nm-col-num nm-col-neto">${fmtMoney(e.neto_pagar)}</td>
+      </tr>`;
+    }).join("");
+    detFoot.style.display = "";
+    document.getElementById("nm_ft_salario").textContent = fmtMoney(totals.sal);
+    document.getElementById("nm_ft_he").textContent = fmtMoney(totals.he);
+    document.getElementById("nm_ft_bono").textContent = fmtMoney(totals.bono);
+    document.getElementById("nm_ft_ingresos").textContent = fmtMoney(totals.ing);
+    document.getElementById("nm_ft_afp").textContent = fmtMoney(totals.afp);
+    document.getElementById("nm_ft_sfs").textContent = fmtMoney(totals.sfs);
+    document.getElementById("nm_ft_isr").textContent = fmtMoney(totals.isr);
+    document.getElementById("nm_ft_adelanto").textContent = fmtMoney(totals.adel);
+    document.getElementById("nm_ft_otras").textContent = fmtMoney(totals.otras);
+    document.getElementById("nm_ft_neto").textContent = fmtMoney(totals.neto);
+  }
+
+  detBody.addEventListener("click", (ev) => {
+    const row = ev.target.closest("tr[data-ent-id]");
+    if (!row) return;
+    if (currentPeriodo && currentPeriodo.estatus !== "BORRADOR" && currentPeriodo.estatus !== "PROCESADA") return;
+    const id = parseInt(row.dataset.entId);
+    const ent = currentEntradas.find(e => e.id_entrada === id);
+    if (ent) openEntradaModal(ent);
+  });
+
+  async function generarNomina() {
+    if (!confirm("¿Generar/regenerar la nomina para este periodo? Esto recalculara todas las entradas.")) return;
+    try {
+      await apiPost("{% url 'empleados:control_nomina_generar' %}", { id_periodo: currentPeriodoId });
+      openDetalle(currentPeriodoId);
+      loadPeriodos();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function aprobarNomina() {
+    if (!confirm("¿Aprobar esta nomina? No se podra editar despues.")) return;
+    try {
+      await apiPost("{% url 'empleados:control_nomina_aprobar' %}", { id_periodo: currentPeriodoId });
+      openDetalle(currentPeriodoId);
+      loadPeriodos();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function anularNomina() {
+    if (!confirm("¿Anular esta nomina? Los adelantos descontados se devolverian.")) return;
+    try {
+      await apiPost("{% url 'empleados:control_nomina_anular' %}", { id_periodo: currentPeriodoId });
+      openDetalle(currentPeriodoId);
+      loadPeriodos();
+    } catch (e) { alert(e.message); }
+  }
+
+  /* ── Entrada Modal ── */
+  const entBackdrop = document.getElementById("nm_entrada_backdrop");
+  let editingEntradaId = null;
+  function openEntradaModal(e) {
+    editingEntradaId = e.id_entrada;
+    document.getElementById("nm_ent_title").textContent = `${e.codigo} - ${e.nombre}`;
+    document.getElementById("nm_ent_emp").value = `${e.codigo} - ${e.nombre}`;
+    document.getElementById("nm_ent_salario").value = e.salario_periodo;
+    document.getElementById("nm_ent_he35").value = e.horas_extras_35;
+    document.getElementById("nm_ent_he100").value = e.horas_extras_100;
+    document.getElementById("nm_ent_bono").value = e.bonificacion;
+    document.getElementById("nm_ent_bono_desc").value = e.bonificacion_desc;
+    document.getElementById("nm_ent_comisiones").value = e.comisiones;
+    document.getElementById("nm_ent_vacpag").value = e.vacaciones_pagadas;
+    document.getElementById("nm_ent_regalia").value = e.regalia;
+    document.getElementById("nm_ent_otros_ing").value = e.otros_ingresos;
+    document.getElementById("nm_ent_otros_ing_desc").value = e.otros_ingresos_desc;
+    document.getElementById("nm_ent_adelanto").value = e.adelanto;
+    document.getElementById("nm_ent_prestamo").value = e.prestamo_descuento;
+    document.getElementById("nm_ent_otras_ded").value = e.otras_deducciones;
+    document.getElementById("nm_ent_otras_ded_desc").value = e.otras_deducciones_desc;
+    document.getElementById("nm_ent_notas").value = e.notas;
+    entBackdrop.classList.add("open");
+  }
+  document.getElementById("nm_entrada_close").addEventListener("click", () => entBackdrop.classList.remove("open"));
+  document.getElementById("nm_entrada_cancel").addEventListener("click", () => entBackdrop.classList.remove("open"));
+  document.getElementById("nm_entrada_save").addEventListener("click", async () => {
+    try {
+      await apiPost("{% url 'empleados:control_nomina_guardar_entrada' %}", {
+        id_entrada: editingEntradaId,
+        horas_extras_35: parseFloat(document.getElementById("nm_ent_he35").value) || 0,
+        horas_extras_100: parseFloat(document.getElementById("nm_ent_he100").value) || 0,
+        bonificacion: parseFloat(document.getElementById("nm_ent_bono").value) || 0,
+        bonificacion_desc: document.getElementById("nm_ent_bono_desc").value,
+        comisiones: parseFloat(document.getElementById("nm_ent_comisiones").value) || 0,
+        vacaciones_pagadas: parseFloat(document.getElementById("nm_ent_vacpag").value) || 0,
+        regalia: parseFloat(document.getElementById("nm_ent_regalia").value) || 0,
+        otros_ingresos: parseFloat(document.getElementById("nm_ent_otros_ing").value) || 0,
+        otros_ingresos_desc: document.getElementById("nm_ent_otros_ing_desc").value,
+        adelanto: parseFloat(document.getElementById("nm_ent_adelanto").value) || 0,
+        prestamo_descuento: parseFloat(document.getElementById("nm_ent_prestamo").value) || 0,
+        otras_deducciones: parseFloat(document.getElementById("nm_ent_otras_ded").value) || 0,
+        otras_deducciones_desc: document.getElementById("nm_ent_otras_ded_desc").value,
+        notas: document.getElementById("nm_ent_notas").value,
+      });
+      entBackdrop.classList.remove("open");
+      openDetalle(currentPeriodoId);
+    } catch (e) { alert(e.message); }
+  });
+
+  /* ═══ Tab 3: Adelantos ═══ */
+  const adelBody = document.getElementById("nm_adelantos_body");
+  const adelBackdrop = document.getElementById("nm_adelanto_backdrop");
+  const adelEmpSelect = document.getElementById("nm_adel_emp");
+
+  async function loadAdelantos() {
+    try {
+      const data = await apiGet("{% url 'empleados:control_nomina_adelantos_listar' %}");
+      const items = data.results || [];
+      if (!items.length) { adelBody.innerHTML = '<tr><td colspan="6">No hay adelantos registrados.</td></tr>'; return; }
+      adelBody.innerHTML = items.map(a => `<tr>
+        <td>${esc(a.codigo)}</td>
+        <td>${esc(a.nombre)}</td>
+        <td class="nm-col-num">${fmtMoney(a.monto)}</td>
+        <td>${fmtDate(a.fecha)}</td>
+        <td><span class="nm-badge ${a.descontado ? 'aprobada' : 'borrador'}">${a.descontado ? 'Descontado' : 'Pendiente'}</span></td>
+        <td>${esc(a.nota)}</td>
+      </tr>`).join("");
+    } catch (e) { adelBody.innerHTML = `<tr><td colspan="6">${esc(e.message)}</td></tr>`; }
+  }
+
+  async function loadEmpleadosForSelect() {
+    try {
+      const data = await apiGet("{% url 'empleados:control_vacaciones_listar' %}");
+      const emps = data.results || [];
+      adelEmpSelect.innerHTML = emps.map(e => `<option value="${e.id_empleado}">${esc(e.codigo)} - ${esc(e.nombre)}</option>`).join("");
+    } catch (e) { adelEmpSelect.innerHTML = '<option>Error</option>'; }
+  }
+
+  document.getElementById("nm_nuevo_adelanto").addEventListener("click", () => {
+    document.getElementById("nm_adel_monto").value = "";
+    document.getElementById("nm_adel_fecha").value = todayStr();
+    document.getElementById("nm_adel_nota").value = "";
+    adelBackdrop.classList.add("open");
+  });
+  document.getElementById("nm_adelanto_close").addEventListener("click", () => adelBackdrop.classList.remove("open"));
+  document.getElementById("nm_adelanto_cancel").addEventListener("click", () => adelBackdrop.classList.remove("open"));
+  document.getElementById("nm_adelanto_save").addEventListener("click", async () => {
+    try {
+      await apiPost("{% url 'empleados:control_nomina_adelanto' %}", {
+        id_empleado: parseInt(adelEmpSelect.value),
+        monto: parseFloat(document.getElementById("nm_adel_monto").value) || 0,
+        fecha: document.getElementById("nm_adel_fecha").value,
+        nota: document.getElementById("nm_adel_nota").value,
+      });
+      adelBackdrop.classList.remove("open");
+      loadAdelantos();
+    } catch (e) { alert(e.message); }
+  });
+
+  /* ── Init ── */
+  loadPeriodos();
+  loadAdelantos();
+  loadEmpleadosForSelect();
+})();
+</script>
+{% endblock %}

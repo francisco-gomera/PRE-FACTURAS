@@ -1796,6 +1796,63 @@ def _tu_split_address(address):
     }
 
 
+def _tu_load_last_payments(doc_numbers):
+    """Query DET_RECIBO_INGRESO for the last payment date and amount per document."""
+    docs = [str(doc or "").strip() for doc in doc_numbers if str(doc or "").strip()]
+    if not docs:
+        return {}
+    result = {}
+    chunk_size = 300
+    for idx in range(0, len(docs), chunk_size):
+        chunk = docs[idx:idx + chunk_size]
+        placeholders = ", ".join(["%s"] * len(chunk))
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT
+                        sub.NO_DOC,
+                        sub.FECHA_CONT,
+                        sub.TOTAL_PAGO
+                    FROM (
+                        SELECT
+                            d.NO_DOC,
+                            d.FECHA_CONT,
+                            COALESCE(d.TOTAL_PAGO, d.ABONO, d.PAGO, d.IMPORTE, 0) AS TOTAL_PAGO,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY d.NO_DOC
+                                ORDER BY d.FECHA_CONT DESC, d.NO_LINEA DESC
+                            ) AS rn
+                        FROM DET_RECIBO_INGRESO d
+                        WHERE d.NO_DOC IN ({placeholders})
+                    ) sub
+                    WHERE sub.rn = 1
+                    """,
+                    chunk,
+                )
+                for no_doc, fecha_pago, monto_pago in cursor.fetchall():
+                    doc_key = str(no_doc or "").strip()
+                    if doc_key:
+                        result[doc_key] = {
+                            "fecha": fecha_pago,
+                            "monto": Decimal(str(monto_pago or "0")),
+                        }
+        except Exception:
+            pass
+    return result
+
+
+def _tu_estatus_cuenta(dias):
+    """Determine account status based on days overdue."""
+    if dias <= 0:
+        return "NORMAL"
+    if dias <= 30:
+        return "ATRASO"
+    if dias <= 90:
+        return "MORA"
+    return "CASTIGO"
+
+
 def _tu_build_row(raw, corte=None):
     corte = corte or timezone.localdate()
     id_sn = _tu_clean(raw.get("id_sn"))
@@ -1811,6 +1868,8 @@ def _tu_build_row(raw, corte=None):
     cuotas_atrasadas = raw.get("cuotas_atrasadas")
     if cuotas_atrasadas is None:
         cuotas_atrasadas = 1 if dias > 0 and saldo > 0 else 0
+    est_doc = str(raw.get("est_doc") or "ABIERTO").strip().upper()
+    estado_cuenta = "ABIERTA" if est_doc == "ABIERTO" else "CERRADA"
     row = {
         "tipo_entidad": "E" if is_company else "I",
         "codigo_cliente": id_sn,
@@ -1829,13 +1888,13 @@ def _tu_build_row(raw, corte=None):
         "email": _tu_clean(raw.get("email")),
         "otro": "",
         "calle_avenida": address["calle_avenida"],
-        "esquina": "",
+        "esquina": address["provincia_municipio"],
         "numero": "",
         "edificio": "",
         "urbanizacion": "",
         "sector": _tu_clean(raw.get("sector") or address["sector"]),
         "ciudad": address["ciudad"],
-        "provincia_municipio": address["provincia_municipio"],
+        "provincia_municipio": "",
         "numero_cuenta": _tu_clean(raw.get("numero_cuenta")),
         "unidad_monetaria": "R",
         "tipo_cuenta": "CREDITO_COMERCIAL",
@@ -1850,8 +1909,8 @@ def _tu_build_row(raw, corte=None):
         "balance_actual": _tu_money(saldo),
         "monto_atraso": _tu_money(monto_atraso),
         "cuotas_atrasadas": str(cuotas_atrasadas),
-        "estatus_cuenta": "ACTIVA",
-        "estado_cuenta": "AL_DIA" if _tu_decimal(monto_atraso) <= Decimal("0.01") else "ATRASO",
+        "estatus_cuenta": _tu_estatus_cuenta(dias),
+        "estado_cuenta": estado_cuenta,
     }
     for key, value in buckets.items():
         row[key] = _tu_money(value)
@@ -1896,13 +1955,16 @@ def _tu_load_accounts(query="", limit=100, corte=None):
     except Exception:
         rows = []
 
-    prestamo_summary = _tu_load_prestamo_summary([row[0] for row in rows], corte)
+    doc_ids = [row[0] for row in rows]
+    prestamo_summary = _tu_load_prestamo_summary(doc_ids, corte)
+    last_payments = _tu_load_last_payments(doc_ids)
     results = []
     for row in rows:
         doc_key = _tu_clean(row[0])
         loan = prestamo_summary.get(doc_key) or {}
         loan_balance = loan.get("balance_actual")
         loan_has_balance = loan_balance is not None and loan_balance > Decimal("0.01")
+        last_pmt = last_payments.get(doc_key) or {}
         raw = {
             "id_doc": row[0],
             "id_sn": row[1],
@@ -1912,7 +1974,9 @@ def _tu_load_accounts(query="", limit=100, corte=None):
             "fecha_venc": loan.get("fecha_vencimiento") or row[5],
             "total_doc": row[6],
             "saldo": loan_balance if loan_has_balance else row[7],
-            "monto_ultimo_pago": row[8],
+            "fecha_ultimo_pago": last_pmt.get("fecha"),
+            "monto_ultimo_pago": last_pmt.get("monto", Decimal("0")),
+            "est_doc": "ABIERTO",
             "moneda": row[9] or row[19],
             "ent_factura": row[10],
             "dir_factura": row[11],
@@ -1986,6 +2050,152 @@ def reportes_transunion_cuentas_view(request):
             "results": rows,
         }
     )
+
+
+@require_http_methods(["POST"])
+def reportes_transunion_actualizar_cuentas_view(request):
+    ctx = _base_context(request, page_title="Integraciones - Reportes TransUnion", active_nav="ajustes")
+    if not ctx:
+        return JsonResponse({"detail": "No autenticado"}, status=401)
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "ajustes", "ver_reportes_transunion"):
+        return JsonResponse({"detail": "Acceso denegado."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "JSON invalido."}, status=400)
+
+    id_docs = payload.get("id_docs") or []
+    if not isinstance(id_docs, list) or not id_docs:
+        return JsonResponse({"detail": "No hay cuentas para actualizar."}, status=400)
+
+    corte_str = payload.get("corte")
+    corte = _to_date_or_none(corte_str) or timezone.localdate()
+
+    id_docs_clean = [str(doc or "").strip() for doc in id_docs if str(doc or "").strip()]
+    if not id_docs_clean:
+        return JsonResponse({"detail": "No hay cuentas validas para actualizar."}, status=400)
+
+    placeholders = ", ".join(["%s"] * len(id_docs_clean))
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT
+                    f.ID_DOC, f.ID_SN, f.NOM_SOCIO, f.RNC_CED, f.FECHA_DOC, f.FECHA_VENC,
+                    f.TOTAL_DOC, f.SALDO, f.ABONO, f.MON_DOC, f.ENT_FACTURA,
+                    s.DIR_FACTURA, s.TEL1, s.TEL2, s.CELULAR, s.FAX, s.EMAIL, s.COMENTARIO,
+                    s.LIM_CREDITO, s.MONEDA,
+                    UPPER(ISNULL(f.EST_DOC, '')) AS EST_DOC_UPPER
+                FROM CAB_FACTURA f
+                LEFT JOIN MAESTRO_SN s ON CAST(s.ID_SN AS NVARCHAR(50)) = CAST(f.ID_SN AS NVARCHAR(50))
+                WHERE CAST(f.ID_DOC AS NVARCHAR(50)) IN ({placeholders})
+                ORDER BY f.ID_DOC
+                """,
+                id_docs_clean,
+            )
+            rows = cursor.fetchall()
+    except Exception:
+        return JsonResponse({"detail": "Error al consultar las cuentas."}, status=500)
+
+    found_docs = {}
+    for row in rows:
+        doc_key = _tu_clean(row[0])
+        est_doc = str(row[20] or "").strip()
+        saldo_val = Decimal(str(row[7] or "0"))
+        is_closed = est_doc != "ABIERTO" or saldo_val <= Decimal("0")
+        found_docs[doc_key] = {
+            "row": row,
+            "is_closed": is_closed,
+            "est_doc": est_doc,
+            "saldo": saldo_val,
+        }
+
+    prestamo_doc_ids = [doc for doc, info in found_docs.items() if not info["is_closed"]]
+    prestamo_summary = _tu_load_prestamo_summary(prestamo_doc_ids, corte) if prestamo_doc_ids else {}
+    last_payments = _tu_load_last_payments(prestamo_doc_ids) if prestamo_doc_ids else {}
+
+    updated = []
+    removed = []
+    not_found = []
+
+    for doc_id in id_docs_clean:
+        info = found_docs.get(doc_id)
+        if not info:
+            not_found.append(doc_id)
+            removed.append({"id_doc": doc_id, "reason": "No encontrada en la base de datos"})
+            continue
+
+        if info["is_closed"]:
+            reason = "Cuenta saldada (saldo 0)" if info["saldo"] <= Decimal("0") else f"Cuenta cerrada (estado: {info['est_doc']})"
+            removed.append({"id_doc": doc_id, "reason": reason})
+            continue
+
+        row = info["row"]
+        loan = prestamo_summary.get(doc_id) or {}
+        loan_balance = loan.get("balance_actual")
+        loan_has_balance = loan_balance is not None and loan_balance > Decimal("0.01")
+        last_pmt = last_payments.get(doc_id) or {}
+        raw = {
+            "id_doc": row[0],
+            "id_sn": row[1],
+            "nom_socio": row[2],
+            "rnc_ced": row[3],
+            "fecha_doc": row[4],
+            "fecha_venc": loan.get("fecha_vencimiento") or row[5],
+            "total_doc": row[6],
+            "saldo": loan_balance if loan_has_balance else row[7],
+            "fecha_ultimo_pago": last_pmt.get("fecha"),
+            "monto_ultimo_pago": last_pmt.get("monto", Decimal("0")),
+            "est_doc": info["est_doc"],
+            "moneda": row[9] or row[19],
+            "ent_factura": row[10],
+            "dir_factura": row[11],
+            "tel1": row[12],
+            "tel2": row[13],
+            "celular": row[14],
+            "fax": row[15],
+            "email": row[16],
+            "sector": row[17],
+            "lim_credito": row[18],
+            "numero_cuenta": row[0],
+        }
+        if loan:
+            raw.update(
+                {
+                    "monto_cuota": loan.get("monto_cuota") or raw.get("saldo"),
+                    "cantidad_cuotas": loan.get("cantidad_cuotas"),
+                    "monto_atraso": loan.get("monto_atraso"),
+                    "cuotas_atrasadas": loan.get("cuotas_atrasadas"),
+                    "buckets": loan.get("buckets"),
+                }
+            )
+        updated.append(
+            {
+                "source": {
+                    "id_doc": doc_id,
+                    "id_sn": _tu_clean(row[1]),
+                    "cliente": _tu_clean(row[2]),
+                    "rnc_ced": _tu_clean(row[3]),
+                    "fecha_venc": _tu_date(raw.get("fecha_venc")),
+                    "saldo": _tu_money(raw.get("saldo")),
+                    "dias_atraso": _tu_days_overdue(raw.get("fecha_venc"), corte),
+                    "cuotas": str(loan.get("cantidad_cuotas") or ""),
+                    "cuotas_atrasadas": str(loan.get("cuotas_atrasadas") or ""),
+                    "monto_atraso": _tu_money(raw.get("monto_atraso")),
+                },
+                "fields": _tu_build_row(raw, corte),
+            }
+        )
+
+    return JsonResponse({
+        "updated": updated,
+        "removed": removed,
+        "summary": {
+            "total": len(id_docs_clean),
+            "actualizadas": len(updated),
+            "eliminadas": len(removed),
+        },
+    })
 
 
 @require_http_methods(["POST"])

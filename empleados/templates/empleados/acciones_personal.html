@@ -2417,6 +2417,40 @@
     });
     fechaField.value = todayValue();
     syncTipoAccion();
+
+    // ── Prefill from URL params (e.g. from Control de Vacaciones) ──
+    (async function handlePrefill() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("prefill") !== "1") return;
+      const empId = params.get("id_empleado");
+      if (!empId) return;
+      try {
+        const url = urls.detalleTemplate.replace(/0\/$/, `${empId}/`);
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.empleado) return;
+        fillEmployee(data.empleado);
+        const tipoAccion = params.get("tipo_accion") || "";
+        if (tipoAccion) {
+          tipoAccionField.value = tipoAccion;
+          syncTipoAccion();
+        }
+        const motivo = params.get("motivo") || "";
+        if (motivo && tipoAccion === "CAMBIO") {
+          cambioMotivoField.value = motivo;
+          syncCambioMotivo();
+        }
+        const fechaDesde = params.get("fecha_desde") || "";
+        const fechaHasta = params.get("fecha_hasta") || "";
+        if (motivo === "VACACIONES" && fechaDesde) {
+          cambioVacacionesDesdeField.value = fechaDesde;
+          if (fechaHasta) cambioVacacionesHastaField.value = fechaHasta;
+          syncVacationDates();
+        }
+        // Clean URL without reloading
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch (e) {}
+    })();
   })();
 </script>
 {% endblock %}

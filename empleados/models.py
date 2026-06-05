@@ -203,3 +203,142 @@ class EmpleadoVacacionPlanificada(models.Model):
     class Meta:
         db_table = "EMPLEADO_VACACION_PLANIFICADA"
         ordering = ["fecha_desde", "id_plan"]
+
+
+class EmpleadoVacacionDescuento(models.Model):
+    id_descuento = models.AutoField(db_column="ID_DESCUENTO", primary_key=True)
+    empleado = models.ForeignKey(
+        EmpleadoNomina,
+        db_column="ID_EMPLEADO",
+        on_delete=models.CASCADE,
+        related_name="descuentos_vacaciones",
+    )
+    dias = models.PositiveSmallIntegerField(db_column="DIAS")
+    descripcion = models.CharField(db_column="DESCRIPCION", max_length=200)
+    fecha_descuento = models.DateField(db_column="FECHA_DESCUENTO")
+    fecha_dias_desde = models.DateField(db_column="FECHA_DIAS_DESDE")
+    fecha_dias_hasta = models.DateField(db_column="FECHA_DIAS_HASTA")
+    creado_en = models.DateTimeField(db_column="CREADO_EN", auto_now_add=True)
+
+    class Meta:
+        db_table = "EMPLEADO_VACACION_DESCUENTO"
+        ordering = ["-fecha_descuento", "-id_descuento"]
+
+class NominaPeriodo(models.Model):
+    TIPO_SEMANAL = "SEMANAL"
+    TIPO_QUINCENAL = "QUINCENAL"
+    TIPO_MENSUAL = "MENSUAL"
+    ESTATUS_BORRADOR = "BORRADOR"
+    ESTATUS_PROCESADA = "PROCESADA"
+    ESTATUS_APROBADA = "APROBADA"
+    ESTATUS_PAGADA = "PAGADA"
+    ESTATUS_ANULADA = "ANULADA"
+
+    id_periodo = models.AutoField(db_column="ID_PERIODO", primary_key=True)
+    tipo = models.CharField(db_column="TIPO", max_length=20)
+    fecha_desde = models.DateField(db_column="FECHA_DESDE")
+    fecha_hasta = models.DateField(db_column="FECHA_HASTA")
+    descripcion = models.CharField(db_column="DESCRIPCION", max_length=120, blank=True)
+    estatus = models.CharField(db_column="ESTATUS", max_length=20, default=ESTATUS_BORRADOR)
+
+    # Toggles para deducciones legales (deshabilitados por defecto)
+    aplicar_afp = models.BooleanField(db_column="APLICAR_AFP", default=False)
+    aplicar_sfs = models.BooleanField(db_column="APLICAR_SFS", default=False)
+    aplicar_srl = models.BooleanField(db_column="APLICAR_SRL", default=False)
+    aplicar_isr = models.BooleanField(db_column="APLICAR_ISR", default=False)
+
+    creado_en = models.DateTimeField(db_column="CREADO_EN", auto_now_add=True)
+    actualizado_en = models.DateTimeField(db_column="ACTUALIZADO_EN", auto_now=True)
+
+    class Meta:
+        db_table = "NOMINA_PERIODO"
+        ordering = ["-fecha_desde", "-id_periodo"]
+
+
+class NominaEntrada(models.Model):
+    id_entrada = models.AutoField(db_column="ID_ENTRADA", primary_key=True)
+    periodo = models.ForeignKey(
+        NominaPeriodo,
+        db_column="ID_PERIODO",
+        on_delete=models.CASCADE,
+        related_name="entradas",
+    )
+    empleado = models.ForeignKey(
+        EmpleadoNomina,
+        db_column="ID_EMPLEADO",
+        on_delete=models.PROTECT,
+        related_name="nomina_entradas",
+    )
+    salario_periodo = models.DecimalField(db_column="SALARIO_PERIODO", max_digits=12, decimal_places=2, default=0)
+    dias_trabajados = models.DecimalField(db_column="DIAS_TRABAJADOS", max_digits=6, decimal_places=2, default=0)
+
+    # Ingresos adicionales
+    horas_extras_35 = models.DecimalField(db_column="HORAS_EXTRAS_35", max_digits=6, decimal_places=2, default=0)
+    monto_horas_extras_35 = models.DecimalField(db_column="MONTO_HORAS_EXTRAS_35", max_digits=12, decimal_places=2, default=0)
+    horas_extras_100 = models.DecimalField(db_column="HORAS_EXTRAS_100", max_digits=6, decimal_places=2, default=0)
+    monto_horas_extras_100 = models.DecimalField(db_column="MONTO_HORAS_EXTRAS_100", max_digits=12, decimal_places=2, default=0)
+    bonificacion = models.DecimalField(db_column="BONIFICACION", max_digits=12, decimal_places=2, default=0)
+    bonificacion_desc = models.CharField(db_column="BONIFICACION_DESC", max_length=120, blank=True)
+    comisiones = models.DecimalField(db_column="COMISIONES", max_digits=12, decimal_places=2, default=0)
+    vacaciones_pagadas = models.DecimalField(db_column="VACACIONES_PAGADAS", max_digits=12, decimal_places=2, default=0)
+    regalia = models.DecimalField(db_column="REGALIA", max_digits=12, decimal_places=2, default=0)
+    otros_ingresos = models.DecimalField(db_column="OTROS_INGRESOS", max_digits=12, decimal_places=2, default=0)
+    otros_ingresos_desc = models.CharField(db_column="OTROS_INGRESOS_DESC", max_length=120, blank=True)
+
+    # Deducciones legales
+    afp_empleado = models.DecimalField(db_column="AFP_EMPLEADO", max_digits=12, decimal_places=2, default=0)
+    afp_empleador = models.DecimalField(db_column="AFP_EMPLEADOR", max_digits=12, decimal_places=2, default=0)
+    sfs_empleado = models.DecimalField(db_column="SFS_EMPLEADO", max_digits=12, decimal_places=2, default=0)
+    sfs_empleador = models.DecimalField(db_column="SFS_EMPLEADOR", max_digits=12, decimal_places=2, default=0)
+    srl_empleador = models.DecimalField(db_column="SRL_EMPLEADOR", max_digits=12, decimal_places=2, default=0)
+    isr_retencion = models.DecimalField(db_column="ISR_RETENCION", max_digits=12, decimal_places=2, default=0)
+
+    # Deducciones manuales
+    adelanto = models.DecimalField(db_column="ADELANTO", max_digits=12, decimal_places=2, default=0)
+    prestamo_descuento = models.DecimalField(db_column="PRESTAMO_DESCUENTO", max_digits=12, decimal_places=2, default=0)
+    otras_deducciones = models.DecimalField(db_column="OTRAS_DEDUCCIONES", max_digits=12, decimal_places=2, default=0)
+    otras_deducciones_desc = models.CharField(db_column="OTRAS_DEDUCCIONES_DESC", max_length=120, blank=True)
+
+    # Totales
+    total_ingresos = models.DecimalField(db_column="TOTAL_INGRESOS", max_digits=12, decimal_places=2, default=0)
+    total_deducciones_legales = models.DecimalField(db_column="TOTAL_DEDUCCIONES_LEGALES", max_digits=12, decimal_places=2, default=0)
+    total_otras_deducciones = models.DecimalField(db_column="TOTAL_OTRAS_DEDUCCIONES", max_digits=12, decimal_places=2, default=0)
+    neto_pagar = models.DecimalField(db_column="NETO_PAGAR", max_digits=12, decimal_places=2, default=0)
+
+    notas = models.TextField(db_column="NOTAS", blank=True)
+    creado_en = models.DateTimeField(db_column="CREADO_EN", auto_now_add=True)
+    actualizado_en = models.DateTimeField(db_column="ACTUALIZADO_EN", auto_now=True)
+
+    class Meta:
+        db_table = "NOMINA_ENTRADA"
+        constraints = [
+            models.UniqueConstraint(fields=["periodo", "empleado"], name="uq_nomina_entrada_periodo_empleado"),
+        ]
+        ordering = ["empleado__codigo"]
+
+
+class NominaAdelanto(models.Model):
+    id_adelanto = models.AutoField(db_column="ID_ADELANTO", primary_key=True)
+    empleado = models.ForeignKey(
+        EmpleadoNomina,
+        db_column="ID_EMPLEADO",
+        on_delete=models.CASCADE,
+        related_name="adelantos",
+    )
+    monto = models.DecimalField(db_column="MONTO", max_digits=12, decimal_places=2)
+    fecha = models.DateField(db_column="FECHA")
+    periodo_descuento = models.ForeignKey(
+        NominaPeriodo,
+        db_column="ID_PERIODO_DESCUENTO",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="adelantos_descontados",
+    )
+    descontado = models.BooleanField(db_column="DESCONTADO", default=False)
+    nota = models.CharField(db_column="NOTA", max_length=200, blank=True)
+    creado_en = models.DateTimeField(db_column="CREADO_EN", auto_now_add=True)
+
+    class Meta:
+        db_table = "NOMINA_ADELANTO"
+        ordering = ["-fecha", "-id_adelanto"]

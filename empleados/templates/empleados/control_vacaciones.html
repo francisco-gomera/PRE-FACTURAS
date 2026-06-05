@@ -134,8 +134,12 @@
   }
 
   .vc-emp-table .vc-col-actions {
-    width: 30px;
+    width: 54px;
     text-align: center;
+  }
+
+  .vc-emp-table .vc-col-actions .vc-act-group {
+    display: flex; gap: 3px; justify-content: center;
   }
 
   .vc-color-dot {
@@ -164,6 +168,76 @@
     background: #0f6edc;
     color: #fff;
     border-color: #0f6edc;
+  }
+
+  .vc-history-btn {
+    width: 24px;
+    height: 22px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #f8fbff;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .vc-history-btn:hover {
+    background: #334155;
+    color: #fff;
+    border-color: #334155;
+  }
+
+  /* ── History modal table ── */
+  .vc-hist-table { width: 100%; border-collapse: collapse; }
+  .vc-hist-table th, .vc-hist-table td { padding: 6px 8px; text-align: left; font-size: 11px; border-bottom: 1px solid #eef3fa; }
+  .vc-hist-table th { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #334155; background: #f8fbff; position: sticky; top: 0; }
+  .vc-hist-empty { padding: 20px; text-align: center; color: #94a3b8; font-size: 12px; }
+
+  /* ── Message / Confirm modal ── */
+  .vc-msg-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .vc-msg-icon.is-warn {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  .vc-msg-icon.is-error {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .vc-msg-icon.is-info {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  .vc-msg-icon.is-confirm {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  .vc-msg-content {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 18px 14px;
+  }
+
+  .vc-msg-text {
+    font-size: 13px;
+    color: #0f172a;
+    line-height: 1.45;
   }
 
   /* ── Right panel: calendar ── */
@@ -588,6 +662,9 @@
       <div class="vc-field"><label>Empleado</label><input id="vc_disc_emp_name" readonly /></div>
       <div class="vc-field"><label>Disponibles</label><input id="vc_disc_disponibles" readonly /></div>
       <div class="vc-field"><label>Descontar</label><input id="vc_disc_dias" type="number" min="1" /></div>
+      <div class="vc-field"><label>Descripcion</label><textarea id="vc_disc_descripcion" maxlength="200" style="height:50px;resize:vertical;" placeholder="Motivo del descuento..."></textarea></div>
+      <div class="vc-field"><label>Fecha desde</label><input id="vc_disc_fecha_desde" type="date" /></div>
+      <div class="vc-field"><label>Fecha hasta</label><input id="vc_disc_fecha_hasta" type="date" /></div>
     </div>
     <div class="vc-modal-footer">
       <button type="button" class="vc-cal-btn" id="vc_disc_cancel">Cancelar</button>
@@ -614,8 +691,67 @@
     </div>
     <div class="vc-modal-footer">
       <button type="button" class="vc-cal-btn" id="vc_plan_delete" style="margin-right:auto;color:#dc2626;border-color:#fca5a5;display:none;">Eliminar</button>
+      <button type="button" class="vc-cal-btn" id="vc_plan_to_accion" style="color:#059669;border-color:#86efac;display:none;">Crear Accion Personal</button>
       <button type="button" class="vc-cal-btn" id="vc_plan_cancel">Cancelar</button>
       <button type="button" class="vc-cal-btn is-primary" id="vc_plan_save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── History modal ── -->
+<div id="vc_history_backdrop" class="vc-backdrop" aria-hidden="true">
+  <div class="vc-modal" style="width:min(600px,96vw);">
+    <div class="vc-modal-head">
+      <h4 id="vc_hist_title">Historial de Descuentos</h4>
+      <button type="button" class="vc-modal-close" id="vc_history_close">&times;</button>
+    </div>
+    <div class="vc-modal-body" style="padding:0;max-height:50vh;overflow-y:auto;">
+      <table class="vc-hist-table">
+        <thead>
+          <tr><th>Fecha Desc.</th><th>Dias</th><th>Desde</th><th>Hasta</th><th>Descripcion</th></tr>
+        </thead>
+        <tbody id="vc_hist_body">
+          <tr><td colspan="5" class="vc-hist-empty">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="vc-modal-footer">
+      <button type="button" class="vc-cal-btn" id="vc_history_ok">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Message modal ── -->
+<div id="vc_msg_backdrop" class="vc-backdrop" aria-hidden="true">
+  <div class="vc-modal" style="width:min(420px,94vw);">
+    <div class="vc-modal-head">
+      <h4 id="vc_msg_title">Aviso</h4>
+      <button type="button" class="vc-modal-close" id="vc_msg_close">&times;</button>
+    </div>
+    <div class="vc-msg-content">
+      <div class="vc-msg-icon is-warn" id="vc_msg_icon">!</div>
+      <div class="vc-msg-text" id="vc_msg_text"></div>
+    </div>
+    <div class="vc-modal-footer">
+      <button type="button" class="vc-cal-btn is-primary" id="vc_msg_ok">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm modal ── -->
+<div id="vc_confirm_backdrop" class="vc-backdrop" aria-hidden="true">
+  <div class="vc-modal" style="width:min(420px,94vw);">
+    <div class="vc-modal-head">
+      <h4 id="vc_confirm_title">Confirmacion</h4>
+      <button type="button" class="vc-modal-close" id="vc_confirm_close">&times;</button>
+    </div>
+    <div class="vc-msg-content">
+      <div class="vc-msg-icon is-confirm">?</div>
+      <div class="vc-msg-text" id="vc_confirm_text"></div>
+    </div>
+    <div class="vc-modal-footer">
+      <button type="button" class="vc-cal-btn" id="vc_confirm_no">Cancelar</button>
+      <button type="button" class="vc-cal-btn is-primary" id="vc_confirm_yes">Aceptar</button>
     </div>
   </div>
 </div>
@@ -716,6 +852,56 @@
     return data;
   }
 
+  /* ── Message modal (replaces alert) ── */
+  const msgBackdrop = document.getElementById("vc_msg_backdrop");
+  const msgTitle = document.getElementById("vc_msg_title");
+  const msgText = document.getElementById("vc_msg_text");
+  const msgIcon = document.getElementById("vc_msg_icon");
+
+  function showMessage(text, title = "Aviso", type = "warn") {
+    msgTitle.textContent = title;
+    msgText.textContent = text;
+    msgIcon.className = `vc-msg-icon is-${type}`;
+    msgIcon.textContent = type === "error" ? "✕" : type === "info" ? "i" : "!";
+    msgBackdrop.classList.add("open");
+    msgBackdrop.setAttribute("aria-hidden", "false");
+    document.getElementById("vc_msg_ok").focus();
+  }
+
+  function closeMessageModal() {
+    msgBackdrop.classList.remove("open");
+    msgBackdrop.setAttribute("aria-hidden", "true");
+  }
+
+  document.getElementById("vc_msg_close").addEventListener("click", closeMessageModal);
+  document.getElementById("vc_msg_ok").addEventListener("click", closeMessageModal);
+
+  /* ── Confirm modal (replaces confirm) ── */
+  const confirmBackdrop = document.getElementById("vc_confirm_backdrop");
+  const confirmText = document.getElementById("vc_confirm_text");
+  let confirmResolve = null;
+
+  function showConfirm(text, title = "Confirmacion") {
+    return new Promise((resolve) => {
+      confirmResolve = resolve;
+      document.getElementById("vc_confirm_title").textContent = title;
+      confirmText.textContent = text;
+      confirmBackdrop.classList.add("open");
+      confirmBackdrop.setAttribute("aria-hidden", "false");
+      document.getElementById("vc_confirm_yes").focus();
+    });
+  }
+
+  function closeConfirmModal(result) {
+    confirmBackdrop.classList.remove("open");
+    confirmBackdrop.setAttribute("aria-hidden", "true");
+    if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
+  }
+
+  document.getElementById("vc_confirm_close").addEventListener("click", () => closeConfirmModal(false));
+  document.getElementById("vc_confirm_no").addEventListener("click", () => closeConfirmModal(false));
+  document.getElementById("vc_confirm_yes").addEventListener("click", () => closeConfirmModal(true));
+
   /* ── Employee list ── */
   async function loadEmployees() {
     try {
@@ -751,7 +937,7 @@
         <td class="vc-col-name">${escapeHtml(e.nombre)}</td>
         <td class="vc-col-num">${e.dias_anuales}</td>
         <td class="vc-col-num" data-disp-emp="${e.id_empleado}">${e.dias_disponibles}</td>
-        <td class="vc-col-actions"><button type="button" class="vc-discount-btn" data-discount="${e.id_empleado}" title="Descontar dias">−</button></td>
+        <td class="vc-col-actions"><div class="vc-act-group"><button type="button" class="vc-discount-btn" data-discount="${e.id_empleado}" title="Descontar dias">−</button><button type="button" class="vc-history-btn" data-history="${e.id_empleado}" title="Historial descuentos">☰</button></div></td>
       </tr>`;
     }).join("");
   }
@@ -767,6 +953,12 @@
     if (btn) {
       const id = parseInt(btn.dataset.discount);
       openDiscountModal(id);
+      return;
+    }
+    const histBtn = ev.target.closest("[data-history]");
+    if (histBtn) {
+      const id = parseInt(histBtn.dataset.history);
+      openHistoryModal(id);
       return;
     }
     const row = ev.target.closest("tr[data-emp-id]");
@@ -940,6 +1132,9 @@
     discEmpName.value = `${emp.codigo} - ${emp.nombre}`;
     discDisponibles.value = emp.dias_disponibles;
     discDias.value = "";
+    document.getElementById("vc_disc_descripcion").value = "";
+    document.getElementById("vc_disc_fecha_desde").value = "";
+    document.getElementById("vc_disc_fecha_hasta").value = "";
     discBackdrop.classList.add("open");
     discBackdrop.setAttribute("aria-hidden", "false");
     discDias.focus();
@@ -956,11 +1151,19 @@
 
   document.getElementById("vc_disc_save").addEventListener("click", async () => {
     const dias = parseInt(discDias.value);
-    if (!dias || dias <= 0) return alert("Indique una cantidad valida.");
+    const descripcion = document.getElementById("vc_disc_descripcion").value.trim();
+    const fechaDesde = document.getElementById("vc_disc_fecha_desde").value;
+    const fechaHasta = document.getElementById("vc_disc_fecha_hasta").value;
+    if (!dias || dias <= 0) return showMessage("Indique una cantidad valida.");
+    if (!descripcion) return showMessage("Debe indicar una descripcion.");
+    if (!fechaDesde || !fechaHasta) return showMessage("Debe indicar las fechas de los dias a descontar.");
     try {
       const data = await apiPost("{% url 'empleados:control_vacaciones_descontar' %}", {
         id_empleado: discountEmpId,
         dias: dias,
+        descripcion: descripcion,
+        fecha_dias_desde: fechaDesde,
+        fecha_dias_hasta: fechaHasta,
       });
       // Update local state
       const emp = employees.find(e => e.id_empleado === discountEmpId);
@@ -968,9 +1171,48 @@
       renderEmployees();
       closeDiscountModal();
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message, "Error", "error");
     }
   });
+
+  /* ── History modal ── */
+  const histBackdrop = document.getElementById("vc_history_backdrop");
+  const histBody = document.getElementById("vc_hist_body");
+  const histTitle = document.getElementById("vc_hist_title");
+
+  async function openHistoryModal(empId) {
+    const emp = employees.find(e => e.id_empleado === empId);
+    if (!emp) return;
+    histTitle.textContent = `Historial de Descuentos — ${emp.codigo} - ${emp.nombre}`;
+    histBody.innerHTML = '<tr><td colspan="5" class="vc-hist-empty">Cargando...</td></tr>';
+    histBackdrop.classList.add("open");
+    histBackdrop.setAttribute("aria-hidden", "false");
+    try {
+      const data = await apiGet(`{% url 'empleados:control_vacaciones_descuentos' %}?id_empleado=${empId}`);
+      const items = data.results || [];
+      if (!items.length) {
+        histBody.innerHTML = '<tr><td colspan="5" class="vc-hist-empty">No hay descuentos registrados para este empleado.</td></tr>';
+        return;
+      }
+      histBody.innerHTML = items.map(d => `<tr>
+        <td>${escapeHtml(d.fecha_descuento)}</td>
+        <td style="font-weight:700;text-align:center;">${d.dias}</td>
+        <td>${escapeHtml(d.fecha_dias_desde)}</td>
+        <td>${escapeHtml(d.fecha_dias_hasta)}</td>
+        <td>${escapeHtml(d.descripcion)}</td>
+      </tr>`).join("");
+    } catch (e) {
+      histBody.innerHTML = `<tr><td colspan="5" class="vc-hist-empty">${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function closeHistoryModal() {
+    histBackdrop.classList.remove("open");
+    histBackdrop.setAttribute("aria-hidden", "true");
+  }
+
+  document.getElementById("vc_history_close").addEventListener("click", closeHistoryModal);
+  document.getElementById("vc_history_ok").addEventListener("click", closeHistoryModal);
 
   /* ── Plan modal ── */
   function openPlanModal(existing) {
@@ -985,6 +1227,7 @@
       editingPlanId = existing.id_plan;
       planTitle.textContent = "Editar Vacacion Planificada";
       planDeleteBtn.style.display = "";
+      document.getElementById("vc_plan_to_accion").style.display = "";
       planDesde.value = existing.fecha_desde || "";
       planHasta.value = existing.fecha_hasta || "";
       planNota.value = existing.nota || "";
@@ -993,6 +1236,7 @@
       planEmpleado.disabled = true;
     } else {
       planEmpleado.disabled = false;
+      document.getElementById("vc_plan_to_accion").style.display = "none";
       if (selectedEmployeeId) {
         planEmpleado.value = String(selectedEmployeeId);
       }
@@ -1026,23 +1270,41 @@
       closePlanModal();
       loadCalendar();
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message, "Error", "error");
     }
   });
 
   planDeleteBtn.addEventListener("click", async () => {
     if (!editingPlanId) return;
-    if (!confirm("¿Eliminar esta vacacion planificada?")) return;
+    const yes = await showConfirm("¿Eliminar esta vacacion planificada?");
+    if (!yes) return;
     try {
       await apiPost("{% url 'empleados:control_vacaciones_eliminar_plan' %}", { id_plan: editingPlanId });
       closePlanModal();
       loadCalendar();
     } catch (e) {
-      alert(e.message);
+      showMessage(e.message, "Error", "error");
     }
   });
 
   /* ── Init ── */
+  // Redirect to Acciones de Personal with pre-filled vacation data
+  document.getElementById("vc_plan_to_accion").addEventListener("click", () => {
+    const empId = parseInt(planEmpleado.value);
+    const desde = planDesde.value;
+    const hasta = planHasta.value;
+    const baseUrl = "{% url 'empleados:acciones_personal' %}";
+    const params = new URLSearchParams({
+      prefill: "1",
+      id_empleado: empId,
+      tipo_accion: "CAMBIO",
+      motivo: "VACACIONES",
+      fecha_desde: desde,
+      fecha_hasta: hasta,
+    });
+    window.location.href = `${baseUrl}?${params.toString()}`;
+  });
+
   loadEmployees();
   loadCalendar();
 })();
