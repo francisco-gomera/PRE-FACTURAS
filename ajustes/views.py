@@ -1595,12 +1595,30 @@ def _tu_digits(value):
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
 
+NUMERIC_FIELDS = {
+    "limite_credito",
+    "credito_mas_alto",
+    "monto_cuota",
+    "monto_ultimo_pago",
+    "balance_actual",
+    "monto_atraso",
+    "saldo_vencido_1_30",
+    "saldo_vencido_31_60",
+    "saldo_vencido_61_90",
+    "saldo_vencido_91_120",
+    "saldo_vencido_121_150",
+    "saldo_vencido_151_180",
+    "saldo_vencido_181_mas",
+}
+
+
 def _tu_money(value):
     try:
-        amount = Decimal(str(value or "0"))
+        clean_val = str(value or "0").replace(",", "").strip()
+        amount = Decimal(clean_val)
     except Exception:
         amount = Decimal("0")
-    return f"{amount.quantize(Decimal('0.01'))}"
+    return f"{amount.quantize(Decimal('1'), rounding='ROUND_HALF_UP')}"
 
 
 def _tu_date(value):
@@ -1797,36 +1815,112 @@ def _tu_split_address(address):
 
 
 def _tu_load_last_payments(doc_numbers):
-    """Query DET_RECIBO_INGRESO for the last payment date and amount per document."""
+    """Query DET_RECIBO_INGRESO joined with CAB_RECIBO_INGRESO for the last payment date and amount per document."""
     docs = [str(doc or "").strip() for doc in doc_numbers if str(doc or "").strip()]
     if not docs:
         return {}
+
+    try:
+        det_columns = _load_table_columns("DET_RECIBO_INGRESO")
+        cab_columns = _load_table_columns("CAB_RECIBO_INGRESO")
+    except Exception:
+        return {}
+    if not det_columns:
+        return {}
+
+    det_doc_col = _tu_pick_existing_column(det_columns, "NO_DOC", "ID_DOC", "DOCUMENTO", "FACTURA")
+    if not det_doc_col:
+        return {}
+
+    det_amount_col = _tu_pick_existing_column(
+        det_columns,
+        "TOTAL_PAGO", "TOTAL_PAGO2", "PAGO_ABONO", "IMP_ABONO",
+        "IMP_PAGADO", "IMP_PAGO", "IMP_COBRADO", "IMP_APLICADO",
+        "MONTO_APLICADO", "ABONO_APLICADO", "MONTO_ABONO", "MONTO_PAGO",
+        "ABONO", "PAGADO", "PAGO", "COBRO", "IMPORTE", "SALDO_VENC",
+    )
+    det_recibo_col = _tu_pick_existing_column(det_columns, "ID_RECIBO", "NO_RECIBO")
+    det_line_col = _tu_pick_existing_column(det_columns, "NO_LINEA", "LINEA", "NO_ITEM", "ORDEN", "ID_LINEA")
+
+    amount_expr = f"ISNULL(d.[{det_amount_col}], 0)" if det_amount_col else "0"
+
+    use_join = bool(cab_columns and det_recibo_col)
+    cab_fecha_pago_col = None
+    cab_recibo_col = None
+    if use_join:
+        cab_fecha_pago_col = _tu_pick_existing_column(cab_columns, "FECHA_PAGO", "FECHA_DOC", "FECHA_CONT", "F_CONT", "FECHA")
+        cab_recibo_col = _tu_pick_existing_column(cab_columns, "ID_RECIBO", "NO_RECIBO", "ID_DOC", "NO_DOC")
+        if not cab_fecha_pago_col or not cab_recibo_col:
+            use_join = False
+
+    extra_filters = []
+    if use_join:
+        fecha_expr = f"c.[{cab_fecha_pago_col}]"
+        join_clause = f"INNER JOIN CAB_RECIBO_INGRESO c ON CAST(c.[{cab_recibo_col}] AS NVARCHAR(255)) = CAST(d.[{det_recibo_col}] AS NVARCHAR(255))"
+        order_parts = [f"c.[{cab_fecha_pago_col}] DESC", f"c.[{cab_recibo_col}] DESC"]
+        if det_line_col:
+            order_parts.append(f"d.[{det_line_col}] DESC")
+
+        cab_cancel_col = _tu_pick_existing_column(cab_columns, "CANCELADO", "ANULADO")
+        if cab_cancel_col:
+            extra_filters.append(f"ISNULL(c.[{cab_cancel_col}], 'N') != 'Y'")
+        cab_est_doc_col = _tu_pick_existing_column(cab_columns, "EST_DOC", "ESTATUS", "ESTADO")
+        if cab_est_doc_col:
+            extra_filters.append(f"UPPER(ISNULL(c.[{cab_est_doc_col}], '')) != 'CANCELADO'")
+    else:
+        det_fecha_col = _tu_pick_existing_column(det_columns, "FECHA_CONT", "F_CONT", "FECHA", "FECHA_PAGO")
+        if not det_fecha_col:
+            return {}
+        fecha_expr = f"d.[{det_fecha_col}]"
+        join_clause = ""
+        order_parts = [f"d.[{det_fecha_col}] DESC"]
+        if det_recibo_col:
+            order_parts.append(f"d.[{det_recibo_col}] DESC")
+        if det_line_col:
+            order_parts.append(f"d.[{det_line_col}] DESC")
+
+    if det_amount_col:
+        extra_filters.append(f"ISNULL(d.[{det_amount_col}], 0) > 0")
+
+    extra_filter_sql = ""
+    if extra_filters:
+        extra_filter_sql = " AND " + " AND ".join(extra_filters)
+
+    det_recibo_expr = f"d.[{det_recibo_col}]" if det_recibo_col else "1"
+    det_amount_expr = f"d.[{det_amount_col}]" if det_amount_col else "0"
+
     result = {}
+    unique_docs = list(dict.fromkeys(docs))
     chunk_size = 300
-    for idx in range(0, len(docs), chunk_size):
-        chunk = docs[idx:idx + chunk_size]
+    for idx in range(0, len(unique_docs), chunk_size):
+        chunk = unique_docs[idx:idx + chunk_size]
         placeholders = ", ".join(["%s"] * len(chunk))
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT
-                        sub.NO_DOC,
-                        sub.FECHA_CONT,
-                        sub.TOTAL_PAGO
-                    FROM (
+                    ;WITH LastReceipts AS (
                         SELECT
-                            d.NO_DOC,
-                            d.FECHA_CONT,
-                            COALESCE(d.TOTAL_PAGO, d.ABONO, d.PAGO, d.IMPORTE, 0) AS TOTAL_PAGO,
+                            d.[{det_doc_col}] AS DOC_KEY,
+                            {det_recibo_expr} AS REC_KEY,
+                            {fecha_expr} AS FECHA_PAGO,
                             ROW_NUMBER() OVER (
-                                PARTITION BY d.NO_DOC
-                                ORDER BY d.FECHA_CONT DESC, d.NO_LINEA DESC
+                                PARTITION BY d.[{det_doc_col}]
+                                ORDER BY {', '.join(order_parts)}
                             ) AS rn
                         FROM DET_RECIBO_INGRESO d
-                        WHERE d.NO_DOC IN ({placeholders})
-                    ) sub
-                    WHERE sub.rn = 1
+                        {join_clause}
+                        WHERE CAST(d.[{det_doc_col}] AS NVARCHAR(50)) IN ({placeholders}){extra_filter_sql}
+                    )
+                    SELECT
+                        lr.DOC_KEY,
+                        lr.FECHA_PAGO,
+                        SUM(ISNULL({det_amount_expr}, 0)) AS MONTO_PAGO
+                    FROM LastReceipts lr
+                    INNER JOIN DET_RECIBO_INGRESO d ON CAST({det_recibo_expr} AS NVARCHAR(255)) = CAST(lr.REC_KEY AS NVARCHAR(255))
+                                                   AND CAST(d.[{det_doc_col}] AS NVARCHAR(255)) = CAST(lr.DOC_KEY AS NVARCHAR(255))
+                    WHERE lr.rn = 1
+                    GROUP BY lr.DOC_KEY, lr.FECHA_PAGO
                     """,
                     chunk,
                 )
@@ -1842,15 +1936,11 @@ def _tu_load_last_payments(doc_numbers):
     return result
 
 
-def _tu_estatus_cuenta(dias):
-    """Determine account status based on days overdue."""
-    if dias <= 0:
-        return "NORMAL"
-    if dias <= 30:
-        return "ATRASO"
-    if dias <= 90:
-        return "MORA"
-    return "CASTIGO"
+def _tu_estatus_cuenta(dias, cuotas_atrasadas=0):
+    """Determine account status based on overdue state."""
+    if dias > 0 or (cuotas_atrasadas is not None and int(cuotas_atrasadas or 0) > 0):
+        return "CASTIGADA"
+    return "NORMAL"
 
 
 def _tu_build_row(raw, corte=None):
@@ -1881,26 +1971,26 @@ def _tu_build_row(raw, corte=None):
         "razon_social": _tu_clean(raw.get("nom_socio")) if is_company else "",
         "siglas": "",
         "rnc": rnc_ced if is_company else "",
-        "telefono_residencia": _tu_clean(raw.get("tel1")),
-        "telefono_oficina": _tu_clean(raw.get("tel2")),
-        "telefono_movil": _tu_clean(raw.get("celular") or raw.get("fax")),
+        "telefono_residencia": _tu_clean(raw.get("tel2")),
+        "telefono_oficina": _tu_clean(raw.get("celular") or raw.get("fax")),
+        "telefono_movil": _tu_clean(raw.get("tel1")),
         "fax": "",
         "email": _tu_clean(raw.get("email")),
         "otro": "",
         "calle_avenida": address["calle_avenida"],
-        "esquina": address["provincia_municipio"],
+        "esquina": "",
         "numero": "",
         "edificio": "",
         "urbanizacion": "",
         "sector": _tu_clean(raw.get("sector") or address["sector"]),
-        "ciudad": address["ciudad"],
-        "provincia_municipio": "",
+        "ciudad": "",
+        "provincia_municipio": _tu_clean(raw.get("provincia_municipio") or address["provincia_municipio"]),
         "numero_cuenta": _tu_clean(raw.get("numero_cuenta")),
         "unidad_monetaria": "R",
         "tipo_cuenta": "CREDITO_COMERCIAL",
         "fecha_apertura": _tu_date(raw.get("fecha_doc")),
         "fecha_vencimiento": _tu_date(raw.get("fecha_venc")),
-        "limite_credito": _tu_money(raw.get("lim_credito")),
+        "limite_credito": _tu_money(max(total_doc, saldo)),
         "credito_mas_alto": _tu_money(max(total_doc, saldo)),
         "monto_cuota": _tu_money(raw.get("monto_cuota") or saldo),
         "cantidad_cuotas": _tu_clean(raw.get("cantidad_cuotas") or "1"),
@@ -1909,7 +1999,7 @@ def _tu_build_row(raw, corte=None):
         "balance_actual": _tu_money(saldo),
         "monto_atraso": _tu_money(monto_atraso),
         "cuotas_atrasadas": str(cuotas_atrasadas),
-        "estatus_cuenta": _tu_estatus_cuenta(dias),
+        "estatus_cuenta": _tu_estatus_cuenta(dias, cuotas_atrasadas),
         "estado_cuenta": estado_cuenta,
     }
     for key, value in buckets.items():
@@ -1934,18 +2024,52 @@ def _tu_load_accounts(query="", limit=100, corte=None):
         like = f"%{query}%"
         params.extend([like, like, like, like])
 
+    has_territorio = False
+    prov_col = None
+    desc_col = None
+    try:
+        territorio_cols = _load_table_columns("TERRITORIO")
+        if territorio_cols:
+            has_territorio = True
+            prov_col = _tu_pick_existing_column(territorio_cols, "PROV")
+            desc_col = _tu_pick_existing_column(territorio_cols, "DESCRIPCION", "DESC")
+    except Exception:
+        pass
+
+    select_fields = [
+        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "f.RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
+        "f.TOTAL_DOC", "f.SALDO", "f.ABONO", "f.MON_DOC", "f.ENT_FACTURA",
+        "s.DIR_FACTURA", "s.TEL1", "s.TEL2", "s.CELULAR", "s.FAX", "s.EMAIL", "s.COMENTARIO",
+        "s.LIM_CREDITO", "s.MONEDA"
+    ]
+    
+    join_clause = "LEFT JOIN MAESTRO_SN s ON CAST(s.ID_SN AS NVARCHAR(50)) = CAST(f.ID_SN AS NVARCHAR(50))"
+    
+    if has_territorio:
+        if desc_col:
+            select_fields.append(f"t.[{desc_col}] AS SECTOR_NAME")
+        else:
+            select_fields.append("NULL AS SECTOR_NAME")
+            
+        if prov_col:
+            select_fields.append(f"t.[{prov_col}] AS SECTOR_PROV")
+        else:
+            select_fields.append("NULL AS SECTOR_PROV")
+            
+        join_clause += "\nLEFT JOIN TERRITORIO t ON CAST(t.ID_CODIGO AS NVARCHAR(50)) = CAST(s.ID_SECTOR AS NVARCHAR(50))"
+    else:
+        select_fields.append("NULL AS SECTOR_NAME")
+        select_fields.append("NULL AS SECTOR_PROV")
+
     rows = []
     try:
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
                 SELECT TOP {max(int(limit), 1)}
-                    f.ID_DOC, f.ID_SN, f.NOM_SOCIO, f.RNC_CED, f.FECHA_DOC, f.FECHA_VENC,
-                    f.TOTAL_DOC, f.SALDO, f.ABONO, f.MON_DOC, f.ENT_FACTURA,
-                    s.DIR_FACTURA, s.TEL1, s.TEL2, s.CELULAR, s.FAX, s.EMAIL, s.COMENTARIO,
-                    s.LIM_CREDITO, s.MONEDA
+                    {', '.join(select_fields)}
                 FROM CAB_FACTURA f
-                LEFT JOIN MAESTRO_SN s ON CAST(s.ID_SN AS NVARCHAR(50)) = CAST(f.ID_SN AS NVARCHAR(50))
+                {join_clause}
                 {where}
                 ORDER BY f.FECHA_VENC, f.ID_SN, f.ID_DOC
                 """,
@@ -1985,7 +2109,8 @@ def _tu_load_accounts(query="", limit=100, corte=None):
             "celular": row[14],
             "fax": row[15],
             "email": row[16],
-            "sector": row[17],
+            "sector": row[20] if (len(row) > 20 and row[20] is not None) else row[17],
+            "provincia_municipio": row[21] if (len(row) > 21 and row[21] is not None) else "",
             "lim_credito": row[18],
             "numero_cuenta": row[0],
         }
@@ -2075,19 +2200,53 @@ def reportes_transunion_actualizar_cuentas_view(request):
     if not id_docs_clean:
         return JsonResponse({"detail": "No hay cuentas validas para actualizar."}, status=400)
 
+    has_territorio = False
+    prov_col = None
+    desc_col = None
+    try:
+        territorio_cols = _load_table_columns("TERRITORIO")
+        if territorio_cols:
+            has_territorio = True
+            prov_col = _tu_pick_existing_column(territorio_cols, "PROV")
+            desc_col = _tu_pick_existing_column(territorio_cols, "DESCRIPCION", "DESC")
+    except Exception:
+        pass
+
+    select_fields = [
+        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "f.RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
+        "f.TOTAL_DOC", "f.SALDO", "f.ABONO", "f.MON_DOC", "f.ENT_FACTURA",
+        "s.DIR_FACTURA", "s.TEL1", "s.TEL2", "s.CELULAR", "s.FAX", "s.EMAIL", "s.COMENTARIO",
+        "s.LIM_CREDITO", "s.MONEDA",
+        "UPPER(ISNULL(f.EST_DOC, '')) AS EST_DOC_UPPER"
+    ]
+    
+    join_clause = "LEFT JOIN MAESTRO_SN s ON CAST(s.ID_SN AS NVARCHAR(50)) = CAST(f.ID_SN AS NVARCHAR(50))"
+    
+    if has_territorio:
+        if desc_col:
+            select_fields.append(f"t.[{desc_col}] AS SECTOR_NAME")
+        else:
+            select_fields.append("NULL AS SECTOR_NAME")
+            
+        if prov_col:
+            select_fields.append(f"t.[{prov_col}] AS SECTOR_PROV")
+        else:
+            select_fields.append("NULL AS SECTOR_PROV")
+            
+        join_clause += "\nLEFT JOIN TERRITORIO t ON CAST(t.ID_CODIGO AS NVARCHAR(50)) = CAST(s.ID_SECTOR AS NVARCHAR(50))"
+    else:
+        select_fields.append("NULL AS SECTOR_NAME")
+        select_fields.append("NULL AS SECTOR_PROV")
+
     placeholders = ", ".join(["%s"] * len(id_docs_clean))
     try:
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
                 SELECT
-                    f.ID_DOC, f.ID_SN, f.NOM_SOCIO, f.RNC_CED, f.FECHA_DOC, f.FECHA_VENC,
-                    f.TOTAL_DOC, f.SALDO, f.ABONO, f.MON_DOC, f.ENT_FACTURA,
-                    s.DIR_FACTURA, s.TEL1, s.TEL2, s.CELULAR, s.FAX, s.EMAIL, s.COMENTARIO,
-                    s.LIM_CREDITO, s.MONEDA,
-                    UPPER(ISNULL(f.EST_DOC, '')) AS EST_DOC_UPPER
+                    {', '.join(select_fields)}
                 FROM CAB_FACTURA f
-                LEFT JOIN MAESTRO_SN s ON CAST(s.ID_SN AS NVARCHAR(50)) = CAST(f.ID_SN AS NVARCHAR(50))
+                {join_clause}
                 WHERE CAST(f.ID_DOC AS NVARCHAR(50)) IN ({placeholders})
                 ORDER BY f.ID_DOC
                 """,
@@ -2155,7 +2314,8 @@ def reportes_transunion_actualizar_cuentas_view(request):
             "celular": row[14],
             "fax": row[15],
             "email": row[16],
-            "sector": row[17],
+            "sector": row[21] if (len(row) > 21 and row[21] is not None) else row[17],
+            "provincia_municipio": row[22] if (len(row) > 22 and row[22] is not None) else "",
             "lim_credito": row[18],
             "numero_cuenta": row[0],
         }
@@ -2228,7 +2388,13 @@ def reportes_transunion_generar_view(request):
     for row in rows:
         if not isinstance(row, dict):
             continue
-        writer.writerow([_tu_clean(row.get(key)) for key, _ in TRANSUNION_FIELDS])
+        cleaned_row = []
+        for key, _ in TRANSUNION_FIELDS:
+            val = row.get(key)
+            if key in NUMERIC_FIELDS:
+                val = _tu_money(val)
+            cleaned_row.append(_tu_clean(val))
+        writer.writerow(cleaned_row)
 
     response = HttpResponse(output.getvalue(), content_type="text/plain; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'

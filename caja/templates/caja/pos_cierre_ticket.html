@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cierre de Caja #{{ print_data.session_id }}</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #000;
+            margin: 0;
+            padding: 4mm 3mm;
+            width: 80mm;
+            box-sizing: border-box;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .bold {
+            font-weight: bold;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 3mm 0;
+        }
+        .header-section {
+            margin-bottom: 3mm;
+            line-height: 1.3;
+        }
+        .header-section h2 {
+            margin: 0 0 1mm 0;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        .info-table, .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2mm;
+        }
+        .info-table td {
+            padding: 0.5mm 0;
+            vertical-align: top;
+        }
+        .info-label {
+            font-weight: bold;
+            width: 45%;
+        }
+        .totals-table td {
+            padding: 0.8mm 0;
+        }
+        .totals-table tr.total-row td {
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 1.5mm 0;
+        }
+        .footer-section {
+            margin-top: 6mm;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        @media print {
+            body {
+                width: 80mm;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-section text-center">
+        <h2>{{ print_data.empresa.nombre|default:"COMERCIAL ANITA" }}</h2>
+        <div>RNC: {{ print_data.empresa.rnc|default:"---" }}</div>
+        <div>Tel: {{ print_data.empresa.telefono|default:"---" }}</div>
+        <div>{{ print_data.empresa.direccion|default:"---" }}</div>
+        
+        <div class="divider"></div>
+        <h3 style="margin: 2mm 0 0 0; text-transform: uppercase; font-size: 13px;">*** CIERRE DE CAJA ***</h3>
+    </div>
+
+    <div class="divider"></div>
+
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Sesion No:</td>
+            <td>#{{ print_data.session_id }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Cajero:</td>
+            <td>{{ print_data.cajero }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Terminal:</td>
+            <td>{{ print_data.terminal }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">F. Apertura:</td>
+            <td>{{ print_data.fecha_apertura }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">F. Cierre:</td>
+            <td>{{ print_data.fecha_cierre }}</td>
+        </tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <table class="totals-table">
+        <tr>
+            <td>Fondo Inicial:</td>
+            <td class="text-right">RD$ {{ print_data.summary.fondo|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Ventas Efectivo:</td>
+            <td class="text-right">RD$ {{ print_data.summary.efectivo_ventas|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Ventas Tarjeta:</td>
+            <td class="text-right">RD$ {{ print_data.summary.tarjeta_ventas|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Ventas Transf.:</td>
+            <td class="text-right">RD$ {{ print_data.summary.transferencia_ventas|floatformat:2 }}</td>
+        </tr>
+        <tr class="total-row">
+            <td>TOTAL VENTAS:</td>
+            <td class="text-right">RD$ {{ print_data.summary.total_ventas|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <table class="totals-table">
+        <tr>
+            <td>Efectivo Esperado:</td>
+            <td class="text-right">RD$ {{ print_data.expected_cash|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Efectivo Real:</td>
+            <td class="text-right">RD$ {{ print_data.summary.monto_cierre|floatformat:2 }}</td>
+        </tr>
+        <tr class="total-row" style="font-size: 13px;">
+            <td>DIFERENCIA:</td>
+            <td class="text-right">RD$ {{ print_data.summary.diferencia|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    {% if print_data.observaciones %}
+    <div class="divider"></div>
+    <div style="font-size: 10px; font-style: italic;">
+        Observaciones: {{ print_data.observaciones }}
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="footer-section text-center">
+        <div class="bold">CUADRE FINALIZADO Y ARQUEADO</div>
+        <div style="margin-top: 15mm; border-top: 1px solid #000; width: 60%; margin-left: auto; margin-right: auto; padding-top: 1mm;">
+            Firma Cajero
+        </div>
+    </div>
+</body>
+</html>

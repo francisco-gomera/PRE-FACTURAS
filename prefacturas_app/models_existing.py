@@ -1,4 +1,4 @@
-﻿# This is an auto-generated Django model module.
+# This is an auto-generated Django model module.
 # You'll have to do the following manually to clean this up:
 #   * Rearrange models' order
 #   * Make sure each model has one field with primary_key=True
@@ -223,7 +223,7 @@ class MaestroSn(models.Model):
 
 class MaestroArticulo(models.Model):
     id_codigo = models.IntegerField(db_column='ID_CODIGO', blank=True, null=True)  # Field name made lowercase.
-    id_articulo = models.CharField(db_column='ID_ARTICULO', max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    id_articulo = models.CharField(db_column='ID_ARTICULO', primary_key=True, max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     descrip_art = models.CharField(db_column='DESCRIP_ART', max_length=100, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     serie = models.DecimalField(db_column='SERIE', max_digits=18, decimal_places=0, blank=True, null=True)  # Field name made lowercase.
     id_grupo = models.DecimalField(db_column='ID_GRUPO', max_digits=18, decimal_places=0, blank=True, null=True)  # Field name made lowercase.

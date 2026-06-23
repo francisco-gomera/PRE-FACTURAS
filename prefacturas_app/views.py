@@ -817,22 +817,27 @@ def buscar_stock_articulos_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT TOP 800 ID_ARTICULO, DESCRIP_ART, ISNULL(STOCK, 0), UM_INV, REFERENCIA
-        FROM MAESTRO_ARTICULO
+        SELECT TOP 800 A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA
+        FROM MAESTRO_ARTICULO A
+        LEFT JOIN (
+            SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
+            FROM TARJETERO
+            GROUP BY ID_ARTICULO
+        ) T ON T.ID_ARTICULO = A.ID_ARTICULO
         WHERE 1=1
     """
     params = []
     if q:
-        sql += " AND (ID_ARTICULO LIKE %s OR DESCRIP_ART LIKE %s OR REFERENCIA LIKE %s)"
+        sql += " AND (A.ID_ARTICULO LIKE %s OR A.DESCRIP_ART LIKE %s OR A.REFERENCIA LIKE %s)"
         like = f"%{q}%"
         params.extend([like, like, like])
     if stock_desde is not None:
-        sql += " AND ISNULL(STOCK, 0) >= %s"
+        sql += " AND COALESCE(T.STOCK_TARJ, 0) >= %s"
         params.append(stock_desde)
     if stock_hasta is not None:
-        sql += " AND ISNULL(STOCK, 0) <= %s"
+        sql += " AND COALESCE(T.STOCK_TARJ, 0) <= %s"
         params.append(stock_hasta)
-    sql += " ORDER BY DESCRIP_ART, ID_ARTICULO"
+    sql += " ORDER BY A.DESCRIP_ART, A.ID_ARTICULO"
 
     with connection.cursor() as cursor:
         cursor.execute(sql, params)
@@ -878,22 +883,27 @@ def stock_articulos_print_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT ID_ARTICULO, DESCRIP_ART, ISNULL(STOCK, 0), UM_INV, REFERENCIA
-        FROM MAESTRO_ARTICULO
+        SELECT A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA
+        FROM MAESTRO_ARTICULO A
+        LEFT JOIN (
+            SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
+            FROM TARJETERO
+            GROUP BY ID_ARTICULO
+        ) T ON T.ID_ARTICULO = A.ID_ARTICULO
         WHERE 1=1
     """
     params = []
     if q:
-        sql += " AND (ID_ARTICULO LIKE %s OR DESCRIP_ART LIKE %s OR REFERENCIA LIKE %s)"
+        sql += " AND (A.ID_ARTICULO LIKE %s OR A.DESCRIP_ART LIKE %s OR A.REFERENCIA LIKE %s)"
         like = f"%{q}%"
         params.extend([like, like, like])
     if stock_desde is not None:
-        sql += " AND ISNULL(STOCK, 0) >= %s"
+        sql += " AND COALESCE(T.STOCK_TARJ, 0) >= %s"
         params.append(stock_desde)
     if stock_hasta is not None:
-        sql += " AND ISNULL(STOCK, 0) <= %s"
+        sql += " AND COALESCE(T.STOCK_TARJ, 0) <= %s"
         params.append(stock_hasta)
-    sql += " ORDER BY DESCRIP_ART, ID_ARTICULO"
+    sql += " ORDER BY A.DESCRIP_ART, A.ID_ARTICULO"
 
     with connection.cursor() as cursor:
         cursor.execute(sql, params)
@@ -1066,15 +1076,14 @@ def buscar_articulos_view(request):
     else:
         qs = qs.order_by("id_articulo")
 
-    qs = qs.values(
+    values = list(qs.values(
         "id_articulo",
         "descrip_art",
         "referencia",
         "precio_det",
-        "stock",
         "id_impto_vt",
         "bloqueado",
-    )[:80]
+    )[:80])
 
     def _num(v):
         if v is None:
@@ -1084,18 +1093,33 @@ def buscar_articulos_view(request):
         except Exception:
             return None
 
-    results = [
-        {
-            "id_articulo": r.get("id_articulo") or "",
-            "descrip_art": r.get("descrip_art") or "",
-            "referencia": r.get("referencia") or "",
-            "precio_det": _num(r.get("precio_det")),
-            "stock": _num(r.get("stock")),
-            "id_impto_vt": r.get("id_impto_vt"),
-            "bloqueado": (r.get("bloqueado") or "N"),
-        }
-        for r in qs
-    ]
+    results = []
+    if values:
+        articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
+        tarj_stock = {}
+        if articulo_ids:
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(articulo_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                    articulo_ids
+                )
+                tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+
+        for r in values:
+            art_id = r.get("id_articulo") or ""
+            stock_val = tarj_stock.get(art_id, 0.0)
+            results.append(
+                {
+                    "id_articulo": art_id,
+                    "descrip_art": r.get("descrip_art") or "",
+                    "referencia": r.get("referencia") or "",
+                    "precio_det": _num(r.get("precio_det")),
+                    "stock": stock_val,
+                    "id_impto_vt": r.get("id_impto_vt"),
+                    "bloqueado": (r.get("bloqueado") or "N"),
+                }
+            )
     return JsonResponse({"results": results})
 
 

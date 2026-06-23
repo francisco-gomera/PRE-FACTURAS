@@ -849,24 +849,36 @@ def _load_entrada_articulos_articulo_rows(*, query="", filtro="descripcion"):
         qs = qs.order_by("referencia", "id_articulo")
     else:
         qs = qs.order_by("id_articulo")
-    values = qs.values(
+    values = list(qs.values(
         "id_articulo",
         "descrip_art",
         "referencia",
         "precio_det",
-        "stock",
         "um_inv",
         "cta_aum_stock",
         "alm_dft",
         "ceco",
-    )[:80]
+    )[:80])
+
+    tarj_stock = {}
+    if values:
+        articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
+        if articulo_ids:
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(articulo_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                    articulo_ids
+                )
+                tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+
     return [
         {
             "id_articulo": row.get("id_articulo") or "",
             "descrip_art": row.get("descrip_art") or "",
             "referencia": row.get("referencia") or "",
             "precio_det": float(_to_decimal(row.get("precio_det"))),
-            "stock": float(_to_decimal(row.get("stock"))),
+            "stock": tarj_stock.get(str(row.get("id_articulo") or "").strip(), 0.0),
             "um_inv": row.get("um_inv") or "",
             "porc_com": 0,
             "cta_aum_stock": row.get("cta_aum_stock") or "",

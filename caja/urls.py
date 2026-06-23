@@ -22,6 +22,18 @@ from .views import (
     cuadre_caja_view,
     financiamiento_view,
     index,
+    caja_pos_view,
+    caja_pos_session_status_view,
+    caja_pos_session_open_view,
+    caja_pos_session_close_view,
+    caja_pos_buscar_articulo_view,
+    caja_pos_buscar_cliente_view,
+    caja_pos_save_sale_view,
+    caja_pos_ticket_print_data_view,
+    caja_pos_session_print_close_view,
+    caja_pos_sales_list_view,
+    caja_pos_sales_detail_view,
+    caja_pos_sales_cancel_view,
 )
 
 app_name = "caja"
@@ -104,4 +116,17 @@ urlpatterns = [
     ),
     path("financiamiento/detalle/", financiamiento_detalle_view, name="financiamiento_detalle"),
     path("financiamiento/guardar/", financiamiento_guardar_view, name="financiamiento_guardar"),
+    # POS routes
+    path("pos/", caja_pos_view, name="pos"),
+    path("pos/articulo/buscar/", caja_pos_buscar_articulo_view, name="pos_buscar_articulo"),
+    path("pos/session/status/", caja_pos_session_status_view, name="pos_session_status"),
+    path("pos/session/open/", caja_pos_session_open_view, name="pos_session_open"),
+    path("pos/session/close/", caja_pos_session_close_view, name="pos_session_close"),
+    path("pos/save-sale/", caja_pos_save_sale_view, name="pos_save_sale"),
+    path("pos/cliente/buscar/", caja_pos_buscar_cliente_view, name="pos_buscar_cliente"),
+    path("pos/ticket/print-data/", caja_pos_ticket_print_data_view, name="pos_ticket_print_data"),
+    path("pos/session/print-close/", caja_pos_session_print_close_view, name="pos_session_print_close"),
+    path("pos/sales/list/", caja_pos_sales_list_view, name="pos_sales_list"),
+    path("pos/sales/detail/", caja_pos_sales_detail_view, name="pos_sales_detail"),
+    path("pos/sales/cancel/", caja_pos_sales_cancel_view, name="pos_sales_cancel"),
 ]

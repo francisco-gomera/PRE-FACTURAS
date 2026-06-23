@@ -988,19 +988,100 @@ def _load_factura_detail_quantities(cursor, factura_id):
 
 
 def _restore_factura_stock(cursor, factura_id):
-    cantidades = _load_factura_detail_quantities(cursor, factura_id)
-    for articulo_id, cantidad in cantidades.items():
-        if cantidad.copy_abs() <= Decimal("0.0001"):
-            continue
-        cursor.execute(
-            """
-            UPDATE MAESTRO_ARTICULO
-            SET STOCK = ISNULL(STOCK, 0) + %s,
-                FECHA_ACT = GETDATE()
-            WHERE ID_ARTICULO = %s
-            """,
-            [cantidad, articulo_id],
+    # Fetch invoice header details
+    cursor.execute(
+        """
+        SELECT ID_SN, NOM_SOCIO, ID_VENDEDOR, ID_USUARIO, TERMINAL, FECHA_CONT, FECHA_VENC, FECHA_DOC
+        FROM CAB_FACTURA
+        WHERE TRY_CAST(ID_DOC AS BIGINT) = %s
+        """,
+        [factura_id],
+    )
+    cab = cursor.fetchone()
+    if not cab:
+        return
+    id_sn, nom_socio, id_vendedor, id_usuario, terminal, fecha_cont, fecha_venc, fecha_doc = cab
+
+    # Fetch invoice lines details
+    cursor.execute(
+        """
+        SELECT ID_ARTICULO, DESCRIP_ART, CANTIDAD, PRECIO, ID_ALMACEN
+        FROM DET_FACTURA
+        WHERE TRY_CAST(ID_DOC AS BIGINT) = %s
+        """,
+        [factura_id],
+    )
+    detalles = cursor.fetchall()
+
+    tarjetero_columns = _load_table_columns(cursor, "TARJETERO")
+    if tarjetero_columns:
+        tarjetero_identity_columns = (
+            _load_identity_columns(cursor, "TARJETERO") if tarjetero_columns else set()
         )
+        for det in detalles:
+            id_articulo, descrip_art, cantidad, precio, id_almacen = det
+            if not id_articulo or cantidad is None or cantidad <= 0:
+                continue
+
+            cantidad_pos = Decimal(str(cantidad))
+            total_costo_t = cantidad_pos
+            costo_t = Decimal("1")
+            total_precio_t = total_costo_t * Decimal(str(precio or 0))
+
+            # Safe extraction of month/year
+            month_val = int(timezone.localdate().month)
+            year_val = int(timezone.localdate().year)
+            if fecha_cont:
+                if hasattr(fecha_cont, "month"):
+                    month_val = int(fecha_cont.month)
+                elif isinstance(fecha_cont, str):
+                    try:
+                        parsed_dt = datetime.strptime(fecha_cont[:10], "%Y-%m-%d")
+                        month_val = parsed_dt.month
+                    except Exception:
+                        pass
+                if hasattr(fecha_cont, "year"):
+                    year_val = int(fecha_cont.year)
+                elif isinstance(fecha_cont, str):
+                    try:
+                        parsed_dt = datetime.strptime(fecha_cont[:10], "%Y-%m-%d")
+                        year_val = parsed_dt.year
+                    except Exception:
+                        pass
+
+            tarj_values = {}
+            _assign_existing_values(tarj_values, tarjetero_columns, "NC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
+            _assign_existing_values(tarj_values, tarjetero_columns, factura_id, "ID_DOC", "NO_DOC", "NO", "DOCUMENTO")
+            _assign_existing_values(tarj_values, tarjetero_columns, id_sn, "ID_SN", "ID_CLIENTE")
+            _assign_existing_values(tarj_values, tarjetero_columns, nom_socio, "NOM_SN", "NOM_SOCIO", "NOMBRE_SN")
+            _assign_existing_values(tarj_values, tarjetero_columns, _clip_str("11020101", 20), "CTA_ASOCIADA")
+            _assign_existing_values(tarj_values, tarjetero_columns, id_articulo, "ID_ARTICULO", "ARTICULO", "COD_ART")
+            _assign_existing_values(tarj_values, tarjetero_columns, descrip_art, "DESCRIP_ART", "DESCRIPCION", "DESCRIP")
+            _assign_existing_values(tarj_values, tarjetero_columns, cantidad_pos, "CANTIDAD", "CANT")
+            _assign_existing_values(tarj_values, tarjetero_columns, total_costo_t, "TOTAL_COSTO")
+            _assign_existing_values(tarj_values, tarjetero_columns, costo_t, "COSTO", "COSTO_UNIT", "COSTO_UNITARIO")
+            _assign_existing_values(tarj_values, tarjetero_columns, precio, "PRECIO", "PRECIO_UNIT", "PRECIO_UNITARIO")
+            _assign_existing_values(tarj_values, tarjetero_columns, total_precio_t, "TOTAL_PRECIO", "TOTAL_NETO")
+            _assign_existing_values(tarj_values, tarjetero_columns, "No", "LOTE")
+            _assign_existing_values(tarj_values, tarjetero_columns, fecha_cont, "FECHA_CONT", "F_CONT")
+            _assign_existing_values(tarj_values, tarjetero_columns, fecha_venc, "FECHA_VENC", "F_VENC")
+            _assign_existing_values(tarj_values, tarjetero_columns, fecha_doc, "FECHA_DOC", "F_DOC")
+            _assign_existing_values(tarj_values, tarjetero_columns, "RD$", "MONEDA", "MON_DOC")
+            _assign_existing_values(tarj_values, tarjetero_columns, timezone.localdate(), "FECHA_CREACION")
+            _assign_existing_values(tarj_values, tarjetero_columns, month_val, "PERIODO_CONT")
+            _assign_existing_values(tarj_values, tarjetero_columns, year_val, "EJERCICIO")
+            _assign_existing_values(tarj_values, tarjetero_columns, id_almacen or 1, "ID_ALMACEN", "ALM", "ALMACEN")
+            _assign_existing_values(tarj_values, tarjetero_columns, id_vendedor, "ID_VENDEDOR", "VENDEDOR")
+            _assign_existing_values(tarj_values, tarjetero_columns, id_usuario, "ID_USUARIO", "USUARIO_ID")
+            _assign_existing_values(tarj_values, tarjetero_columns, _clip_str("41010101", 20), "CTA_INGRESO")
+            _assign_existing_values(tarj_values, tarjetero_columns, _clip_str("21020301", 20), "CTA_IMPTO_VT", "CTA_IMPTO")
+            _insert_dynamic_row(
+                cursor,
+                "TARJETERO",
+                tarjetero_columns,
+                tarj_values,
+                skip_columns=tarjetero_identity_columns,
+            )
 
 
 def _create_factura_cancel_ed_entries(
@@ -2018,30 +2099,44 @@ def facturacion_articulos_buscar_view(request):
     else:
         qs = qs.order_by("id_articulo")
 
-    values = qs.values(
+    values = list(qs.values(
         "id_articulo",
         "descrip_art",
         "referencia",
         "precio_det",
-        "stock",
         "id_impto_vt",
         "um_inv",
         "bloqueado",
-    )[:80]
+    )[:80])
 
-    results = [
-        {
-            "id_articulo": row.get("id_articulo") or "",
-            "descrip_art": row.get("descrip_art") or "",
-            "referencia": row.get("referencia") or "",
-            "precio_det": _num(row.get("precio_det")),
-            "stock": _num(row.get("stock")),
-            "id_impto_vt": row.get("id_impto_vt"),
-            "um_inv": row.get("um_inv") or "",
-            "bloqueado": row.get("bloqueado") or "N",
-        }
-        for row in values
-    ]
+    results = []
+    if values:
+        articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
+        tarj_stock = {}
+        if articulo_ids:
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(articulo_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                    articulo_ids
+                )
+                tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+
+        for row in values:
+            art_id = row.get("id_articulo") or ""
+            stock_val = tarj_stock.get(art_id, 0.0)
+            results.append(
+                {
+                    "id_articulo": art_id,
+                    "descrip_art": row.get("descrip_art") or "",
+                    "referencia": row.get("referencia") or "",
+                    "precio_det": _num(row.get("precio_det")),
+                    "stock": stock_val,
+                    "id_impto_vt": row.get("id_impto_vt"),
+                    "um_inv": row.get("um_inv") or "",
+                    "bloqueado": row.get("bloqueado") or "N",
+                }
+            )
     return JsonResponse({"results": results})
 
 
@@ -3118,25 +3213,36 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
     blocked_items = []
     stock_items = {}
     if detalle_articulos:
-        articulos = MaestroArticulo.objects.filter(id_articulo__in=list(detalle_articulos)).values(
+        articulos = list(MaestroArticulo.objects.filter(id_articulo__in=list(detalle_articulos)).values(
             "id_articulo",
             "descrip_art",
             "referencia",
-            "stock",
             "bloqueado",
             "um_inv",
             "alm_dft",
             "ceco",
             "cta_aum_stock",
-        )
+        ))
+        articulo_ids = [str(a.get("id_articulo") or "").strip() for a in articulos if a.get("id_articulo")]
+        tarj_stock = {}
+        if articulo_ids:
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(articulo_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                    articulo_ids
+                )
+                tarj_stock = {str(row[0] or "").strip(): Decimal(str(row[1] or 0)) for row in cursor.fetchall()}
+
         for articulo in articulos:
             articulo_id = str(articulo.get("id_articulo") or "").strip()
             if not articulo_id:
                 continue
             referencia_map[articulo_id] = str(articulo.get("referencia") or "")
+            stock_val = tarj_stock.get(articulo_id, Decimal("0"))
             stock_items[articulo_id] = {
                 "descrip_art": str(articulo.get("descrip_art") or "").strip(),
-                "stock": _to_decimal(articulo.get("stock"), Decimal("0")),
+                "stock": stock_val,
                 "uom": str(articulo.get("um_inv") or "").strip(),
                 "alm_dft": _stringify_doc(articulo.get("alm_dft")),
                 "ceco": str(articulo.get("ceco") or "").strip(),
