@@ -3292,11 +3292,23 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                     }
                 )
         if stock_errors:
+            allow_request = True
+            from inventario.models import SolicitudExistencia
+            from django.db.models import Q
+            q_filter = Q()
+            if factura_id_payload > 0:
+                q_filter |= Q(origen_referencia__iexact=f"Factura {factura_id_payload}")
+            if prefactura_id:
+                q_filter |= Q(origen_referencia__iexact=f"Prefactura {prefactura_id}")
+
+            if (factura_id_payload > 0 or prefactura_id) and SolicitudExistencia.objects.filter(Q(origen_modulo="FACTURA") & q_filter).exists():
+                allow_request = False
+
             return None, JsonResponse(
                 {
                     "detail": "No hay inventario suficiente para facturar:\n"
                     + "\n".join(stock_errors),
-                    "allow_request_existence": True,
+                    "allow_request_existence": allow_request,
                     "stock_request_items": stock_request_items,
                 },
                 status=400,

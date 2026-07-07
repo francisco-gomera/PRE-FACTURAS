@@ -1,4 +1,4 @@
-﻿{% extends "core/base.html" %}
+{% extends "core/base.html" %}
 
 {% block head_extra %}
 <style>
@@ -1067,6 +1067,30 @@
     width: min(640px, 94vw);
   }
 
+  .cxc-history-modal {
+    width: min(780px, 94vw);
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #56709a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .tab-btn:hover {
+    color: #0f3f78;
+  }
+  .tab-btn.active {
+    border-bottom-color: #0f3f78;
+    font-weight: 700;
+    color: #0f3f78;
+  }
+
   .cxc-print-body {
     display: grid;
     gap: 12px;
@@ -1895,8 +1919,8 @@
                 </div>
 
                 <div class="cxc-importe-row">
-                  <span class="cxc-importe-icon" aria-hidden="true">âœ“</span>
-                  <button id="btn_cxc_importe_total" type="button" class="cxc-importe-icon" title="Cargar total al importe actual">âœ“</button>
+                  <span class="cxc-importe-icon" aria-hidden="true">✓</span>
+                  <button id="btn_cxc_importe_total" type="button" class="cxc-importe-icon" title="Cargar total al importe actual">✓</button>
                   <label class="cxc-importe-label" for="cxc_importe_pago">Importe</label>
                   <input id="cxc_importe_pago" class="cxc-importe-input" type="number" min="0" step="0.01" value="0.00" inputmode="decimal" autocomplete="off" />
                 </div>
@@ -2079,6 +2103,7 @@
 
 <div id="cxc_detalle_context_menu" class="cxc-context-menu" aria-hidden="true">
   <button id="btn_cxc_detalle_context_print_origin" type="button">Ver factura de origen</button>
+  <button id="btn_cxc_detalle_context_payment_history" type="button">Ver historial de pago</button>
 </div>
 
 <div id="cxc_estado_context_menu" class="cxc-context-menu" aria-hidden="true">
@@ -2236,6 +2261,105 @@
   </div>
 </div>
 
+<div id="cxc_historial_pago_modal_backdrop" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal cxc-history-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_history_modal_title">
+    <div class="win-titlebar">
+      <span id="cxc_history_modal_title">Historial de pagos de la factura</span>
+      <button id="btn_close_cxc_history_modal" type="button">X</button>
+    </div>
+    <div class="win-body">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 12px; background: #eef4ff; padding: 10px; border-radius: 12px; border: 1px solid #d5e2f6;">
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">No. Factura</span>
+          <strong id="cxc_historial_pago_no_doc" style="font-size: 12px; color: #0f3f78;">-</strong>
+        </div>
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">F. Facturacion</span>
+          <strong id="cxc_historial_pago_fecha_doc" style="font-size: 12px; color: #0f3f78;">-</strong>
+        </div>
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">F. Vencimiento</span>
+          <strong id="cxc_historial_pago_fecha_venc" style="font-size: 12px; color: #0f3f78;">-</strong>
+        </div>
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">Monto Total</span>
+          <strong id="cxc_historial_pago_total_doc" style="font-size: 12px; color: #0f3f78;">-</strong>
+        </div>
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">Total Pagado</span>
+          <strong id="cxc_historial_pago_abono" style="font-size: 12px; color: #2e7d32;">-</strong>
+        </div>
+        <div>
+          <span style="font-size: 9.5px; color: #5c6f8b; text-transform: uppercase; font-weight: 700; display: block; letter-spacing: 0.05em;">Restante</span>
+          <strong id="cxc_historial_pago_saldo" style="font-size: 12px; color: #c62828;">-</strong>
+        </div>
+      </div>
+      
+      <!-- Tabs switcher -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; border-bottom: 1px solid #d7e3f4; padding-bottom: 4px;">
+        <div style="display: flex; gap: 8px;">
+          <button id="btn_tab_history_payments" type="button" class="tab-btn active">Pagos Recibidos</button>
+          <button id="btn_tab_history_products" type="button" class="tab-btn">Productos Facturados</button>
+        </div>
+        <div id="cxc_history_cancelled_filter_container" style="display: flex; align-items: center; gap: 6px;">
+          <input id="chk_history_show_cancelled" type="checkbox" style="cursor: pointer; margin: 0;" />
+          <label for="chk_history_show_cancelled" style="font-size: 11px; color: #56709a; font-weight: 500; cursor: pointer; user-select: none;">Mostrar pagos cancelados</label>
+        </div>
+      </div>
+
+      <!-- Panel: Payments -->
+      <div class="grid-shell cxc-grid-shell" style="height: 220px; overflow: auto; border: 1px solid #d7e3f4; border-radius: 12px; background: rgba(255, 255, 255, 0.92);">
+        <table style="width: 100%; border-collapse: collapse; min-width: 100%;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">No. Recibo</th>
+              <th style="text-align: left; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Fecha Pago</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Pago/Abono</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Descuento</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Total Pago</th>
+              <th style="text-align: left; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_historial_pago_body">
+            <tr>
+              <td colspan="6" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">
+                No hay pagos registrados para esta factura.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Panel: Products -->
+      <div class="grid-shell cxc-grid-shell" style="height: 220px; overflow: auto; border: 1px solid #d7e3f4; border-radius: 12px; background: rgba(255, 255, 255, 0.92); display: none;">
+        <table style="width: 100%; border-collapse: collapse; min-width: 100%;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Codigo</th>
+              <th style="text-align: left; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Descripción</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Cantidad</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Precio Unit.</th>
+              <th style="text-align: right; padding: 6px 10px; background: linear-gradient(180deg, #fefeff, #edf3ff); font-size: 9.5px; text-transform: uppercase; color: #56709a; letter-spacing: 0.04em; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #d7e3f4;">Total Linea</th>
+            </tr>
+          </thead>
+          <tbody id="cxc_historial_productos_body">
+            <tr>
+              <td colspan="5" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">
+                No hay productos registrados para esta factura.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <button id="btn_cxc_history_modal_print" type="button" class="cxc-action" style="height: 28px; font-size: 11.5px; border-radius: 10px; padding: 0 16px; min-width: 120px; background: linear-gradient(180deg, #1f7aed, #0f3f78); color: #fff;">Imprimir Historial</button>
+        <button id="btn_cxc_history_modal_close" type="button" class="cxc-action is-muted" style="height: 28px; font-size: 11.5px; border-radius: 10px; padding: 0 16px; min-width: 80px;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="cxc_cliente_modal_backdrop" class="modal-backdrop" aria-hidden="true">
   <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="cxc_cliente_modal_title">
     <div class="win-titlebar">
@@ -2373,13 +2497,17 @@
   </div>
 </div>
 
+{{ empresa|json_script:"cxc_empresa_data" }}
+
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const cxcEmpresaData = JSON.parse(document.getElementById("cxc_empresa_data")?.textContent || "{}");
     const cxcPendientesUrl = "{% url 'caja:cuentas_por_cobrar_pendientes' %}";
     const cxcBuscarRecibosUrl = "{% url 'caja:cuentas_por_cobrar_buscar' %}";
     const cxcDetalleReciboUrl = "{% url 'caja:cuentas_por_cobrar_detalle' %}";
     const cxcCobrosAnterioresUrl = "{% url 'caja:cuentas_por_cobrar_cobros_anteriores' %}";
     const cxcGuardarUrl = "{% url 'caja:cuentas_por_cobrar_guardar' %}";
+    const cxcHistorialPagoUrl = "{% url 'caja:cuentas_por_cobrar_historial_pago' %}";
     const cxcMedioPagoUrl = "{% url 'caja:cuentas_por_cobrar_medio_pago' %}";
     const cxcCorregirMontoUrl = "{% url 'caja:cuentas_por_cobrar_corregir_monto' %}";
     const cxcMarcarImpresoUrl = "{% url 'caja:cuentas_por_cobrar_marcar_impreso' %}";
@@ -2406,7 +2534,6 @@
       cerrar_cuenta: {{ cxc_permissions.cerrar_cuenta|yesno:"true,false" }},
       modificar_medio_pago: {{ cxc_permissions.modificar_medio_pago|yesno:"true,false" }},
       corregir_monto_pago: {{ cxc_permissions.corregir_monto_pago|yesno:"true,false" }},
-      modificar_fechas_pago: {{ cxc_permissions.modificar_fechas_pago|yesno:"true,false" }},
     };
     const cxcShortcutPermissions = {
       financiamiento: {{ cxc_shortcuts.financiamiento|yesno:"true,false" }},
@@ -2436,6 +2563,23 @@
     const btnCxcCobrosContextPrint = document.getElementById("btn_cxc_cobros_context_print");
     const cxcDetalleContextMenu = document.getElementById("cxc_detalle_context_menu");
     const btnCxcDetalleContextPrintOrigin = document.getElementById("btn_cxc_detalle_context_print_origin");
+    const btnCxcDetalleContextPaymentHistory = document.getElementById("btn_cxc_detalle_context_payment_history");
+    const historyModalBackdrop = document.getElementById("cxc_historial_pago_modal_backdrop");
+    const btnCloseCxcHistoryModal = document.getElementById("btn_close_cxc_history_modal");
+    const btnCxcHistoryModalClose = document.getElementById("btn_cxc_history_modal_close");
+    const fieldHistoryNoDoc = document.getElementById("cxc_historial_pago_no_doc");
+    const fieldHistoryFechaDoc = document.getElementById("cxc_historial_pago_fecha_doc");
+    const fieldHistoryFechaVenc = document.getElementById("cxc_historial_pago_fecha_venc");
+    const fieldHistoryTotalDoc = document.getElementById("cxc_historial_pago_total_doc");
+    const fieldHistoryAbono = document.getElementById("cxc_historial_pago_abono");
+    const fieldHistorySaldo = document.getElementById("cxc_historial_pago_saldo");
+    const cxcHistorialPagoBody = document.getElementById("cxc_historial_pago_body");
+    const cxcHistorialProductosBody = document.getElementById("cxc_historial_productos_body");
+    const btnCxcHistoryModalPrint = document.getElementById("btn_cxc_history_modal_print");
+    const btnTabHistoryPayments = document.getElementById("btn_tab_history_payments");
+    const btnTabHistoryProducts = document.getElementById("btn_tab_history_products");
+    const chkHistoryShowCancelled = document.getElementById("chk_history_show_cancelled");
+    const historyCancelledFilterContainer = document.getElementById("cxc_history_cancelled_filter_container");
     const cxcEstadoContextMenu = document.getElementById("cxc_estado_context_menu");
     const btnCxcEstadoContextCancel = document.getElementById("btn_cxc_estado_context_cancel");
     const btnCxcNuevo = document.getElementById("btn_cxc_nuevo");
@@ -2512,7 +2656,6 @@
     const fieldFechaCont = document.getElementById("cxc_fecha_cont");
     const fieldFechaVenc = document.getElementById("cxc_fecha_venc");
     const fieldFechaAplic = document.getElementById("cxc_fecha_aplic");
-    const cxcPaymentDateFields = [fieldFechaCont, fieldFechaVenc, fieldFechaAplic];
     const fieldEstado = document.getElementById("cxc_estado");
     const fieldTerminalCliente = document.getElementById("cxc_terminal_cliente");
     const fieldMetodo = document.getElementById("cxc_metodo");
@@ -2584,6 +2727,9 @@
     let cxcSelectedCobroAnterior = null;
     let cxcSelectedDetalleRowIndex = -1;
     let cxcSelectedDetalleRow = null;
+    let cxcHistoryActiveClientCod = "";
+    let cxcHistoryActiveClientNom = "";
+    let cxcHistoryLoadedPayments = [];
     let cxcLoadedPaymentAmounts = { Efectivo: 0, Transferencia: 0 };
     let cxcOriginalPaymentAmounts = { Efectivo: 0, Transferencia: 0 };
     let cxcOriginalDetailPayments = [];
@@ -3007,10 +3153,11 @@
           return;
         }
       } catch (error) {
-        // Keep the browser dialog fallback visible when preferences are unavailable.
+        // Keep the browser dialog fallback visible when the agent is unavailable.
       }
       printModalPrinter.textContent = "Dialogo del navegador (selecciona la impresora al imprimir)";
     }
+
     function openCxcPrintModal(reciboId, reciboLabel = "") {
       if (!hasCxcPermission("imprimir")) {
         window.alert("No tienes permiso para imprimir recibos de cuentas por cobrar.");
@@ -3262,6 +3409,74 @@
       cxcSelectedDetalleRow = cxcPendingRows[idx] || null;
     }
 
+    function openCxcHistoryModal() {
+      if (historyModalBackdrop) {
+        historyModalBackdrop.classList.add("open");
+        historyModalBackdrop.setAttribute("aria-hidden", "false");
+        if (chkHistoryShowCancelled) chkHistoryShowCancelled.checked = false;
+        btnTabHistoryPayments?.click();
+      }
+    }
+
+    function closeCxcHistoryModal() {
+      if (historyModalBackdrop) {
+        historyModalBackdrop.classList.remove("open");
+        historyModalBackdrop.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    btnTabHistoryPayments?.addEventListener("click", () => {
+      btnTabHistoryPayments.classList.add("active");
+      btnTabHistoryProducts?.classList.remove("active");
+      cxcHistorialPagoBody.closest(".grid-shell").style.display = "block";
+      cxcHistorialProductosBody.closest(".grid-shell").style.display = "none";
+      if (historyCancelledFilterContainer) historyCancelledFilterContainer.style.display = "flex";
+    });
+
+    btnTabHistoryProducts?.addEventListener("click", () => {
+      btnTabHistoryProducts.classList.add("active");
+      btnTabHistoryPayments?.classList.remove("active");
+      cxcHistorialPagoBody.closest(".grid-shell").style.display = "none";
+      cxcHistorialProductosBody.closest(".grid-shell").style.display = "block";
+      if (historyCancelledFilterContainer) historyCancelledFilterContainer.style.display = "none";
+    });
+
+    function renderHistoryPayments() {
+      const showCancelled = chkHistoryShowCancelled?.checked;
+      const filteredPagos = cxcHistoryLoadedPayments.filter((p) => {
+        const isCancelled = String(p.estado || "").trim().toUpperCase() === "CANCELADO";
+        if (isCancelled && !showCancelled) return false;
+        return true;
+      });
+
+      if (!filteredPagos.length) {
+        cxcHistorialPagoBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">No hay pagos registrados para mostrar.</td></tr>`;
+        return;
+      }
+
+      cxcHistorialPagoBody.innerHTML = filteredPagos.map((p) => {
+        const isCancelled = String(p.estado || "").trim().toUpperCase() === "CANCELADO";
+        const rowStyle = isCancelled ? 'style="color: #9eb1cd; text-decoration: line-through; background-color: #fafbfc;"' : '';
+        const statusBadge = isCancelled
+          ? '<span style="color: #d9534f; font-weight: bold;">Cancelado</span>'
+          : `<span style="color: #2e7d32; font-weight: bold;">${escapeHtml(p.estado || "")}</span>`;
+        return `
+          <tr ${rowStyle}>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4;">${escapeHtml(p.no_recibo || "")}</td>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4;">${escapeHtml(p.fecha_rec || "")}</td>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${fmtMoney(p.pago_abono)}</td>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${fmtMoney(p.descuento)}</td>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${fmtMoney(p.total_pago)}</td>
+            <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4;">${statusBadge}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    chkHistoryShowCancelled?.addEventListener("change", () => {
+      renderHistoryPayments();
+    });
+
     function showDetalleContextMenu(event, idx) {
       if (!cxcDetalleContextMenu || !cxcShortcutPermissions?.factura) return;
       selectDetalleRowByIndex(idx);
@@ -3269,7 +3484,7 @@
         return;
       }
       const menuWidth = 186;
-      const menuHeight = 44;
+      const menuHeight = 76;
       const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
       const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
       cxcDetalleContextMenu.style.left = `${Math.max(8, left)}px`;
@@ -4426,19 +4641,6 @@
         const isFixedReadonly = fixedReadonlyIds.has(control.id);
         control.disabled = !enabled;
         control.readOnly = isFixedReadonly || !enabled;
-      });
-      if (controls === headerControls) {
-        syncCxcPaymentDatePermissions(enabled);
-      }
-    }
-
-    function syncCxcPaymentDatePermissions(headerEnabled) {
-      const canModifyDates = Boolean(headerEnabled) && hasCxcPermission("modificar_fechas_pago");
-      cxcPaymentDateFields.forEach((field) => {
-        if (!field) return;
-        field.disabled = !canModifyDates;
-        field.readOnly = !canModifyDates;
-        field.title = canModifyDates ? "" : "No tienes permiso para modificar estas fechas.";
       });
     }
 
@@ -6669,13 +6871,11 @@
 
     fieldCxcPrintModalCopies?.addEventListener("input", () => {
       syncCxcPrintModalSummary();
-      void syncCxcPrintModalPrinter();
     });
 
     fieldCxcPrintModalCopies?.addEventListener("blur", () => {
       fieldCxcPrintModalCopies.value = String(getCxcPrintCopies());
       syncCxcPrintModalSummary();
-      void syncCxcPrintModalPrinter();
     });
 
     fieldCxcPrintModalCopies?.addEventListener("keydown", (event) => {
@@ -6929,6 +7129,177 @@
       const rowData = cxcSelectedDetalleRow;
       hideDetalleContextMenu();
       openFacturaOrigenPrint(rowData);
+    });
+
+    btnCxcDetalleContextPaymentHistory?.addEventListener("click", async () => {
+      const rowData = cxcSelectedDetalleRow;
+      hideDetalleContextMenu();
+      if (!rowData || !rowData.no_doc) return;
+
+      openCxcHistoryModal();
+      cxcHistorialPagoBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">Cargando historial de pagos...</td></tr>`;
+      cxcHistorialProductosBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">Cargando productos...</td></tr>`;
+
+      fieldHistoryNoDoc.textContent = rowData.no_doc;
+      fieldHistoryFechaDoc.textContent = rowData.fecha_cont || "-";
+      fieldHistoryFechaVenc.textContent = rowData.fecha_venc || "-";
+      fieldHistoryTotalDoc.textContent = fmtMoney(rowData.monto_doc || 0);
+      fieldHistoryAbono.textContent = fmtMoney(0);
+      fieldHistorySaldo.textContent = fmtMoney(rowData.monto_doc || 0);
+
+      try {
+        const url = `${cxcHistorialPagoUrl}?no_doc=${encodeURIComponent(rowData.no_doc)}`;
+        const res = await fetch(url, {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        if (!res.ok) {
+          throw new Error("No se pudo cargar el historial.");
+        }
+        const data = await res.json();
+
+        if (data.factura) {
+          fieldHistoryFechaDoc.textContent = data.factura.fecha_doc || "-";
+          fieldHistoryFechaVenc.textContent = data.factura.fecha_venc || "-";
+          fieldHistoryTotalDoc.textContent = fmtMoney(data.factura.total_doc || 0);
+          fieldHistoryAbono.textContent = fmtMoney(data.factura.abono || 0);
+          fieldHistorySaldo.textContent = fmtMoney(data.factura.saldo || 0);
+          cxcHistoryActiveClientCod = data.factura.cliente_codigo || "";
+          cxcHistoryActiveClientNom = data.factura.cliente_nombre || "";
+        }
+
+        cxcHistoryLoadedPayments = data.pagos || [];
+        renderHistoryPayments();
+
+        const productos = data.productos || [];
+        if (!productos.length) {
+          cxcHistorialProductosBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #7f92b0; padding: 20px; font-size: 11px;">No hay productos registrados para esta factura.</td></tr>`;
+        } else {
+          cxcHistorialProductosBody.innerHTML = productos.map(p => `
+            <tr>
+              <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4;">${escapeHtml(p.articulo_id || "")}</td>
+              <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4;">${escapeHtml(p.descripcion || "")}</td>
+              <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${escapeHtml(String(p.cantidad))}</td>
+              <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${fmtMoney(p.precio)}</td>
+              <td style="padding: 6px 10px; border-bottom: 1px solid #d7e3f4; border-right: 1px solid #d7e3f4; text-align: right;">${fmtMoney(p.total)}</td>
+            </tr>
+          `).join("");
+        }
+
+      } catch (err) {
+        cxcHistorialPagoBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #d9534f; padding: 20px; font-size: 11px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+        cxcHistorialProductosBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #d9534f; padding: 20px; font-size: 11px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    });
+
+    btnCxcHistoryModalPrint?.addEventListener("click", () => {
+      const docNo = fieldHistoryNoDoc.textContent || "-";
+      const clientCod = cxcHistoryActiveClientCod || fieldCliente.value || "";
+      const clientNom = cxcHistoryActiveClientNom || fieldNombre.value || "";
+      const fechaDoc = fieldHistoryFechaDoc.textContent || "-";
+      const fechaVenc = fieldHistoryFechaVenc.textContent || "-";
+      const total = fieldHistoryTotalDoc.textContent || "-";
+      const abono = fieldHistoryAbono.textContent || "-";
+      const saldo = fieldHistorySaldo.textContent || "-";
+      
+      const paymentsHtml = cxcHistorialPagoBody.innerHTML;
+      const productsHtml = cxcHistorialProductosBody.innerHTML;
+
+      const logoB64 = cxcEmpresaData.logo_b64 || "";
+      const logoTipo = cxcEmpresaData.logo_tipo || "png";
+      const logoSrc = logoB64 ? `data:image/${logoTipo};base64,${logoB64}` : "";
+
+      const printWin = window.open("", "_blank", "width=850,height=650");
+      if (!printWin) {
+        window.alert("Por favor permite los popups para poder imprimir el reporte.");
+        return;
+      }
+      printWin.document.write(`
+        <html>
+        <head>
+          <title>Historial de Pagos - Factura ${docNo}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1a2942; line-height: 1.5; }
+            h2 { color: #0f3f78; border-bottom: 2px solid #d7e3f4; padding-bottom: 8px; margin-top: 0; margin-bottom: 20px; font-size: 20px; }
+            .header-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; background: #f4f8ff; padding: 15px; border-radius: 8px; border: 1px solid #d7e3f4; font-size: 12px; }
+            .header-info div { display: flex; flex-direction: column; }
+            .header-info span { font-weight: 700; color: #56709a; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
+            .header-info strong { color: #0f3f78; font-size: 13px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            th { background: #edf3ff; color: #56709a; text-transform: uppercase; font-size: 9px; padding: 8px; text-align: left; border-bottom: 1px solid #d7e3f4; font-weight: 700; }
+            td { padding: 8px; border-bottom: 1px solid #eef4ff; color: #1a2942; }
+            .right { text-align: right; }
+            .section-title { font-size: 13px; font-weight: bold; color: #0f3f78; margin-top: 30px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-left: 3px solid #1f7aed; padding-left: 8px; }
+          </style>
+        </head>
+        <body>
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px; border-bottom: 3px solid #0f3f78; padding-bottom: 10px;">
+            ${logoSrc ? `<img src="${logoSrc}" alt="Logo" style="max-height: 60px; max-width: 120px; object-fit: contain;" />` : ""}
+            <div>
+              <h1 style="margin: 0; color: #0f3f78; font-size: 22px; text-transform: uppercase;">${escapeHtml(cxcEmpresaData.nombre || "COMERCIAL ANITA SRL")}</h1>
+              <div style="font-size: 11px; color: #56709a; margin-top: 4px;">
+                ${cxcEmpresaData.direccion ? `<span>${escapeHtml(cxcEmpresaData.direccion)}</span>` : ""}
+                ${cxcEmpresaData.tel1 ? `<span style="margin-left: 10px;">Tel: ${escapeHtml(cxcEmpresaData.tel1)}</span>` : ""}
+                ${cxcEmpresaData.rnc ? `<span style="margin-left: 10px;">RNC: ${escapeHtml(cxcEmpresaData.rnc)}</span>` : ""}
+              </div>
+            </div>
+          </div>
+
+          <h2>REPORTE DE HISTORIAL DE PAGOS</h2>
+          <div class="header-info">
+            <div><span>No. Factura</span><strong>${docNo}</strong></div>
+            <div><span>Cliente</span><strong>${clientCod} - ${clientNom}</strong></div>
+            <div><span>Fecha Emisión</span><strong>${fechaDoc}</strong></div>
+            <div><span>Fecha Vencimiento</span><strong>${fechaVenc}</strong></div>
+            <div><span>Monto Total</span><strong>${total}</strong></div>
+            <div><span>Total Pagado</span><strong style="color: #2e7d32;">${abono}</strong></div>
+            <div><span>Saldo Restante</span><strong style="color: #c62828;">${saldo}</strong></div>
+          </div>
+          
+          <div class="section-title">Detalle de Pagos Recibidos</div>
+          <table>
+            <thead>
+              <tr>
+                <th>No. Recibo</th>
+                <th>Fecha Pago</th>
+                <th class="right">Pago/Abono</th>
+                <th class="right">Descuento</th>
+                <th class="right">Total Pago</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentsHtml}
+            </tbody>
+          </table>
+
+          <div class="section-title">Productos Facturados</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Codigo</th>
+                <th>Descripción</th>
+                <th class="right">Cantidad</th>
+                <th class="right">Precio Unit.</th>
+                <th class="right">Total Linea</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${productsHtml}
+            </tbody>
+          </table>
+          
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 300);
+            }
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWin.document.close();
     });
 
     btnCxcMobileHistoryPrint?.addEventListener("click", () => {
@@ -7237,6 +7608,10 @@
         hideCobrosContextMenu();
         hideDetalleContextMenu();
         hideEstadoContextMenu();
+        if (historyModalBackdrop?.classList.contains("open")) {
+          closeCxcHistoryModal();
+          return;
+        }
         if (cxcConfirmOpen) {
           closeCxcConfirmModal(false);
           return;
@@ -7277,6 +7652,15 @@
       }
     });
 
+    historyModalBackdrop?.addEventListener("click", (event) => {
+      if (event.target === historyModalBackdrop) {
+        closeCxcHistoryModal();
+      }
+    });
+
+    btnCloseCxcHistoryModal?.addEventListener("click", closeCxcHistoryModal);
+    btnCxcHistoryModalClose?.addEventListener("click", closeCxcHistoryModal);
+
     clienteModalBackdrop.addEventListener("click", (event) => {
       if (event.target === clienteModalBackdrop) return;
     });
@@ -7299,6 +7683,9 @@
     if (btnCxcDetalleContextPrintOrigin) {
       btnCxcDetalleContextPrintOrigin.disabled = !cxcShortcutPermissions?.factura;
     }
+    if (btnCxcDetalleContextPaymentHistory) {
+      btnCxcDetalleContextPaymentHistory.disabled = !cxcPermissions?.buscar;
+    }
     if (btnCxcEstadoContextCancel) {
       btnCxcEstadoContextCancel.disabled = !hasCxcPermission("cancelar");
     }
@@ -7311,6 +7698,3 @@
   });
 </script>
 {% endblock %}
-
-
-

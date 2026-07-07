@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const config = window.facturacionManualConfig || {};
   const prefSearchInput = document.getElementById("fac_pref_q");
   const prefSearchFilter = document.getElementById("fac_pref_filtro");
@@ -103,6 +103,7 @@
   let activeFacturaId = "";
   let activeFacturaPrintUrl = "";
   let activeFacturaEditable = false;
+  let hasRequestedExistenciaForCurrentInvoice = false;
   let unidadesMedida = [];
   let selectedDetalleRow = null;
   let detalleCodigoMode = "";
@@ -437,13 +438,18 @@
     };
   }
 
+  let isRequestingExistencia = false;
   async function requestExistenciaFromStock(stockItems) {
+    if (isRequestingExistencia) {
+      return false;
+    }
     const payload = buildExistenciaRequestPayload(stockItems);
     if (!payload.detalles.length) {
       closeAlert();
       await showAlert("No se pudo preparar el pedido de existencia.");
       return false;
     }
+    isRequestingExistencia = true;
     closeAlert();
     try {
       const res = await fetch(config.requestExistenciaUrl, {
@@ -460,6 +466,7 @@
         await showAlert(data.detail || "No se pudo pedir existencia para los articulos faltantes.");
         return false;
       }
+      hasRequestedExistenciaForCurrentInvoice = true;
       window.dispatchEvent(new CustomEvent("stock-request-created", {
         detail: {
           notification: data.notification || null
@@ -471,6 +478,8 @@
     } catch (error) {
       await showAlert("Error de conexion solicitando existencia.");
       return false;
+    } finally {
+      isRequestingExistencia = false;
     }
   }
 
@@ -914,6 +923,7 @@
     activeFacturaId = "";
     activeFacturaPrintUrl = "";
     activeFacturaEditable = false;
+    hasRequestedExistenciaForCurrentInvoice = false;
     hideEstadoContextMenu();
     clearFormValues();
     clearPrefSelection();
@@ -942,6 +952,7 @@
     activeFacturaId = "";
     activeFacturaPrintUrl = "";
     activeFacturaEditable = false;
+    hasRequestedExistenciaForCurrentInvoice = false;
     hideEstadoContextMenu();
     clearFormValues();
     clearPrefSelection();
@@ -1872,7 +1883,7 @@
           updatePrintButton();
         }
         btnGrabar.disabled = false;
-        if (Array.isArray(data.stock_request_items) && data.stock_request_items.length && data.allow_request_existence) {
+        if (Array.isArray(data.stock_request_items) && data.stock_request_items.length && data.allow_request_existence && !hasRequestedExistenciaForCurrentInvoice) {
           await showAlert(data.detail || "No se pudo grabar la factura.", {
             actionLabel: "Pedir existencia",
             onAction: () => requestExistenciaFromStock(data.stock_request_items),

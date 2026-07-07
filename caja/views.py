@@ -531,8 +531,12 @@ def _create_cxc_ed_entries(
         )
         _assign_existing_values(det_ed_values, det_ed_columns, "RI", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
         _assign_existing_values(det_ed_values, det_ed_columns, no_recibo, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-        _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "DEBITO", "DEBE")
-        _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "CREDITO", "HABER")
+        if line_no == 1:
+            _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "DEBITO", "DEBE")
+            _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "CREDITO", "HABER")
+        else:
+            _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "DEBITO", "DEBE")
+            _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "CREDITO", "HABER")
         _assign_existing_values(det_ed_values, det_ed_columns, "RD$", "MON_DOC", "MONEDA")
         _assign_existing_values(det_ed_values, det_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
         _assign_existing_values(det_ed_values, det_ed_columns, cta_asociada, "CTA_ASOCIADA")
@@ -583,7 +587,7 @@ def _create_cxc_ed_entries(
                 f"No se encontro en CATALOGO la cuenta {cuenta_cliente_num} - {cuenta_cliente_nombre}."
             )
 
-        nuevo_saldo = _to_decimal(saldo_row[0]) + _to_decimal(total_recibo)
+        nuevo_saldo = _to_decimal(saldo_row[0]) - _to_decimal(total_recibo)
         _update_dynamic_row(
             cursor,
             "CATALOGO",
@@ -1946,6 +1950,145 @@ def _load_cxc_cobros_anteriores(id_sn, exclude_recibo_id=""):
     return results
 
 
+def _load_cxc_factura_historial_pago(no_doc):
+    no_doc_text = str(no_doc or "").strip()
+    if not no_doc_text:
+        return None
+
+    cab_columns = _load_table_columns("CAB_FACTURA")
+    if not cab_columns:
+        return None
+
+    doc_col = _pick_existing_column(cab_columns, "ID_DOC", "NO_DOC", "DOCUMENTO", "FACTURA")
+    fecha_col = _pick_existing_column(cab_columns, "FECHA_DOC", "FECHA_CONT", "FECHA")
+    fecha_venc_col = _pick_existing_column(cab_columns, "FECHA_VENC", "F_VENC", "VENCIMIENTO")
+    total_col = _pick_existing_column(cab_columns, "TOTAL_DOC", "MONTO", "IMPORTE", "TOTAL")
+    saldo_col = _pick_existing_column(cab_columns, "SALDO", "BALANCE")
+    abono_col = _pick_existing_column(cab_columns, "ABONO")
+    estado_col = _pick_existing_column(cab_columns, "EST_DOC", "ESTATUS", "ESTADO")
+    cliente_col = _pick_existing_column(cab_columns, "ID_SN", "CLIENTE", "COD_CLIENTE")
+
+    if not doc_col:
+        return None
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT TOP 1 * FROM CAB_FACTURA WHERE CAST([{doc_col}] AS NVARCHAR(255)) = %s",
+            [no_doc_text],
+        )
+        raw_row = cursor.fetchone()
+        if not raw_row:
+            return None
+        raw_columns = [col[0] for col in cursor.description]
+        factura_row = _normalize_result_row(raw_columns, raw_row)
+
+    id_sn = _pick_row_text(factura_row, cliente_col)
+    clientes_lookup = _load_maestro_sn_lookup([id_sn])
+    cliente_info = clientes_lookup.get(id_sn, {})
+
+    factura_data = {
+        "no_doc": no_doc_text,
+        "cliente_codigo": id_sn,
+        "cliente_nombre": cliente_info.get("nombre") or id_sn,
+        "fecha_doc": _fmt_date(_pick_row_value(factura_row, fecha_col)),
+        "fecha_venc": _fmt_date(_pick_row_value(factura_row, fecha_venc_col)),
+        "total_doc": _to_float(_pick_row_value(factura_row, total_col, default=0.0)),
+        "saldo": _to_float(_pick_row_value(factura_row, saldo_col, default=0.0)),
+        "abono": _to_float(_pick_row_value(factura_row, abono_col, default=0.0)),
+        "estado": _pick_row_text(factura_row, estado_col),
+    }
+
+    # Query payments applied to this invoice
+    det_columns = _load_table_columns("DET_RECIBO_INGRESO")
+    cab_columns_ri = _load_table_columns("CAB_RECIBO_INGRESO")
+    if not det_columns or not cab_columns_ri:
+        return {"factura": factura_data, "pagos": []}
+
+    det_doc_col = _pick_existing_column(det_columns, "NO_DOC", "ID_DOC", "DOCUMENTO", "FACTURA")
+    det_recibo_col = _pick_existing_column(det_columns, "ID_RECIBO", "NO_RECIBO")
+    cab_key_col = _pick_existing_column(cab_columns_ri, "ID_RECIBO", "NO_RECIBO")
+
+    if not det_doc_col or not det_recibo_col or not cab_key_col:
+        return {"factura": factura_data, "pagos": []}
+
+    select_parts = [f"c.[{column}] AS [C__{column}]" for column in cab_columns_ri]
+    select_parts.extend(f"d.[{column}] AS [D__{column}]" for column in det_columns)
+    sql = (
+        f"SELECT {', '.join(select_parts)} "
+        "FROM CAB_RECIBO_INGRESO c "
+        f"INNER JOIN DET_RECIBO_INGRESO d ON c.[{cab_key_col}] = d.[{det_recibo_col}] "
+        f"WHERE CAST(d.[{det_doc_col}] AS NVARCHAR(255)) = %s"
+    )
+
+    order_col_ri = _pick_existing_column(cab_columns_ri, "FECHA_CONT", "FECHA_DOC", "FECHA")
+    if order_col_ri:
+        sql += f" ORDER BY c.[{order_col_ri}] ASC"
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [no_doc_text])
+        raw_ri_columns = [col[0] for col in cursor.description]
+        ri_rows = [_normalize_result_row(raw_ri_columns, raw_row) for raw_row in cursor.fetchall()]
+
+    pagos = []
+    for row in ri_rows:
+        cab_ri = _split_prefixed_row(row, "C__")
+        det_ri = _split_prefixed_row(row, "D__")
+
+        pago_abono = _to_float(_get_det_recibo_payment_amount(det_ri))
+        descuento = _to_float(_get_det_recibo_discount_amount(det_ri))
+        mora = _to_float(_pick_amount_value(det_ri, "MORA", "CARGO", "TOTAL_MORA", default=0.0))
+
+        pagos.append({
+            "recibo_id": _stringify_doc(_pick_row_value(cab_ri, "ID_RECIBO", "NO_RECIBO")),
+            "no_recibo": _stringify_doc(_pick_row_value(cab_ri, "NO_RECIBO", "ID_RECIBO")),
+            "fecha_rec": _fmt_date(_pick_row_value(cab_ri, "FECHA_CONT", "FECHA_DOC")),
+            "pago_abono": pago_abono,
+            "descuento": descuento,
+            "mora": mora,
+            "total_pago": pago_abono + descuento + mora,
+            "estado": _pick_row_text(cab_ri, "ESTATUS", "EST_DOC", "ESTADO") or "Abierto",
+        })
+
+    # Query products (details) for this invoice
+    det_factura_columns = _load_table_columns("DET_FACTURA")
+    productos = []
+    if det_factura_columns:
+        det_doc_col_f = _pick_existing_column(det_factura_columns, "ID_DOC", "NO_DOC", "DOCUMENTO")
+        det_art_col_f = _pick_existing_column(det_factura_columns, "ID_ARTICULO", "ARTICULO", "COD_ART")
+        det_desc_col_f = _pick_existing_column(det_factura_columns, "DESCRIP_ART", "DESCRIPCION", "DESCRIP")
+        det_cant_col_f = _pick_existing_column(det_factura_columns, "CANTIDAD", "CANT")
+        det_precio_col_f = _pick_existing_column(det_factura_columns, "PRECIO", "PRECIO_UNIT")
+        det_total_col_f = _pick_existing_column(det_factura_columns, "TOTAL_LINEA", "TOTAL", "IMPORTE", "TOTAL_PRECIO")
+
+        if det_doc_col_f and det_art_col_f:
+            sql_det = (
+                f"SELECT * FROM DET_FACTURA "
+                f"WHERE CAST([{det_doc_col_f}] AS NVARCHAR(255)) = %s"
+            )
+            with connection.cursor() as cursor:
+                cursor.execute(sql_det, [no_doc_text])
+                raw_det_cols = [col[0] for col in cursor.description]
+                det_rows = [_normalize_result_row(raw_det_cols, raw_row) for raw_row in cursor.fetchall()]
+
+            for r in det_rows:
+                cant = _to_float(_pick_row_value(r, det_cant_col_f, default=0.0))
+                precio = _to_float(_pick_row_value(r, det_precio_col_f, default=0.0))
+                total = _to_float(_pick_row_value(r, det_total_col_f, default=cant * precio))
+                productos.append({
+                    "articulo_id": _pick_row_text(r, det_art_col_f),
+                    "descripcion": _pick_row_text(r, det_desc_col_f) or "",
+                    "cantidad": cant,
+                    "precio": precio,
+                    "total": total,
+                })
+
+    return {
+        "factura": factura_data,
+        "pagos": pagos,
+        "productos": productos
+    }
+
+
 def _build_cxc_recibo_payload(header_row, detail_rows):
     cliente_codigo = _pick_row_text(header_row, "ID_SN", "CLIENTE", "COD_CLIENTE")
     maestro_sn = _load_maestro_sn_lookup([cliente_codigo]).get(cliente_codigo, {})
@@ -2098,7 +2241,11 @@ def _build_cxc_recibo_payload(header_row, detail_rows):
         total_doc_meta = _to_float(factura_meta.get("total_doc"))
         saldo_meta = _to_float(factura_meta.get("saldo"))
         abono_meta = _to_float(factura_meta.get("abono"))
-        balance_total_por_doc[no_doc] = max(saldo_meta, max(total_doc_meta - abono_meta, 0.0))
+        reconstructed = max(total_doc_meta - abono_meta, 0.0)
+        if saldo_meta > 0.01 and saldo_meta < reconstructed:
+            balance_total_por_doc[no_doc] = saldo_meta
+        else:
+            balance_total_por_doc[no_doc] = reconstructed
     detalle = []
 
     for raw_row in detail_rows:
@@ -3189,10 +3336,13 @@ def _load_cxc_pendientes(id_sn):
         factura_abierta_por_estado = estado_doc == "ABIERTO"
         factura_cerrada_por_abono = _factura_closed_by_abono(total_doc, abono_doc)
         pagos_doc_val = _to_float(pagos_por_doc.get(id_doc))
-        saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(
+        reconstructed = max(
             max(total_doc_val - abono_doc_val, 0.0),
             max(total_doc_val - pagos_doc_val, 0.0),
         )
+        saldo_doc_reconstruido = reconstructed
+        if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+            saldo_doc_reconstruido = saldo_doc_val
         if factura_abierta_por_estado and saldo_doc_reconstruido <= 0.01 and total_doc_val > 0 and pagos_doc_val <= 0.01:
             # Si el documento sigue abierto y no hay pagos activos aplicados, no lo descartamos
             # solo porque CAB_FACTURA.SALDO venga en cero por datos inconsistentes.
@@ -3569,7 +3719,10 @@ def _load_financiamiento_facturas_disponibles(query="", filtro="nombre", limit=1
         saldo_doc_val = max(_to_float(_pick_row_value(row, saldo_col, default=0)), 0.0)
         abono_doc_val = max(_to_float(_pick_row_value(row, abono_col, default=0)), 0.0)
         estado_doc = str(_pick_row_text(row, estado_col) or "").strip().upper()
-        saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(total_doc_val - abono_doc_val, 0.0)
+        reconstructed = max(total_doc_val - abono_doc_val, 0.0)
+        saldo_doc_reconstruido = reconstructed
+        if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+            saldo_doc_reconstruido = saldo_doc_val
         if estado_doc != "ABIERTO" or saldo_doc_reconstruido <= 0.01 or _factura_closed_by_abono(total_doc_val, abono_doc_val):
             continue
 
@@ -3879,7 +4032,10 @@ def _load_financiamiento_factura_base_snapshot(factura_no):
     total_doc_val = max(_to_float(_pick_row_value(row, total_col, default=0)), 0.0)
     saldo_doc_val = max(_to_float(_pick_row_value(row, saldo_col, default=0)), 0.0)
     abono_doc_val = max(_to_float(_pick_row_value(row, abono_col, default=0)), 0.0)
-    saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(total_doc_val - abono_doc_val, 0.0)
+    reconstructed = max(total_doc_val - abono_doc_val, 0.0)
+    saldo_doc_reconstruido = reconstructed
+    if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+        saldo_doc_reconstruido = saldo_doc_val
     estado_doc = _pick_row_text(row, estado_col) or "Abierto"
     return {
         "no_doc": factura_no,
@@ -3984,7 +4140,10 @@ def _lock_financiamiento_factura_base(cursor, factura_no):
     saldo_doc = max(_to_decimal(_pick_row_value(factura_row, saldo_col, default=0)), Decimal("0"))
     abono_doc = max(_to_decimal(_pick_row_value(factura_row, abono_col, default=0)), Decimal("0"))
     estado_doc = _pick_row_text(factura_row, estado_col).strip().upper()
-    saldo_reconstruido = saldo_doc if saldo_doc > Decimal("0.01") else max(total_doc - abono_doc, Decimal("0"))
+    reconstructed = max(total_doc - abono_doc, Decimal("0"))
+    saldo_reconstruido = reconstructed
+    if saldo_doc > Decimal("0.01") and saldo_doc < reconstructed:
+        saldo_reconstruido = saldo_doc
     if estado_doc != "ABIERTO" or saldo_reconstruido <= Decimal("0.01") or _factura_closed_by_abono(total_doc, abono_doc):
         raise ValueError(f"La factura {factura_no} no esta disponible para financiamiento.")
 
@@ -4252,7 +4411,6 @@ def cuentas_por_cobrar_view(request):
         "cerrar_cuenta": has_perm(usuario_id, "caja", "cxc_cerrar_cuenta"),
         "modificar_medio_pago": has_perm(usuario_id, "caja", "cxc_modificar_medio_pago"),
         "corregir_monto_pago": has_perm(usuario_id, "caja", "cxc_corregir_monto_pago"),
-        "modificar_fechas_pago": has_perm(usuario_id, "caja", "cxc_modificar_fechas_pago"),
     }
     ctx["cxc_shortcuts"] = {
         "financiamiento": has_perm(usuario_id, "caja", "ver_financiamiento"),
@@ -4888,7 +5046,7 @@ def cuentas_por_cobrar_corregir_monto_view(request):
                         cursor,
                         cuenta_num="11020101",
                         cuenta_nombre="Cuentas por Cobrar Clientes",
-                        delta=delta_total,
+                        delta=-delta_total,
                     )
 
                 cab_ed_columns = _load_table_columns("CAB_ED")
@@ -5265,7 +5423,7 @@ def cuentas_por_cobrar_cancelar_view(request):
                     cursor,
                     cuenta_num="11020101",
                     cuenta_nombre="Cuentas por Cobrar Clientes",
-                    delta=-total_recibo,
+                    delta=total_recibo,
                 )
 
                 transaction.on_commit(
@@ -5362,15 +5520,9 @@ def cuentas_por_cobrar_guardar_view(request):
             status=400,
         )
 
-    can_modify_payment_dates = has_perm((auth_payload or {}).get("usuario_id"), "caja", "cxc_modificar_fechas_pago")
-    if can_modify_payment_dates:
-        fecha_cont = _parse_date_value(payload.get("fecha_cont")) or timezone.localdate()
-        fecha_venc = _parse_date_value(payload.get("fecha_venc")) or fecha_cont
-        fecha_aplic = _parse_date_value(payload.get("fecha_aplic")) or fecha_cont
-    else:
-        fecha_cont = timezone.localdate()
-        fecha_venc = fecha_cont
-        fecha_aplic = fecha_cont
+    fecha_cont = _parse_date_value(payload.get("fecha_cont")) or timezone.localdate()
+    fecha_venc = _parse_date_value(payload.get("fecha_venc")) or fecha_cont
+    fecha_aplic = _parse_date_value(payload.get("fecha_aplic")) or fecha_cont
     fecha_pago = _parse_date_value(payload.get("fecha_pago")) or fecha_cont
     now = timezone.localtime()
     local_date = timezone.localdate()
@@ -5860,6 +6012,26 @@ def cuentas_por_cobrar_cobros_anteriores_view(request):
         return JsonResponse({"detail": "No se pudieron cargar los cobros anteriores."}, status=500)
 
     return JsonResponse({"results": results})
+
+
+@require_GET
+def cuentas_por_cobrar_historial_pago_view(request):
+    auth_payload = _require_perm_json(request, "caja", "cxc_buscar")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+
+    no_doc = (request.GET.get("no_doc") or "").strip()
+    if not no_doc:
+        return JsonResponse({"detail": "Parametro no_doc requerido"}, status=400)
+
+    try:
+        results = _load_cxc_factura_historial_pago(no_doc)
+        if not results:
+            return JsonResponse({"detail": "No se encontro la factura o no se pudo cargar su historial."}, status=404)
+    except Exception as e:
+        return JsonResponse({"detail": f"Error cargando historial de pago: {e}"}, status=500)
+
+    return JsonResponse(results)
 
 
 @require_GET

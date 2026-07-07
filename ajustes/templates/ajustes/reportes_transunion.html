@@ -632,8 +632,30 @@
           if (existing && existing.fields) {
             if (existing.fields.fecha_apertura !== undefined) newItem.fields.fecha_apertura = existing.fields.fecha_apertura;
             if (existing.fields.fecha_vencimiento !== undefined) newItem.fields.fecha_vencimiento = existing.fields.fecha_vencimiento;
+            if (existing.fields.limite_credito !== undefined) newItem.fields.limite_credito = formatMoney(existing.fields.limite_credito);
             if (existing.fields.credito_mas_alto !== undefined) newItem.fields.credito_mas_alto = formatMoney(existing.fields.credito_mas_alto);
             if (existing.fields.monto_cuota !== undefined) newItem.fields.monto_cuota = formatMoney(existing.fields.monto_cuota);
+            
+            // Preservar campos de direccion, ubicacion y otros campos fijos del frontend para que no se actualicen
+            const fieldsToPreserve = [
+              "calle_avenida",
+              "numero",
+              "edificio",
+              "urbanizacion",
+              "sector",
+              "ciudad",
+              "provincia_municipio",
+              "numero_pasaporte",
+              "siglas",
+              "fax",
+              "otro",
+              "esquina"
+            ];
+            fieldsToPreserve.forEach((key) => {
+              if (existing.fields[key] !== undefined) {
+                newItem.fields[key] = existing.fields[key];
+              }
+            });
           }
           selected.set(docId, newItem);
         }

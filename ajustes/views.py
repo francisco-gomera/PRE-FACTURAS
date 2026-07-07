@@ -2184,7 +2184,7 @@ def _tu_load_accounts(query="", limit=100, corte=None):
         pass
 
     select_fields = [
-        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "f.RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
+        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "COALESCE(NULLIF(LTRIM(RTRIM(s.RNC_CED)), ''), f.RNC_CED) AS RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
         "f.TOTAL_DOC", "f.SALDO", "f.ABONO", "f.MON_DOC", "f.ENT_FACTURA",
         "s.DIR_FACTURA", "s.TEL1", "s.TEL2", "s.CELULAR", "s.FAX", "s.EMAIL", "s.COMENTARIO",
         "s.LIM_CREDITO", "s.MONEDA"
@@ -2360,7 +2360,7 @@ def reportes_transunion_actualizar_cuentas_view(request):
         pass
 
     select_fields = [
-        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "f.RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
+        "f.ID_DOC", "f.ID_SN", "f.NOM_SOCIO", "COALESCE(NULLIF(LTRIM(RTRIM(s.RNC_CED)), ''), f.RNC_CED) AS RNC_CED", "f.FECHA_DOC", "f.FECHA_VENC",
         "f.TOTAL_DOC", "f.SALDO", "f.ABONO", "f.MON_DOC", "f.ENT_FACTURA",
         "s.DIR_FACTURA", "s.TEL1", "s.TEL2", "s.CELULAR", "s.FAX", "s.EMAIL", "s.COMENTARIO",
         "s.LIM_CREDITO", "s.MONEDA",
