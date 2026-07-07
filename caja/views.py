@@ -531,8 +531,12 @@ def _create_cxc_ed_entries(
         )
         _assign_existing_values(det_ed_values, det_ed_columns, "RI", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
         _assign_existing_values(det_ed_values, det_ed_columns, no_recibo, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-        _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "DEBITO", "DEBE")
-        _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "CREDITO", "HABER")
+        if line_no == 1:
+            _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "DEBITO", "DEBE")
+            _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "CREDITO", "HABER")
+        else:
+            _assign_existing_values(det_ed_values, det_ed_columns, Decimal("0"), "DEBITO", "DEBE")
+            _assign_existing_values(det_ed_values, det_ed_columns, total_recibo, "CREDITO", "HABER")
         _assign_existing_values(det_ed_values, det_ed_columns, "RD$", "MON_DOC", "MONEDA")
         _assign_existing_values(det_ed_values, det_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
         _assign_existing_values(det_ed_values, det_ed_columns, cta_asociada, "CTA_ASOCIADA")
@@ -583,7 +587,7 @@ def _create_cxc_ed_entries(
                 f"No se encontro en CATALOGO la cuenta {cuenta_cliente_num} - {cuenta_cliente_nombre}."
             )
 
-        nuevo_saldo = _to_decimal(saldo_row[0]) + _to_decimal(total_recibo)
+        nuevo_saldo = _to_decimal(saldo_row[0]) - _to_decimal(total_recibo)
         _update_dynamic_row(
             cursor,
             "CATALOGO",
@@ -2237,7 +2241,11 @@ def _build_cxc_recibo_payload(header_row, detail_rows):
         total_doc_meta = _to_float(factura_meta.get("total_doc"))
         saldo_meta = _to_float(factura_meta.get("saldo"))
         abono_meta = _to_float(factura_meta.get("abono"))
-        balance_total_por_doc[no_doc] = max(saldo_meta, max(total_doc_meta - abono_meta, 0.0))
+        reconstructed = max(total_doc_meta - abono_meta, 0.0)
+        if saldo_meta > 0.01 and saldo_meta < reconstructed:
+            balance_total_por_doc[no_doc] = saldo_meta
+        else:
+            balance_total_por_doc[no_doc] = reconstructed
     detalle = []
 
     for raw_row in detail_rows:
@@ -3328,10 +3336,13 @@ def _load_cxc_pendientes(id_sn):
         factura_abierta_por_estado = estado_doc == "ABIERTO"
         factura_cerrada_por_abono = _factura_closed_by_abono(total_doc, abono_doc)
         pagos_doc_val = _to_float(pagos_por_doc.get(id_doc))
-        saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(
+        reconstructed = max(
             max(total_doc_val - abono_doc_val, 0.0),
             max(total_doc_val - pagos_doc_val, 0.0),
         )
+        saldo_doc_reconstruido = reconstructed
+        if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+            saldo_doc_reconstruido = saldo_doc_val
         if factura_abierta_por_estado and saldo_doc_reconstruido <= 0.01 and total_doc_val > 0 and pagos_doc_val <= 0.01:
             # Si el documento sigue abierto y no hay pagos activos aplicados, no lo descartamos
             # solo porque CAB_FACTURA.SALDO venga en cero por datos inconsistentes.
@@ -3708,7 +3719,10 @@ def _load_financiamiento_facturas_disponibles(query="", filtro="nombre", limit=1
         saldo_doc_val = max(_to_float(_pick_row_value(row, saldo_col, default=0)), 0.0)
         abono_doc_val = max(_to_float(_pick_row_value(row, abono_col, default=0)), 0.0)
         estado_doc = str(_pick_row_text(row, estado_col) or "").strip().upper()
-        saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(total_doc_val - abono_doc_val, 0.0)
+        reconstructed = max(total_doc_val - abono_doc_val, 0.0)
+        saldo_doc_reconstruido = reconstructed
+        if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+            saldo_doc_reconstruido = saldo_doc_val
         if estado_doc != "ABIERTO" or saldo_doc_reconstruido <= 0.01 or _factura_closed_by_abono(total_doc_val, abono_doc_val):
             continue
 
@@ -4018,7 +4032,10 @@ def _load_financiamiento_factura_base_snapshot(factura_no):
     total_doc_val = max(_to_float(_pick_row_value(row, total_col, default=0)), 0.0)
     saldo_doc_val = max(_to_float(_pick_row_value(row, saldo_col, default=0)), 0.0)
     abono_doc_val = max(_to_float(_pick_row_value(row, abono_col, default=0)), 0.0)
-    saldo_doc_reconstruido = saldo_doc_val if saldo_doc_val > 0.01 else max(total_doc_val - abono_doc_val, 0.0)
+    reconstructed = max(total_doc_val - abono_doc_val, 0.0)
+    saldo_doc_reconstruido = reconstructed
+    if saldo_doc_val > 0.01 and saldo_doc_val < reconstructed:
+        saldo_doc_reconstruido = saldo_doc_val
     estado_doc = _pick_row_text(row, estado_col) or "Abierto"
     return {
         "no_doc": factura_no,
@@ -4123,7 +4140,10 @@ def _lock_financiamiento_factura_base(cursor, factura_no):
     saldo_doc = max(_to_decimal(_pick_row_value(factura_row, saldo_col, default=0)), Decimal("0"))
     abono_doc = max(_to_decimal(_pick_row_value(factura_row, abono_col, default=0)), Decimal("0"))
     estado_doc = _pick_row_text(factura_row, estado_col).strip().upper()
-    saldo_reconstruido = saldo_doc if saldo_doc > Decimal("0.01") else max(total_doc - abono_doc, Decimal("0"))
+    reconstructed = max(total_doc - abono_doc, Decimal("0"))
+    saldo_reconstruido = reconstructed
+    if saldo_doc > Decimal("0.01") and saldo_doc < reconstructed:
+        saldo_reconstruido = saldo_doc
     if estado_doc != "ABIERTO" or saldo_reconstruido <= Decimal("0.01") or _factura_closed_by_abono(total_doc, abono_doc):
         raise ValueError(f"La factura {factura_no} no esta disponible para financiamiento.")
 
@@ -5026,7 +5046,7 @@ def cuentas_por_cobrar_corregir_monto_view(request):
                         cursor,
                         cuenta_num="11020101",
                         cuenta_nombre="Cuentas por Cobrar Clientes",
-                        delta=delta_total,
+                        delta=-delta_total,
                     )
 
                 cab_ed_columns = _load_table_columns("CAB_ED")
@@ -5403,7 +5423,7 @@ def cuentas_por_cobrar_cancelar_view(request):
                     cursor,
                     cuenta_num="11020101",
                     cuenta_nombre="Cuentas por Cobrar Clientes",
-                    delta=-total_recibo,
+                    delta=total_recibo,
                 )
 
                 transaction.on_commit(
