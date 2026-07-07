@@ -199,6 +199,40 @@
     const selected = new Map();
     let activeKey = "";
 
+    const numericKeys = new Set([
+      "limite_credito",
+      "credito_mas_alto",
+      "monto_cuota",
+      "monto_ultimo_pago",
+      "balance_actual",
+      "monto_atraso",
+      "saldo_vencido_1_30",
+      "saldo_vencido_31_60",
+      "saldo_vencido_61_90",
+      "saldo_vencido_91_120",
+      "saldo_vencido_121_150",
+      "saldo_vencido_151_180",
+      "saldo_vencido_181_mas"
+    ]);
+
+    function formatMoney(value) {
+      if (value === null || value === undefined) return "0";
+      const clean = String(value).replace(/,/g, "").trim();
+      const num = parseFloat(clean);
+      if (isNaN(num)) return "0";
+      return String(Math.round(num));
+    }
+
+    function cleanItemFields(item) {
+      if (!item || !item.fields) return item;
+      for (const key of numericKeys) {
+        if (item.fields[key] !== undefined) {
+          item.fields[key] = formatMoney(item.fields[key]);
+        }
+      }
+      return item;
+    }
+
     const accountsEl = document.getElementById("tu_accounts");
     const editorEl = document.getElementById("tu_editor");
     const selectedListEl = document.getElementById("tu_selected_list");
@@ -315,15 +349,15 @@
           }
         });
         const accountKey = fieldValues.numero_cuenta || fieldValues.codigo_cliente || `archivo-${Date.now()}-${index}`;
-        selected.set(accountKey, {
+        selected.set(accountKey, cleanItemFields({
           source: {
             id_doc: fieldValues.numero_cuenta || accountKey,
             id_sn: fieldValues.codigo_cliente || "",
             cliente: fieldValues.nombre_completo || fieldValues.razon_social || "Registro importado",
-            saldo: fieldValues.balance_actual || "",
+            saldo: formatMoney(fieldValues.balance_actual || ""),
           },
           fields: fieldValues,
-        });
+        }));
         if (!activeKey) {
           activeKey = accountKey;
         }
@@ -397,6 +431,13 @@
             renderSelectedList();
           }
         });
+        if (numericKeys.has(input.dataset.key)) {
+          input.addEventListener("blur", () => {
+            const formatted = formatMoney(input.value);
+            input.value = formatted;
+            item.fields[input.dataset.key] = formatted;
+          });
+        }
       });
       refreshCount();
     }
@@ -434,7 +475,7 @@
           const item = results[index];
           const key = button.dataset.key || item.source.id_doc || item.fields.numero_cuenta;
           if (!selected.has(key)) {
-            selected.set(key, JSON.parse(JSON.stringify(item)));
+            selected.set(key, cleanItemFields(JSON.parse(JSON.stringify(item))));
           }
           activeKey = key;
           renderAccounts(results);
@@ -586,7 +627,37 @@
       (data.updated || []).forEach((item) => {
         const docId = (item.source || {}).id_doc || (item.fields || {}).numero_cuenta;
         if (docId && selected.has(docId)) {
-          selected.set(docId, JSON.parse(JSON.stringify(item)));
+          const existing = selected.get(docId);
+          const newItem = cleanItemFields(JSON.parse(JSON.stringify(item)));
+          if (existing && existing.fields) {
+            if (existing.fields.fecha_apertura !== undefined) newItem.fields.fecha_apertura = existing.fields.fecha_apertura;
+            if (existing.fields.fecha_vencimiento !== undefined) newItem.fields.fecha_vencimiento = existing.fields.fecha_vencimiento;
+            if (existing.fields.limite_credito !== undefined) newItem.fields.limite_credito = formatMoney(existing.fields.limite_credito);
+            if (existing.fields.credito_mas_alto !== undefined) newItem.fields.credito_mas_alto = formatMoney(existing.fields.credito_mas_alto);
+            if (existing.fields.monto_cuota !== undefined) newItem.fields.monto_cuota = formatMoney(existing.fields.monto_cuota);
+            
+            // Preservar campos de direccion, ubicacion y otros campos fijos del frontend para que no se actualicen
+            const fieldsToPreserve = [
+              "calle_avenida",
+              "numero",
+              "edificio",
+              "urbanizacion",
+              "sector",
+              "ciudad",
+              "provincia_municipio",
+              "numero_pasaporte",
+              "siglas",
+              "fax",
+              "otro",
+              "esquina"
+            ];
+            fieldsToPreserve.forEach((key) => {
+              if (existing.fields[key] !== undefined) {
+                newItem.fields[key] = existing.fields[key];
+              }
+            });
+          }
+          selected.set(docId, newItem);
         }
       });
       if (activeKey && !selected.has(activeKey)) activeKey = "";

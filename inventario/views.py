@@ -849,24 +849,36 @@ def _load_entrada_articulos_articulo_rows(*, query="", filtro="descripcion"):
         qs = qs.order_by("referencia", "id_articulo")
     else:
         qs = qs.order_by("id_articulo")
-    values = qs.values(
+    values = list(qs.values(
         "id_articulo",
         "descrip_art",
         "referencia",
         "precio_det",
-        "stock",
         "um_inv",
         "cta_aum_stock",
         "alm_dft",
         "ceco",
-    )[:80]
+    )[:80])
+
+    tarj_stock = {}
+    if values:
+        articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
+        if articulo_ids:
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(articulo_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                    articulo_ids
+                )
+                tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+
     return [
         {
             "id_articulo": row.get("id_articulo") or "",
             "descrip_art": row.get("descrip_art") or "",
             "referencia": row.get("referencia") or "",
             "precio_det": float(_to_decimal(row.get("precio_det"))),
-            "stock": float(_to_decimal(row.get("stock"))),
+            "stock": tarj_stock.get(str(row.get("id_articulo") or "").strip(), 0.0),
             "um_inv": row.get("um_inv") or "",
             "porc_com": 0,
             "cta_aum_stock": row.get("cta_aum_stock") or "",
@@ -2189,10 +2201,24 @@ def solicitudes_existencia_crear_view(request):
     detalles = _parse_solicitud_existencia_items((payload or {}).get("detalles"))
     if not detalles:
         return JsonResponse({"detail": "No hay articulos pendientes para solicitar existencia."}, status=400)
+
+    origen_modulo = str((payload or {}).get("origen_modulo") or "FACTURA").strip().upper() or "FACTURA"
+    origen_referencia = str((payload or {}).get("origen_referencia") or "").strip() or None
+
+    if origen_modulo == "FACTURA" and origen_referencia:
+        ref_upper = origen_referencia.upper()
+        if (ref_upper.startswith("FACTURA ") or ref_upper.startswith("PREFACTURA ")) and ref_upper not in ("FACTURA", "PREFACTURA"):
+            if SolicitudExistencia.objects.filter(origen_modulo="FACTURA", origen_referencia__iexact=origen_referencia).exists():
+                doc_type_es = "prefactura" if ref_upper.startswith("PREFACTURA ") else "factura"
+                return JsonResponse(
+                    {"detail": f"Ya existe un pedido de existencia para esta {doc_type_es}."},
+                    status=400
+                )
+
     origin_terminal = _resolve_request_terminal(request, payload if isinstance(payload, dict) else {})
     solicitud = SolicitudExistencia.objects.create(
-        origen_modulo=str((payload or {}).get("origen_modulo") or "FACTURA").strip().upper() or "FACTURA",
-        origen_referencia=str((payload or {}).get("origen_referencia") or "").strip() or None,
+        origen_modulo=origen_modulo,
+        origen_referencia=origen_referencia,
         cliente_codigo=str((payload or {}).get("cliente_codigo") or "").strip() or None,
         cliente_nombre=str((payload or {}).get("cliente_nombre") or "").strip() or None,
         comentario=str((payload or {}).get("comentario") or "").strip() or None,

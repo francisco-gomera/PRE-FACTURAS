@@ -10,6 +10,7 @@ from .views import (
     cuentas_por_cobrar_buscar_view,
     cuentas_por_cobrar_cancelar_view,
     cuentas_por_cobrar_cobros_anteriores_view,
+    cuentas_por_cobrar_historial_pago_view,
     cuentas_por_cobrar_corregir_monto_view,
     cuentas_por_cobrar_detalle_view,
     cuentas_por_cobrar_guardar_view,
@@ -48,6 +49,11 @@ urlpatterns = [
         "cuentas-por-cobrar/cobros-anteriores/",
         cuentas_por_cobrar_cobros_anteriores_view,
         name="cuentas_por_cobrar_cobros_anteriores",
+    ),
+    path(
+        "cuentas-por-cobrar/historial-pago/",
+        cuentas_por_cobrar_historial_pago_view,
+        name="cuentas_por_cobrar_historial_pago",
     ),
     path(
         "cuentas-por-cobrar/print-data/",
