@@ -92,7 +92,7 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def _can_view_notifications(self, usuario_id):
         return bool(
-            has_perm(usuario_id, "inventario", "ver_entrada_articulos")
+            has_perm(usuario_id, "inventario", "ver_solicitudes_existencia")
             or has_perm(usuario_id, "cobros", "ver_acuerdos")
         )
 
@@ -160,7 +160,7 @@ class InventarioSolicitudesConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _can_view_inventario_solicitudes(self, usuario_id):
-        return bool(has_perm(usuario_id, "inventario", "ver_entrada_articulos"))
+        return bool(has_perm(usuario_id, "inventario", "ver_solicitudes_existencia"))
 
 
 class PrefacturaConsumer(AsyncJsonWebsocketConsumer):

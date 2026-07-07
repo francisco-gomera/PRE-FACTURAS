@@ -128,10 +128,12 @@ class ImpresoraConfig(models.Model):
     TIPO_CUENTAS_COBRAR = "cxc"
     TIPO_FACTURA = "factura"
     TIPO_FINANCIAMIENTO = "financiamiento"
+    TIPO_TICKET = "ticket"
     TIPO_CHOICES = [
         (TIPO_CUENTAS_COBRAR, "Cuentas por Cobrar"),
         (TIPO_FACTURA, "Factura"),
         (TIPO_FINANCIAMIENTO, "Financiamiento"),
+        (TIPO_TICKET, "Venta POS"),
     ]
 
     id_config = models.AutoField(db_column="ID_CONFIG", primary_key=True)

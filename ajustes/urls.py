@@ -21,6 +21,8 @@ from .views import (
     preferencias_impresora_view,
     guardar_preferencias_impresora_view,
     guardar_fact_stock_view,
+    guardar_codigo_variable_view,
+    eliminar_codigo_variable_view,
     crear_sector_view,
     editar_sector_view,
     crear_modulo_view,
@@ -33,6 +35,7 @@ from .views import (
     guardar_firma_usuario_view,
     guardar_usuario_view,
     guardar_preferencia_caja_usuario_view,
+    toggle_permiso_activo_view,
 )
 
 app_name = "ajustes"
@@ -47,6 +50,7 @@ urlpatterns = [
     path("usuarios/roles/permisos/asignar/", asignar_permiso_rol_view, name="asignar_permiso_rol"),
     path("usuarios/permisos/asignar/", asignar_permiso_usuario_view, name="asignar_permiso_usuario"),
     path("usuarios/permisos/guardar/", guardar_permisos_usuario_view, name="guardar_permisos_usuario"),
+    path("usuarios/permisos/toggle-activo/", toggle_permiso_activo_view, name="toggle_permiso_activo"),
     path("usuarios/guardar/", guardar_usuario_view, name="guardar_usuario"),
     path("usuarios/firma/guardar/", guardar_firma_usuario_view, name="guardar_firma_usuario"),
     path("usuarios/caja-preferencia/guardar/", guardar_preferencia_caja_usuario_view, name="guardar_preferencia_caja_usuario"),
@@ -61,6 +65,8 @@ urlpatterns = [
     path("parametros/impresoras/preferencias/", preferencias_impresora_view, name="preferencias_impresora"),
     path("parametros/impresoras/guardar/", guardar_preferencias_impresora_view, name="guardar_preferencias_impresora"),
     path("parametros/fact-stock/guardar/", guardar_fact_stock_view, name="guardar_fact_stock"),
+    path("parametros/codigo-variable/guardar/", guardar_codigo_variable_view, name="guardar_codigo_variable"),
+    path("parametros/codigo-variable/eliminar/", eliminar_codigo_variable_view, name="eliminar_codigo_variable"),
     path("parametros/sectores/crear/", crear_sector_view, name="crear_sector"),
     path("parametros/sectores/editar/", editar_sector_view, name="editar_sector"),
     path("integraciones/", integraciones_view, name="integraciones"),

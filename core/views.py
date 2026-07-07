@@ -100,8 +100,9 @@ def _base_context(request, *, page_title, active_nav):
         "chat_interno": has_perm(usuario_id, "chat_interno", "ver"),
         "empleados": has_perm(usuario_id, "empleados", "ver"),
         "ajustes": has_perm(usuario_id, "ajustes", "ver"),
+        "venta_pos": has_perm(usuario_id, "venta_pos", "ver"),
     }
-    stock_request_notifications_enabled = has_perm(usuario_id, "inventario", "ver_entrada_articulos")
+    stock_request_notifications_enabled = has_perm(usuario_id, "inventario", "ver_solicitudes_existencia")
     empresa = _get_empresa_data()
     return {
         "auth_payload": auth_payload,

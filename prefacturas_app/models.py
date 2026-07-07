@@ -57,3 +57,12 @@ class CodigoVariable(models.Model):
 
     class Meta:
         db_table = "CODIGO_VARIABLE"
+
+
+class ArticuloConversion(models.Model):
+    id_articulo = models.CharField(db_column="ID_ARTICULO", max_length=20, primary_key=True)
+    id_articulo_base = models.CharField(db_column="ID_ARTICULO_BASE", max_length=20)
+    factor = models.DecimalField(db_column="FACTOR", max_digits=19, decimal_places=4, default=1.0)
+
+    class Meta:
+        db_table = "ARTICULO_CONVERSION"

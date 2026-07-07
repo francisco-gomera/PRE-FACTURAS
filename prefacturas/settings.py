@@ -211,6 +211,23 @@ CHANNEL_LAYERS = {
     }
 }
 
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Use signed cookie sessions so we don't require the django_session table
+# in an existing SQL Server database.
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+MESSAGE_STORAGE = "django.contrib.messages.storage.cookie.CookieStorage"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
+
 # Keep the custom auth cookie persistent per terminal/device so the app can be
 # saved to the home screen and reopened without forcing a new login on browser close.
 AUTH_COOKIE_MAX_AGE = int(
@@ -218,3 +235,5 @@ AUTH_COOKIE_MAX_AGE = int(
 )
 SESSION_COOKIE_AGE = AUTH_COOKIE_MAX_AGE
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+DEVELOPER_USER = _env_value("DEVELOPER_USER", "fgomera")

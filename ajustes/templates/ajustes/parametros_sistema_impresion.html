@@ -1,4 +1,4 @@
-﻿{% extends "core/base.html" %}
+{% extends "core/base.html" %}
 {% load ajustes_filters %}
 
 {% block content %}
@@ -7,7 +7,7 @@
 
 <div class="card-grid sistema-grid">
   <div class="info-card sistema-card">
-    <h3>Modo de esta terminal</h3>
+    <h3>Modo y Nombre de esta terminal</h3>
     <div class="form-row theme-local-box">
       <label for="ui_theme_mode">Modo visual</label>
       <select id="ui_theme_mode" data-theme-select>
@@ -15,7 +15,16 @@
         <option value="dark">Oscuro</option>
       </select>
       <small class="helper-text">Se aplica al instante y se guarda solo en esta terminal o navegador.</small>
-      <small class="helper-text helper-strong" data-theme-status>Modo claro activo en esta terminal.</small>
+      <small class="helper-text helper-strong" data-theme-status style="margin-bottom: 8px; display: block;">Modo claro activo en esta terminal.</small>
+      
+      <label for="config_terminal_nombre" style="margin-top: 10px;">Nombre de la terminal</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="config_terminal_nombre" placeholder="Ej. Caja Principal" style="flex-grow: 1; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-alt); padding: 4px 10px; font-size: 12px; color: var(--ink);" />
+        <button type="button" id="btn_save_terminal_nombre" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #1a64c8; background: linear-gradient(180deg, #1f7aed, #0f5fd1); color: #fff; font-weight: 700; font-size: 12px; cursor: pointer; white-space: nowrap;">
+          Guardar
+        </button>
+      </div>
+      <small class="helper-text">Identifica este equipo en el sistema para sus impresoras y cobros.</small>
     </div>
   </div>
 
@@ -95,6 +104,118 @@
       </div>
     </form>
   </div>
+
+  <!-- Configuración de Prefijos de Etiqueta Variable (Balanza) -->
+  <div class="info-card sistema-card form-group-full" style="grid-column: 1 / -1; min-height: auto;">
+    <h3>Configuración de Prefijos de Etiqueta Variable (Balanza)</h3>
+    <small class="helper-text">Registra y edita los prefijos de código de barras que interpretan valores variables de peso o precio en el escáner del POS.</small>
+    
+    <div style="margin-top: 15px; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+        <thead>
+          <tr style="background: #eef5ff; border-bottom: 2px solid #cfdbeb;">
+            <th style="padding: 10px; font-weight: 800; color: #21446f;">Prefijo</th>
+            <th style="padding: 10px; font-weight: 800; color: #21446f;">Tipo</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Pos. Producto</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Largo Producto</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Pos. Valor</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Largo Valor</th>
+            <th style="padding: 10px; text-align: right; font-weight: 800; color: #21446f;">Divisor</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Activo</th>
+            <th style="padding: 10px; text-align: center; font-weight: 800; color: #21446f;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cfg in codigos_variables %}
+          <tr style="border-bottom: 1px solid #e5edf8;">
+            <td style="padding: 10px;"><strong>{{ cfg.prefijo }}</strong></td>
+            <td style="padding: 10px; text-transform: capitalize;">{{ cfg.tipo }}</td>
+            <td style="padding: 10px; text-align: center;">{{ cfg.pos_producto }}</td>
+            <td style="padding: 10px; text-align: center;">{{ cfg.len_producto }}</td>
+            <td style="padding: 10px; text-align: center;">{{ cfg.pos_valor }}</td>
+            <td style="padding: 10px; text-align: center;">{{ cfg.len_valor }}</td>
+            <td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums;">{{ cfg.divisor_valor|floatformat:0 }}</td>
+            <td style="padding: 10px; text-align: center;">
+              {% if cfg.activo == "Y" %}
+                <span style="color: #176540; font-weight: bold; background: #ecfbf3; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid #bde6ce;">Sí</span>
+              {% else %}
+                <span style="color: #a13d28; font-weight: bold; background: #fff1ee; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid #f1c3ba;">No</span>
+              {% endif %}
+            </td>
+            <td style="padding: 10px; text-align: center; display: flex; gap: 8px; justify-content: center; align-items: center;">
+              <button type="button" class="btn-secondary" style="height: 28px; padding: 0 10px; font-size: 11px;" 
+                onclick="editarCodigoVariable('{{ cfg.id_config }}', '{{ cfg.prefijo }}', '{{ cfg.tipo }}', '{{ cfg.pos_producto }}', '{{ cfg.len_producto }}', '{{ cfg.pos_valor }}', '{{ cfg.len_valor }}', '{{ cfg.divisor_valor }}', '{{ cfg.activo }}')">
+                Editar
+              </button>
+              <form method="post" action="{% url 'ajustes:eliminar_codigo_variable' %}" onsubmit="return confirm('¿Seguro que deseas eliminar este prefijo?')" style="margin: 0; display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="id_config" value="{{ cfg.id_config }}" />
+                <button type="submit" style="height: 28px; padding: 0 10px; font-size: 11px; background: #fff1ee; color: #a13d28; border: 1px solid #f1c3ba; cursor: pointer; border-radius: 10px; font-weight: 700; transition: background 0.15s;">
+                  Eliminar
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" style="padding: 20px; text-align: center; color: var(--muted); font-style: italic;">No hay prefijos variables configurados.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Formulario para Registrar/Editar -->
+    <form id="form-codigo-variable" method="post" action="{% url 'ajustes:guardar_codigo_variable' %}" class="sistema-form" style="margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px;">
+      {% csrf_token %}
+      <input type="hidden" id="var_id_config" name="id_config" value="" />
+      <h4 id="form-variable-title" style="margin: 0 0 12px; font-size: 14px; color: #163c73;">Agregar nuevo prefijo</h4>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+        <div>
+          <label for="var_prefijo">Prefijo *</label>
+          <input type="text" id="var_prefijo" name="prefijo" required placeholder="Ej. 22" maxlength="10" />
+        </div>
+        <div>
+          <label for="var_tipo">Tipo *</label>
+          <select id="var_tipo" name="tipo" required>
+            <option value="peso">Peso</option>
+            <option value="precio">Precio</option>
+          </select>
+        </div>
+        <div>
+          <label for="var_pos_producto">Posición Producto *</label>
+          <input type="number" id="var_pos_producto" name="pos_producto" required value="2" min="0" />
+        </div>
+        <div>
+          <label for="var_len_producto">Largo Producto *</label>
+          <input type="number" id="var_len_producto" name="len_producto" required value="5" min="1" />
+        </div>
+        <div>
+          <label for="var_pos_valor">Posición Valor *</label>
+          <input type="number" id="var_pos_valor" name="pos_valor" required value="7" min="0" />
+        </div>
+        <div>
+          <label for="var_len_valor">Largo Valor *</label>
+          <input type="number" id="var_len_valor" name="len_valor" required value="5" min="1" />
+        </div>
+        <div>
+          <label for="var_divisor_valor">Divisor Valor *</label>
+          <input type="number" id="var_divisor_valor" name="divisor_valor" required value="1000" min="1" />
+        </div>
+        <div>
+          <label for="var_activo">Activo *</label>
+          <select id="var_activo" name="activo" required>
+            <option value="Y">Sí</option>
+            <option value="N">No</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions-bar" style="margin-top: 14px;">
+        <button type="submit" id="btn-save-variable" style="cursor: pointer;">Guardar prefijo</button>
+        <button type="button" id="btn-cancel-variable" class="secondary-action" style="display: none; cursor: pointer;" onclick="cancelarEdicionVariable()">Cancelar Edición</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="actions-bar page-actions">
@@ -166,6 +287,10 @@
     };
 
     const getTerminalName = async () => {
+      try {
+        const stored = normalizeTerminalName(window.localStorage.getItem(storageKey) || "");
+        if (stored) return stored;
+      } catch (error) {}
       if (window.CALocalPrint && typeof window.CALocalPrint.resolveTerminalName === "function") {
         return window.CALocalPrint.resolveTerminalName();
       }
@@ -284,8 +409,79 @@
         if (statusNode) statusNode.textContent = error.message || "No se pudo guardar la configuracion.";
       }
     });
+    // Terminal Name controls
+    const configTerminalNombre = document.getElementById("config_terminal_nombre");
+    const btnSaveTerminalNombre = document.getElementById("btn_save_terminal_nombre");
+
+    if (configTerminalNombre && btnSaveTerminalNombre) {
+      btnSaveTerminalNombre.addEventListener("click", async () => {
+        const newName = normalizeTerminalName(configTerminalNombre.value || "");
+        if (!newName) {
+          alert("El nombre de la terminal no puede estar vacío.");
+          return;
+        }
+        try {
+          window.localStorage.setItem(storageKey, newName);
+          alert(`Nombre de la terminal actualizado a "${newName}". Se recargará la configuración.`);
+          await loadPreferences();
+        } catch (error) {
+          alert("No se pudo guardar el nombre de la terminal en el navegador.");
+        }
+      });
+    }
+
+    const initTerminalConfigUI = async () => {
+      const currentTerminal = await getTerminalName();
+      if (configTerminalNombre) {
+        configTerminalNombre.value = currentTerminal;
+      }
+    };
+    initTerminalConfigUI();
+
     loadPreferences();
   })();
 </script>
+
+<script>
+  function editarCodigoVariable(id, prefijo, tipo, posProd, lenProd, posVal, lenVal, divisor, activo) {
+    document.getElementById("var_id_config").value = id;
+    document.getElementById("var_prefijo").value = prefijo;
+    document.getElementById("var_tipo").value = tipo;
+    document.getElementById("var_pos_producto").value = posProd;
+    document.getElementById("var_len_producto").value = lenProd;
+    document.getElementById("var_pos_valor").value = posVal;
+    document.getElementById("var_len_valor").value = lenVal;
+    
+    let parsedDivisor = parseFloat(divisor) || 1000;
+    document.getElementById("var_divisor_valor").value = parsedDivisor;
+    document.getElementById("var_activo").value = activo;
+
+    document.getElementById("form-variable-title").textContent = "Editar prefijo: " + prefijo;
+    document.getElementById("btn-cancel-variable").style.display = "inline-flex";
+    
+    document.getElementById("var_prefijo").focus();
+  }
+
+  function cancelarEdicionVariable() {
+    document.getElementById("var_id_config").value = "";
+    document.getElementById("var_prefijo").value = "";
+    document.getElementById("var_tipo").value = "peso";
+    document.getElementById("var_pos_producto").value = "2";
+    document.getElementById("var_len_producto").value = "5";
+    document.getElementById("var_pos_valor").value = "7";
+    document.getElementById("var_len_valor").value = "5";
+    document.getElementById("var_divisor_valor").value = "1000";
+    document.getElementById("var_activo").value = "Y";
+
+    document.getElementById("form-variable-title").textContent = "Agregar nuevo prefijo";
+    document.getElementById("btn-cancel-variable").style.display = "none";
+  }
+</script>
+
+{% if request.GET.error == "prefix_exists" %}
+<script>
+  alert("Error: El prefijo de etiqueta variable ingresado ya existe.");
+</script>
+{% endif %}
 {% endblock %}
 

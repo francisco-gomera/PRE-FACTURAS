@@ -20,6 +20,7 @@ class Command(BaseCommand):
             ("caja", "Caja"),
             ("chat_interno", "Chat Interno"),
             ("empleados", "Empleados y Nominas"),
+            ("venta_pos", "Venta POS"),
         ]
         permisos_genericos = [
             ("ver", "Ver"),
@@ -36,6 +37,7 @@ class Command(BaseCommand):
                 ("ver_salida_articulos", "Ver Salida de Articulos"),
                 ("ver_grupos", "Ver Grupos de Articulos"),
                 ("ver_stock", "Ver Stock"),
+                ("ver_solicitudes_existencia", "Ver Solicitudes de Existencia"),
             ],
             "reportes": [
                 ("ver_ventas", "Ver Reportes de Ventas"),
@@ -76,6 +78,9 @@ class Command(BaseCommand):
                 ("cxc_modificar_fechas_pago", "Modificar Fechas de Pago en Cuentas por Cobrar"),
                 ("ver_cuadre_caja", "Ver Cuadre de Caja"),
                 ("ver_financiamiento", "Ver Financiamiento"),
+            ],
+            "venta_pos": [
+                ("ver", "Ver Venta POS"),
             ],
             "chat_interno": [
                 ("ver_usuarios", "Ver Usuarios de Chat"),

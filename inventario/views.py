@@ -2058,7 +2058,7 @@ def index(request):
         "salida_articulos": has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_salida_articulos"),
         "grupos": has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_grupos"),
         "stock": has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_stock"),
-        "solicitudes_existencia_operativas": has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_entrada_articulos"),
+        "solicitudes_existencia_operativas": has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_solicitudes_existencia"),
     }
     return render(request, "inventario/index.html", ctx)
 
@@ -2122,7 +2122,7 @@ def solicitudes_existencia_resumen_view(request):
     if not auth_payload:
         return JsonResponse({"detail": "Sesion expirada."}, status=401)
     usuario_id = auth_payload.get("usuario_id")
-    can_view_stock = has_perm(usuario_id, "inventario", "ver_entrada_articulos")
+    can_view_stock = has_perm(usuario_id, "inventario", "ver_solicitudes_existencia")
     can_view_acuerdos = has_perm(usuario_id, "cobros", "ver_acuerdos")
     can_view = can_view_stock or can_view_acuerdos
     if not can_view:
@@ -2168,7 +2168,7 @@ def solicitudes_existencia_resumen_view(request):
 
 @require_GET
 def solicitudes_existencia_lista_view(request):
-    auth_payload = _require_perm_json(request, "inventario", "ver_entrada_articulos")
+    auth_payload = _require_perm_json(request, "inventario", "ver_solicitudes_existencia")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
     solicitudes = list(SolicitudExistencia.objects.filter(atendida=False).order_by("-creado_en", "-id_solicitud")[:100])
@@ -2184,7 +2184,7 @@ def solicitudes_existencia_operativas_view(request):
     ctx = _base_context(request, page_title="Solicitudes de existencia", active_nav="inventario")
     if not ctx:
         return redirect("login")
-    if not has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_entrada_articulos"):
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "inventario", "ver_solicitudes_existencia"):
         return render_denied(request, active_nav="inventario")
     return render(request, "inventario/solicitudes_existencia_operativas.html", ctx)
 
@@ -2231,7 +2231,7 @@ def solicitudes_existencia_crear_view(request):
 
 @require_GET
 def solicitudes_existencia_detalle_view(request, solicitud_id):
-    auth_payload = _require_perm_json(request, "inventario", "ver_entrada_articulos")
+    auth_payload = _require_perm_json(request, "inventario", "ver_solicitudes_existencia")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
     solicitud = SolicitudExistencia.objects.filter(id_solicitud=solicitud_id).first()
@@ -2272,7 +2272,7 @@ def solicitudes_existencia_detalle_view(request, solicitud_id):
 
 @require_http_methods(["POST"])
 def solicitudes_existencia_marcar_leida_view(request, solicitud_id):
-    auth_payload = _require_perm_json(request, "inventario", "ver_entrada_articulos")
+    auth_payload = _require_perm_json(request, "inventario", "ver_solicitudes_existencia")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
     solicitud = SolicitudExistencia.objects.filter(id_solicitud=solicitud_id).first()
@@ -2409,7 +2409,7 @@ def notification_state_delivered_view(request):
 
 @require_http_methods(["POST"])
 def solicitudes_existencia_eliminar_view(request, solicitud_id):
-    auth_payload = _require_perm_json(request, "inventario", "ver_entrada_articulos")
+    auth_payload = _require_perm_json(request, "inventario", "ver_solicitudes_existencia")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
     solicitud = SolicitudExistencia.objects.filter(id_solicitud=solicitud_id).first()
@@ -2645,3 +2645,262 @@ def salida_articulos_guardar_view(request):
         return JsonResponse({"detail": str(exc)}, status=400)
     except Exception as exc:
         return JsonResponse({"detail": f"No se pudo guardar la salida: {exc}"}, status=500)
+
+
+@require_GET
+def articulos_list_view(request):
+    auth_payload = _require_perm_json(request, "inventario", "ver_articulos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    q = (request.GET.get("q") or "").strip()
+    page_num = int(request.GET.get("page") or 1)
+    page_size = 50
+    
+    from django.db.models import Q
+    from prefacturas_app.models_existing import MaestroArticulo
+    
+    qs = MaestroArticulo.objects.all()
+    if q:
+        qs = qs.filter(
+            Q(id_articulo__icontains=q) |
+            Q(descrip_art__icontains=q) |
+            Q(referencia__icontains=q) |
+            Q(cod_barra__icontains=q)
+        )
+        
+    qs = qs.order_by("-id_articulo")
+    
+    total_count = qs.count()
+    
+    start = (page_num - 1) * page_size
+    end = start + page_size
+    
+    articles_slice = qs[start:end]
+    
+    results = []
+    for a in articles_slice:
+        results.append({
+            "id_articulo": a.id_articulo.strip() if a.id_articulo else "",
+            "descrip_art": a.descrip_art.strip() if a.descrip_art else "",
+            "referencia": a.referencia.strip() if a.referencia else "",
+            "cod_barra": a.cod_barra.strip() if a.cod_barra else "",
+            "precio_det": float(a.precio_det or 0),
+            "costo": float(a.costo or 0),
+            "tarifa_vt": float(a.tarifa_vt or 0),
+            "um_venta": a.um_venta.strip() if a.um_venta else "UND",
+            "bloqueado": (a.bloqueado or "N").strip() == "Y"
+        })
+        
+    # Load conversions for the page slice
+    from prefacturas_app.models import ArticuloConversion
+    article_ids = [r["id_articulo"] for r in results]
+    conversions = {
+        c.id_articulo: {
+            "id_articulo_base": c.id_articulo_base,
+            "factor": float(c.factor)
+        }
+        for c in ArticuloConversion.objects.filter(id_articulo__in=article_ids)
+    }
+    for r in results:
+        conv = conversions.get(r["id_articulo"])
+        if conv:
+            r["id_articulo_base"] = conv["id_articulo_base"]
+            r["factor_conversion"] = conv["factor"]
+            r["has_conversion"] = True
+        else:
+            r["id_articulo_base"] = ""
+            r["factor_conversion"] = 1.0
+            r["has_conversion"] = False
+        
+    import math
+    total_pages = math.ceil(total_count / page_size) if total_count > 0 else 1
+    
+    return JsonResponse({
+        "ok": True,
+        "results": results,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page_num
+    })
+
+
+@require_http_methods(["POST"])
+def articulo_save_view(request):
+    auth_payload = _require_perm_json(request, "inventario", "ver_articulos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        is_edit = bool(payload.get("is_edit"))
+        id_articulo = str(payload.get("id_articulo") or "").strip()
+        descrip_art = str(payload.get("descrip_art") or "").strip()
+        referencia = str(payload.get("referencia") or "").strip()
+        cod_barra = str(payload.get("cod_barra") or "").strip()
+        costo = float(payload.get("costo") or 0)
+        precio_det = float(payload.get("precio_det") or 0)
+        raw_tarifa = payload.get("tarifa_vt")
+        tarifa_vt = float(raw_tarifa) if raw_tarifa is not None else 18.0
+        um_venta = str(payload.get("um_venta") or "UND").strip().upper()
+        bloqueado_val = "Y" if bool(payload.get("bloqueado")) else "N"
+        
+        id_articulo_base = str(payload.get("id_articulo_base") or "").strip()
+        try:
+            factor_conversion = float(payload.get("factor_conversion") or 1.0)
+        except (TypeError, ValueError):
+            factor_conversion = 1.0
+    except Exception as exc:
+        return JsonResponse({"detail": f"Datos invalidos: {exc}"}, status=400)
+        
+    if not descrip_art:
+        return JsonResponse({"detail": "La descripcion del articulo es requerida."}, status=400)
+        
+    from prefacturas_app.models_existing import MaestroArticulo
+    from prefacturas_app.models import ArticuloConversion
+    
+    uom_map = {
+        "UND": "Unidad",
+        "LB": "Libra",
+        "KG": "Kilogramo",
+        "GL": "Galón",
+        "PAQ": "Paquete",
+        "CJA": "Caja",
+    }
+    um_inv_val = uom_map.get(um_venta, "Unidad")
+    terminal_name = _resolve_request_terminal(request, payload)
+    
+    try:
+        with transaction.atomic():
+            if is_edit:
+                if not id_articulo:
+                    return JsonResponse({"detail": "Codigo de articulo requerido para editar."}, status=400)
+                try:
+                    articulo = MaestroArticulo.objects.get(id_articulo=id_articulo)
+                except MaestroArticulo.DoesNotExist:
+                    return JsonResponse({"detail": f"Articulo con codigo {id_articulo} no existe."}, status=404)
+                    
+                articulo.descrip_art = descrip_art
+                articulo.referencia = referencia
+                articulo.cod_barra = cod_barra if cod_barra else id_articulo
+                articulo.costo = costo
+                articulo.precio_det = precio_det
+                articulo.tarifa_vt = tarifa_vt
+                articulo.id_impto_vt = 1 if tarifa_vt > 0 else 2
+                articulo.cod_impto_vt = "ITBIS" if tarifa_vt > 0 else "EXENTO"
+                articulo.um_venta = um_venta
+                articulo.um_inv = um_inv_val
+                articulo.bloqueado = bloqueado_val
+                articulo.fecha_act = timezone.localtime()
+                articulo.terminal = terminal_name
+                articulo.save(update_fields=[
+                    'descrip_art',
+                    'referencia',
+                    'cod_barra',
+                    'costo',
+                    'precio_det',
+                    'tarifa_vt',
+                    'id_impto_vt',
+                    'cod_impto_vt',
+                    'um_venta',
+                    'um_inv',
+                    'bloqueado',
+                    'fecha_act',
+                    'terminal'
+                ])
+            else:
+                # Creacion
+                if id_articulo:
+                    # Validar unicidad
+                    if MaestroArticulo.objects.filter(id_articulo=id_articulo).exists():
+                        return JsonResponse({"detail": f"Ya existe un articulo con el codigo '{id_articulo}'."}, status=400)
+                else:
+                    # Auto-generar codigo
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT ISNULL(MAX(TRY_CAST(ID_ARTICULO AS BIGINT)), 0) + 1 FROM MAESTRO_ARTICULO")
+                        next_id = int(cursor.fetchone()[0] or 1)
+                    id_articulo = str(next_id)
+                    
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO MAESTRO_ARTICULO (
+                            ID_ARTICULO, DESCRIP_ART, REFERENCIA, COD_BARRA, COSTO, PRECIO_DET, TARIFA_VT,
+                            ID_IMPTO_VT, COD_IMPTO_VT, UM_VENTA, BLOQUEADO, FECHA_CREACION, FECHA_ACT,
+                            ALM_DFT, MONEDA, STOCK, ART_COMPRA, ART_VENTA, ART_INV, LOTE,
+                            ID_GRUPO, DESCRIP_GRUPO, SECUENCIA, CTA_INGRESO, NOM_1, ID_USUARIO,
+                            ID_PRECIO, DESCRIP_PRECIO, TIPO_PRECIO, CTA_GASTO, NOM_2,
+                            CTA_COSTO, NOM_3, CLASE_ART, UM_INV, TERMINAL,
+                            IDSUBGRUPO, NOMSUBGRUPO, IDCATEGORIA, NOMCATEGORIA
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s
+                        )
+                    """, [
+                        id_articulo,
+                        descrip_art,
+                        referencia,
+                        cod_barra if cod_barra else id_articulo,
+                        costo,
+                        precio_det,
+                        tarifa_vt,
+                        1 if tarifa_vt > 0 else 2,
+                        "ITBIS" if tarifa_vt > 0 else "EXENTO",
+                        um_venta,
+                        bloqueado_val,
+                        timezone.localtime(),
+                        timezone.localtime(),
+                        1,
+                        None,
+                        0.0,
+                        "T",
+                        "T",
+                        "T",
+                        "No",
+                        1,
+                        "MERCANCIAS",
+                        "1000",
+                        "41010101",
+                        "Ingresos p",
+                        auth_payload.get("usuario_id"),
+                        1,
+                        "Lista de Precio",
+                        "Fijo",
+                        "11030102",
+                        "Mercancias en Tránsito",
+                        "51010101",
+                        "Costo de Ventas de Mercancias",
+                        "Articulo",
+                        um_inv_val,
+                        terminal_name,
+                        1,
+                        "Generico",
+                        1,
+                        "Generico"
+                    ])
+                
+            # Save or delete ArticuloConversion
+            if id_articulo_base:
+                if not MaestroArticulo.objects.filter(id_articulo=id_articulo_base).exists():
+                    raise ValueError(f"El articulo base '{id_articulo_base}' no existe.")
+                if id_articulo == id_articulo_base:
+                    raise ValueError("Un articulo no puede ser convertido a si mismo.")
+                ArticuloConversion.objects.update_or_create(
+                    id_articulo=id_articulo,
+                    defaults={
+                        "id_articulo_base": id_articulo_base,
+                        "factor": factor_conversion
+                    }
+                )
+            else:
+                ArticuloConversion.objects.filter(id_articulo=id_articulo).delete()
+
+        return JsonResponse({"ok": True, "id_articulo": id_articulo})
+    except ValueError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error al guardar el articulo: {exc}"}, status=500)

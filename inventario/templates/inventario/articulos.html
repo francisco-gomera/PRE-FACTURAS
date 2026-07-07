@@ -1,14 +1,995 @@
 {% extends "core/base.html" %}
 
-{% block content %}
-<h2 class="page-title">Articulos</h2>
-<p class="page-subtitle">Submodulo listo para administrar el maestro de articulos.</p>
+{% block head_extra %}
+<style>
+  .articles-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: calc(100vh - 120px);
+    min-height: 0;
+    overflow: hidden;
+  }
 
-<div class="card-grid">
-  <div class="info-card">
-    <h3>Articulos</h3>
-    <p>Desde aqui se preparara el mantenimiento de codigos, descripciones, costos, precios y datos base de inventario.</p>
-    <a href="{% url 'inventario:index' %}">Volver a inventario</a>
+  .header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .search-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-grow: 1;
+    max-width: 500px;
+  }
+
+  .search-input {
+    flex-grow: 1;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-alt);
+    padding: 0 14px;
+    font-size: 13px;
+    color: var(--ink);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(31, 122, 237, 0.15);
+  }
+
+  .btn-primary {
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border: 1px solid #1a64c8;
+    background: linear-gradient(180deg, #1f7aed, #0f5fd1);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 16px rgba(31, 122, 237, 0.16);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 11px 20px rgba(31, 122, 237, 0.22);
+    filter: brightness(1.03);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .btn-secondary {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-alt);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .btn-secondary:hover {
+    background: #eef4ff;
+    transform: translateY(-1px);
+  }
+
+  .grid-card {
+    background: linear-gradient(180deg, #ffffff, #f7fbff);
+    border: 1px solid #cedbef;
+    border-radius: 18px;
+    box-shadow: 0 16px 30px rgba(20, 55, 110, 0.08);
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .grid-scroll {
+    overflow-y: auto;
+    flex-grow: 1;
+    min-height: 0;
+    position: relative;
+  }
+
+  .grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+  }
+
+  .grid-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #eef5ff;
+    color: #21446f;
+    font-weight: 800;
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 2px solid #cfdbeb;
+    font-size: 12px;
+  }
+
+  .grid-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5edf8;
+    color: var(--ink);
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grid-table tbody tr:hover td {
+    background: rgba(31, 122, 237, 0.04);
+  }
+
+  .grid-table tbody tr.blocked td {
+    color: var(--muted);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .badge-success {
+    background: #ecfbf3;
+    color: #176540;
+    border: 1px solid #bde6ce;
+  }
+
+  .badge-danger {
+    background: #fff1ee;
+    color: #a13d28;
+    border: 1px solid #f1c3ba;
+  }
+
+  .action-btn {
+    background: transparent;
+    border: 1px solid #cfdcf1;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    cursor: pointer;
+    transition: 0.15s ease;
+  }
+
+  .action-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    transform: scale(1.05);
+  }
+
+  .footer-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-top: 1px solid #cfdbeb;
+    background: #f7fbff;
+    flex-shrink: 0;
+  }
+
+  .pagination-info {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .pagination-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pagination-btn {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #ffffff;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: var(--surface-alt);
+  }
+
+  .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(12, 28, 56, 0.4);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    padding: 16px;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .win-modal {
+    width: min(600px, 100%);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #ffffff, #f7fbff);
+    border-radius: 18px;
+    border: 1px solid #cedbef;
+    box-shadow: 0 24px 52px rgba(10, 45, 110, 0.2);
+    overflow: hidden;
+  }
+
+  .win-titlebar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #0f6edc, #0e3a86);
+    color: #ffffff;
+    padding: 0 20px;
+    font-size: 16px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .win-titlebar button {
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .win-body {
+    padding: 20px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .form-group-full {
+    grid-column: 1 / -1;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #163c73;
+  }
+
+  .form-group input,
+  .form-group select {
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-alt);
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--ink);
+    width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(31, 122, 237, 0.15);
+  }
+
+  .form-group input[readonly],
+  .form-group input:disabled {
+    background: #eef4fb;
+    color: #69809d;
+    cursor: not-allowed;
+    border-color: var(--line);
+    box-shadow: none !important;
+  }
+
+  .form-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--primary);
+  }
+
+  .checkbox-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .checkbox-group label {
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .form-helper {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .status-box {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    display: none;
+  }
+
+  .status-box.error {
+    background: #fff1ee;
+    color: #a13d28;
+    border: 1px solid #f1c3ba;
+    display: block;
+  }
+
+  .status-box.success {
+    background: #ecfbf3;
+    color: #176540;
+    border: 1px solid #bde6ce;
+    display: block;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    margin-top: 20px;
+    flex-shrink: 0;
+  }
+
+  /* LOADING STATE */
+  .grid-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .grid-loading-overlay.active {
+    display: flex;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #cedbef;
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .result-empty {
+    text-align: center;
+    color: var(--muted);
+    font-style: italic;
+    padding: 32px !important;
+  }
+
+  @media (max-width: 768px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .header-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .search-container {
+      max-width: none;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="articles-page">
+  <div class="header-actions">
+    <div class="search-container">
+      <input type="text" id="search-input" class="search-input" placeholder="Buscar por código, descripción, referencia, barras..." />
+      <button type="button" id="btn-search" class="btn-primary">
+        <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        Buscar
+      </button>
+    </div>
+    <button type="button" id="btn-new-article" class="btn-primary">
+      <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>
+      Nuevo Artículo
+    </button>
+  </div>
+
+  <div class="grid-card">
+    <div class="grid-scroll">
+      <div id="grid-loading" class="grid-loading-overlay">
+        <div class="spinner"></div>
+      </div>
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th style="width: 110px;">Código</th>
+            <th>Descripción</th>
+            <th style="width: 140px;">Referencia</th>
+            <th style="width: 160px;">Código de Barras</th>
+            <th style="width: 100px; text-align: right;">Costo</th>
+            <th style="width: 100px; text-align: right;">Precio Venta</th>
+            <th style="width: 80px; text-align: center;">ITBIS</th>
+            <th style="width: 80px; text-align: center;">UOM</th>
+            <th style="width: 110px; text-align: center;">Estado</th>
+            <th style="width: 80px; text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="articles-tbody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-pagination">
+      <div class="pagination-info" id="pagination-info">
+        Cargando artículos...
+      </div>
+      <div class="pagination-controls">
+        <button type="button" id="btn-page-prev" class="pagination-btn" disabled>Anterior</button>
+        <button type="button" id="btn-page-next" class="pagination-btn" disabled>Siguiente</button>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ADD/EDIT ARTICLE MODAL -->
+<div id="article-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="win-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="win-titlebar">
+      <span id="modal-title">Nuevo Artículo</span>
+      <button type="button" id="btn-modal-close" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <div class="win-body">
+      <div id="modal-status" class="status-box"></div>
+      <form id="article-form" autocomplete="off">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="form-id-articulo">Código de Artículo</label>
+            <input type="text" id="form-id-articulo" placeholder="(Auto-generar secuencial)" maxlength="20" />
+            <span class="form-helper" id="code-helper">Si se deja vacío, el sistema generará uno automáticamente.</span>
+          </div>
+          <div class="form-group">
+            <label for="form-referencia">Referencia</label>
+            <input type="text" id="form-referencia" placeholder="Ej. REF-001" maxlength="30" />
+          </div>
+          <div class="form-group-full form-group">
+            <label for="form-descrip-art">Descripción del Artículo *</label>
+            <input type="text" id="form-descrip-art" placeholder="Ej. CHULETA DE CERDO" maxlength="100" required />
+          </div>
+          <div class="form-group">
+            <label for="form-cod-barra">Código de Barras</label>
+            <input type="text" id="form-cod-barra" placeholder="Ej. 7460123456789" maxlength="30" />
+          </div>
+          <div class="form-group">
+            <label for="form-um-venta">Unidad de Medida</label>
+            <select id="form-um-venta">
+              <option value="UND" selected>UND - Unidad</option>
+              <option value="LB">LB - Libra</option>
+              <option value="KG">KG - Kilogramo</option>
+              <option value="GL">GL - Galón</option>
+              <option value="PAQ">PAQ - Paquete</option>
+              <option value="CJA">CJA - Caja</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="form-costo">Costo (RD$)</label>
+            <input type="number" id="form-costo" value="0.00" step="0.0001" min="0" />
+          </div>
+          <div class="form-group">
+            <label for="form-precio-det">Precio de Venta (RD$)</label>
+            <input type="number" id="form-precio-det" value="0.00" step="0.0001" min="0" />
+          </div>
+          <div class="form-group">
+            <label for="form-tarifa-vt">Tasa de Impuesto (ITBIS)</label>
+            <select id="form-tarifa-vt">
+              <option value="18.0" selected>18% - ITBIS General</option>
+              <option value="8.0">8% - ITBIS Reducido</option>
+              <option value="16.0">16% - ITBIS Especial</option>
+              <option value="0.0">0% - Exento</option>
+            </select>
+          </div>
+          <div class="form-group checkbox-group form-group-full">
+            <input type="checkbox" id="form-has-conversion" />
+            <label for="form-has-conversion">Este artículo descuenta stock de un artículo base (Equivalencia / Unidad)</label>
+          </div>
+          <div class="form-group" id="group-articulo-base" style="display: none;">
+            <label for="form-id-articulo-base">Código del Artículo Base *</label>
+            <input type="text" id="form-id-articulo-base" placeholder="Ej. 30 (Salami por Libra)" maxlength="20" />
+            <span class="form-helper">El código del artículo real del cual se debitará el stock.</span>
+          </div>
+          <div class="form-group" id="group-factor-conversion" style="display: none;">
+            <label for="form-factor-conversion">Factor de Conversión *</label>
+            <input type="number" id="form-factor-conversion" value="1.0000" step="0.0001" min="0.0001" />
+            <span class="form-helper">Ej: Si esta unidad equivale a 2.5 libras del artículo base, ingrese 2.5.</span>
+          </div>
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="form-bloqueado" />
+            <label for="form-bloqueado">Bloquear Artículo (Inactivo)</label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-form-cancel" class="btn-secondary">Cancelar</button>
+          <button type="submit" id="btn-form-submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var config = {
+      listUrl: "{% url 'inventario:articulos_list' %}",
+      saveUrl: "{% url 'inventario:articulo_save' %}"
+    };
+
+    var currentPage = 1;
+    var totalPages = 1;
+    var currentSearch = "";
+    var isEditMode = false;
+
+    // DOM Elements
+    var searchInput = document.getElementById("search-input");
+    var btnSearch = document.getElementById("btn-search");
+    var btnNewArticle = document.getElementById("btn-new-article");
+    var articlesTbody = document.getElementById("articles-tbody");
+    var gridLoading = document.getElementById("grid-loading");
+    var paginationInfo = document.getElementById("pagination-info");
+    var btnPagePrev = document.getElementById("btn-page-prev");
+    var btnPageNext = document.getElementById("btn-page-next");
+
+    // Modal Elements
+    var articleModal = document.getElementById("article-modal");
+    var modalTitle = document.getElementById("modal-title");
+    var btnModalClose = document.getElementById("btn-modal-close");
+    var btnFormCancel = document.getElementById("btn-form-cancel");
+    var btnFormSubmit = document.getElementById("btn-form-submit");
+    var articleForm = document.getElementById("article-form");
+    var modalStatus = document.getElementById("modal-status");
+
+    // Form inputs
+    var formIdArticulo = document.getElementById("form-id-articulo");
+    var formReferencia = document.getElementById("form-referencia");
+    var formDescripArt = document.getElementById("form-descrip-art");
+    var formCodBarra = document.getElementById("form-cod-barra");
+    var formUmVenta = document.getElementById("form-um-venta");
+    var formCosto = document.getElementById("form-costo");
+    var formPrecioDet = document.getElementById("form-precio-det");
+    var formTarifaVt = document.getElementById("form-tarifa-vt");
+    var formBloqueado = document.getElementById("form-bloqueado");
+    var codeHelper = document.getElementById("code-helper");
+
+    // Conversion Elements
+    var formHasConversion = document.getElementById("form-has-conversion");
+    var groupArticuloBase = document.getElementById("group-articulo-base");
+    var groupFactorConversion = document.getElementById("group-factor-conversion");
+    var formIdArticuloBase = document.getElementById("form-id-articulo-base");
+    var formFactorConversion = document.getElementById("form-factor-conversion");
+
+    // Initialize Page
+    fetchArticles(1);
+
+    // Event Listeners
+    btnSearch.addEventListener("click", executeSearch);
+    searchInput.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        executeSearch();
+      }
+    });
+
+    btnNewArticle.addEventListener("click", function () {
+      openModal(false);
+    });
+
+    btnModalClose.addEventListener("click", closeModal);
+    btnFormCancel.addEventListener("click", closeModal);
+
+    btnPagePrev.addEventListener("click", function () {
+      if (currentPage > 1) {
+        fetchArticles(currentPage - 1);
+      }
+    });
+
+    btnPageNext.addEventListener("click", function () {
+      if (currentPage < totalPages) {
+        fetchArticles(currentPage + 1);
+      }
+    });
+
+    articleForm.addEventListener("submit", submitForm);
+
+    formHasConversion.addEventListener("change", function() {
+      if (formHasConversion.checked) {
+        groupArticuloBase.style.display = "flex";
+        groupFactorConversion.style.display = "flex";
+        formIdArticuloBase.required = true;
+      } else {
+        groupArticuloBase.style.display = "none";
+        groupFactorConversion.style.display = "none";
+        formIdArticuloBase.required = false;
+        formIdArticuloBase.value = "";
+        formFactorConversion.value = "1.0000";
+      }
+    });
+
+    articleForm.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        var tagName = e.target.tagName.toLowerCase();
+        if (tagName === "input" && e.target.type !== "submit" && e.target.type !== "button") {
+          e.preventDefault();
+        }
+      }
+    });
+
+    // Close modal on click backdrop
+    articleModal.addEventListener("click", function (e) {
+      if (e.target === articleModal) {
+        closeModal();
+      }
+    });
+
+    // Helper functions
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return "";
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatCurrency(val) {
+      var num = parseFloat(val) || 0;
+      return "RD$ " + num.toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function executeSearch() {
+      currentSearch = searchInput.value.trim();
+      fetchArticles(1);
+    }
+
+    async function fetchArticles(page) {
+      gridLoading.classList.add("active");
+      try {
+        var url = config.listUrl + "?page=" + page + "&q=" + encodeURIComponent(currentSearch);
+        var res = await fetch(url, {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        var data = await res.json().catch(function () { return {}; });
+
+        if (!res.ok) {
+          articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">' + escapeHtml(data.detail || "Error al cargar la lista de artículos.") + '</td></tr>';
+          paginationInfo.textContent = "Error al cargar datos.";
+          return;
+        }
+
+        currentPage = data.current_page || 1;
+        totalPages = data.total_pages || 1;
+
+        renderArticles(data.results || []);
+
+        // Update pagination UI
+        btnPagePrev.disabled = (currentPage <= 1);
+        btnPageNext.disabled = (currentPage >= totalPages);
+
+        if (data.total_count === 0) {
+          paginationInfo.textContent = "No se encontraron artículos.";
+        } else {
+          var startRange = (currentPage - 1) * 50 + 1;
+          var endRange = Math.min(currentPage * 50, data.total_count);
+          paginationInfo.textContent = "Mostrando " + startRange + "-" + endRange + " de " + data.total_count + " artículos (Pág. " + currentPage + "/" + totalPages + ")";
+        }
+      } catch (error) {
+        articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">Error de conexión al cargar artículos.</td></tr>';
+        paginationInfo.textContent = "Error de conexión.";
+      } finally {
+        gridLoading.classList.remove("active");
+      }
+    }
+
+    function renderArticles(rows) {
+      if (!rows || rows.length === 0) {
+        articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">No se encontraron artículos que coincidan con la búsqueda.</td></tr>';
+        return;
+      }
+
+      var html = rows.map(function (row) {
+        var trClass = row.bloqueado ? "blocked" : "";
+        var statusBadge = row.bloqueado 
+          ? '<span class="badge badge-danger">Bloqueado</span>' 
+          : '<span class="badge badge-success">Activo</span>';
+        
+        var editDataAttr = encodeURIComponent(JSON.stringify(row));
+
+        return '<tr class="' + trClass + '">' +
+          '<td><strong>' + escapeHtml(row.id_articulo) + '</strong></td>' +
+          '<td title="' + escapeHtml(row.descrip_art) + '">' + escapeHtml(row.descrip_art) + '</td>' +
+          '<td>' + escapeHtml(row.referencia) + '</td>' +
+          '<td>' + escapeHtml(row.cod_barra) + '</td>' +
+          '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + escapeHtml(formatCurrency(row.costo)) + '</td>' +
+          '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + escapeHtml(formatCurrency(row.precio_det)) + '</td>' +
+          '<td style="text-align: center;">' + escapeHtml(row.tarifa_vt) + '%</td>' +
+          '<td style="text-align: center;">' + escapeHtml(row.um_venta) + '</td>' +
+          '<td style="text-align: center;">' + statusBadge + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button type="button" class="action-btn btn-edit-row" data-row="' + editDataAttr + '" title="Editar artículo">' +
+              '<svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join("");
+
+      articlesTbody.innerHTML = html;
+
+      // Attach click events to the newly created edit buttons
+      Array.prototype.forEach.call(articlesTbody.querySelectorAll(".btn-edit-row"), function (btn) {
+        btn.addEventListener("click", function () {
+          var rowData = JSON.parse(decodeURIComponent(btn.getAttribute("data-row")));
+          openModal(true, rowData);
+        });
+      });
+    }
+
+    function openModal(editMode, data) {
+      isEditMode = editMode;
+      hideStatus();
+      articleForm.reset();
+
+      if (isEditMode) {
+        modalTitle.textContent = "Editar Artículo";
+        formIdArticulo.value = data.id_articulo;
+        formIdArticulo.disabled = true;
+        formIdArticulo.readOnly = true;
+        codeHelper.style.display = "none";
+
+        formDescripArt.value = data.descrip_art;
+        formReferencia.value = data.referencia;
+        formCodBarra.value = data.cod_barra;
+        formUmVenta.value = data.um_venta;
+        formCosto.value = data.costo;
+        formPrecioDet.value = data.precio_det;
+        
+        // Select matching tarifa
+        var matchedTarifa = "18.0";
+        var availableTarifas = ["18.0", "8.0", "16.0", "0.0"];
+        var tFloatStr = parseFloat(data.tarifa_vt).toFixed(1);
+        if (availableTarifas.indexOf(tFloatStr) !== -1) {
+          matchedTarifa = tFloatStr;
+        } else {
+          matchedTarifa = parseFloat(data.tarifa_vt).toString();
+        }
+        
+        // Find if option exists, otherwise add it dynamically
+        var optExists = Array.prototype.some.call(formTarifaVt.options, function(opt) {
+          return parseFloat(opt.value) === parseFloat(matchedTarifa);
+        });
+        if (!optExists) {
+          var newOpt = document.createElement("option");
+          newOpt.value = matchedTarifa;
+          newOpt.textContent = matchedTarifa + "% - ITBIS Especial";
+          formTarifaVt.appendChild(newOpt);
+        }
+        formTarifaVt.value = matchedTarifa;
+        
+        formBloqueado.checked = data.bloqueado;
+
+        if (data.has_conversion) {
+          formHasConversion.checked = true;
+          groupArticuloBase.style.display = "flex";
+          groupFactorConversion.style.display = "flex";
+          formIdArticuloBase.value = data.id_articulo_base;
+          formIdArticuloBase.required = true;
+          formFactorConversion.value = data.factor_conversion;
+        } else {
+          formHasConversion.checked = false;
+          groupArticuloBase.style.display = "none";
+          groupFactorConversion.style.display = "none";
+          formIdArticuloBase.value = "";
+          formIdArticuloBase.required = false;
+          formFactorConversion.value = "1.0000";
+        }
+      } else {
+        modalTitle.textContent = "Nuevo Artículo";
+        formIdArticulo.value = "";
+        formIdArticulo.disabled = false;
+        formIdArticulo.readOnly = false;
+        codeHelper.style.display = "block";
+
+        formUmVenta.value = "UND";
+        formTarifaVt.value = "18.0";
+        formCosto.value = "0.00";
+        formPrecioDet.value = "0.00";
+        formBloqueado.checked = false;
+
+        formHasConversion.checked = false;
+        groupArticuloBase.style.display = "none";
+        groupFactorConversion.style.display = "none";
+        formIdArticuloBase.value = "";
+        formIdArticuloBase.required = false;
+        formFactorConversion.value = "1.0000";
+      }
+
+      articleModal.classList.add("open");
+      articleModal.setAttribute("aria-hidden", "false");
+      setTimeout(function () {
+        if (isEditMode) {
+          formDescripArt.focus();
+        } else {
+          formIdArticulo.focus();
+        }
+      }, 100);
+    }
+
+    function closeModal() {
+      articleModal.classList.remove("open");
+      articleModal.setAttribute("aria-hidden", "true");
+      hideStatus();
+      articleForm.reset();
+    }
+
+    function showStatus(msg, isError) {
+      modalStatus.textContent = msg;
+      modalStatus.className = "status-box " + (isError ? "error" : "success");
+    }
+
+    function hideStatus() {
+      modalStatus.textContent = "";
+      modalStatus.className = "status-box";
+    }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      
+      var descVal = formDescripArt.value.trim();
+      if (!descVal) {
+        showStatus("La descripción es obligatoria.", true);
+        return;
+      }
+
+      if (formHasConversion.checked) {
+        var baseCode = formIdArticuloBase.value.trim();
+        if (!baseCode) {
+          showStatus("El código del artículo base es obligatorio si se activa la conversión.", true);
+          return;
+        }
+        var factorVal = parseFloat(formFactorConversion.value) || 0;
+        if (factorVal <= 0) {
+          showStatus("El factor de conversión debe ser mayor que 0.", true);
+          return;
+        }
+      }
+
+      btnFormSubmit.disabled = true;
+      showStatus("Guardando artículo...", false);
+
+      var payload = {
+        is_edit: isEditMode,
+        id_articulo: formIdArticulo.value.trim(),
+        descrip_art: descVal,
+        referencia: formReferencia.value.trim(),
+        cod_barra: formCodBarra.value.trim(),
+        um_venta: formUmVenta.value,
+        costo: parseFloat(formCosto.value) || 0,
+        precio_det: parseFloat(formPrecioDet.value) || 0,
+        tarifa_vt: parseFloat(formTarifaVt.value) || 0,
+        bloqueado: formBloqueado.checked,
+        id_articulo_base: formHasConversion.checked ? formIdArticuloBase.value.trim() : "",
+        factor_conversion: formHasConversion.checked ? parseFloat(formFactorConversion.value) : 1.0
+      };
+
+      try {
+        var res = await fetch(config.saveUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": window.CA_CSRF_TOKEN || "",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        var data = await res.json().catch(function () { return {}; });
+
+        if (!res.ok) {
+          showStatus(data.detail || "Error al intentar guardar el artículo.", true);
+          btnFormSubmit.disabled = false;
+          return;
+        }
+
+        showStatus("¡Artículo guardado exitosamente!", false);
+        setTimeout(function () {
+          closeModal();
+          // Reload current page to see changes
+          fetchArticles(currentPage);
+        }, 1000);
+      } catch (error) {
+        showStatus("Error de red o conexión al intentar guardar.", true);
+        btnFormSubmit.disabled = false;
+      }
+    }
+  })();
+</script>
 {% endblock %}

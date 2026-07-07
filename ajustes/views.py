@@ -18,7 +18,7 @@ from core.views import _base_context, _load_table_columns, render_denied
 from factura.ecf_runtime import build_ecf_runtime_report
 from prefacturas_app.models_existing import Usuario
 from inventario.views import _load_departamento_rows
-from prefacturas_app.views import _encode_delphi_clave
+from prefacturas_app.views import _encode_delphi_clave, _get_auth_payload
 from .models import (
     FacturacionElectronicaConfig,
     FacturacionElectronicaDocumento,
@@ -68,6 +68,7 @@ PRINTER_DOCUMENT_TYPES = [
     ImpresoraConfig.TIPO_CUENTAS_COBRAR,
     ImpresoraConfig.TIPO_FACTURA,
     ImpresoraConfig.TIPO_FINANCIAMIENTO,
+    ImpresoraConfig.TIPO_TICKET,
 ]
 
 
@@ -208,12 +209,28 @@ def usuarios_view(request):
     if not has_perm(ctx["auth_payload"]["usuario_id"], "ajustes", "ver_usuarios"):
         return render_denied(request, active_nav="ajustes")
     ctx["usuarios"] = _fetch_usuarios()
-    ctx["modulos"] = SegModulo.objects.all().order_by("nombre")
-    ctx["permisos"] = (
-        SegPermiso.objects.select_related("modulo")
-        .exclude(modulo__codigo="ajustes", codigo="sectores_borrar")
-        .order_by("modulo__nombre", "nombre")
-    )
+    
+    from django.conf import settings
+    dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+    is_dev = ctx["auth_payload"]["usuario_login"].lower() == dev_user.lower()
+    ctx["is_developer"] = is_dev
+
+    if is_dev:
+        ctx["modulos"] = SegModulo.objects.all().order_by("nombre")
+        ctx["permisos"] = (
+            SegPermiso.objects.select_related("modulo")
+            .exclude(modulo__codigo="ajustes", codigo="sectores_borrar")
+            .order_by("modulo__nombre", "nombre")
+        )
+    else:
+        ctx["modulos"] = SegModulo.objects.filter(activo=True).order_by("nombre")
+        ctx["permisos"] = (
+            SegPermiso.objects.filter(activo=True, modulo__activo=True)
+            .select_related("modulo")
+            .exclude(modulo__codigo="ajustes", codigo="sectores_borrar")
+            .order_by("modulo__nombre", "nombre")
+        )
+
     admin_role, _ = SegRol.objects.get_or_create(
         codigo="admin",
         defaults={"nombre": "Administrador", "descripcion": "Acceso total"},
@@ -669,6 +686,17 @@ def asignar_permiso_rol_view(request):
     rol_id = request.POST.get("rol_id")
     permiso_id = request.POST.get("permiso_id")
     if rol_id and permiso_id:
+        from django.conf import settings
+        auth_payload = _get_auth_payload(request)
+        dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+        is_dev = auth_payload and auth_payload.get("usuario_login", "").lower() == dev_user.lower()
+        if not is_dev:
+            try:
+                p = SegPermiso.objects.get(id=int(permiso_id))
+                if not p.activo or not p.modulo.activo:
+                    return redirect("ajustes:usuarios")
+            except Exception:
+                return redirect("ajustes:usuarios")
         try:
             SegRolPermiso.objects.get_or_create(
                 rol_id=int(rol_id),
@@ -685,6 +713,17 @@ def asignar_permiso_usuario_view(request):
     permiso_id = request.POST.get("permiso_id")
     permitido = request.POST.get("permitido") == "1"
     if id_usuario and permiso_id:
+        from django.conf import settings
+        auth_payload = _get_auth_payload(request)
+        dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+        is_dev = auth_payload and auth_payload.get("usuario_login", "").lower() == dev_user.lower()
+        if not is_dev:
+            try:
+                p = SegPermiso.objects.get(id=int(permiso_id))
+                if not p.activo or not p.modulo.activo:
+                    return redirect("ajustes:usuarios")
+            except Exception:
+                return redirect("ajustes:usuarios")
         with transaction.atomic():
             SegUsuarioPermiso.objects.update_or_create(
                 id_usuario=int(id_usuario),
@@ -711,7 +750,15 @@ def guardar_permisos_usuario_view(request):
         except (TypeError, ValueError):
             continue
 
-    permisos_ids = list(SegPermiso.objects.values_list("id", flat=True))
+    from django.conf import settings
+    auth_payload = _get_auth_payload(request)
+    dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+    is_dev = auth_payload and auth_payload.get("usuario_login", "").lower() == dev_user.lower()
+
+    if is_dev:
+        permisos_ids = list(SegPermiso.objects.values_list("id", flat=True))
+    else:
+        permisos_ids = list(SegPermiso.objects.filter(activo=True, modulo__activo=True).values_list("id", flat=True))
     existing = {
         up.permiso_id: up
         for up in SegUsuarioPermiso.objects.filter(id_usuario=id_usuario)
@@ -922,10 +969,9 @@ def _get_preferencia_impresora_row(nombre_terminal, tipo_documento):
                 NOMBRE_IMPRESORA,
                 PREDETERMINADA
             FROM AJUSTE_IMPRESORA_CONFIG
-            WHERE NOMBRE_TERMINAL = %s
-              AND TIPO_DOCUMENTO = %s
+            WHERE TIPO_DOCUMENTO = %s
             """,
-            [nombre_terminal, tipo_documento],
+            [tipo_documento],
         )
         row = cursor.fetchone()
     if not row:
@@ -945,21 +991,20 @@ def _save_preferencia_impresora_row(nombre_terminal, tipo_documento, nombre_impr
             SET NOMBRE_IMPRESORA = %s,
                 PREDETERMINADA = %s,
                 ACTUALIZADO_EN = GETDATE()
-            WHERE NOMBRE_TERMINAL = %s
-              AND TIPO_DOCUMENTO = %s
+            WHERE TIPO_DOCUMENTO = %s
             """,
-            [nombre_impresora, predeterminada, nombre_terminal, tipo_documento],
+            [nombre_impresora, predeterminada, tipo_documento],
         )
         if cursor.rowcount:
             return
         cursor.execute(
             """
             INSERT INTO AJUSTE_IMPRESORA_CONFIG
-                (NOMBRE_TERMINAL, TIPO_DOCUMENTO, NOMBRE_IMPRESORA, PREDETERMINADA, CREADO_EN, ACTUALIZADO_EN)
+                (TIPO_DOCUMENTO, NOMBRE_IMPRESORA, PREDETERMINADA, CREADO_EN, ACTUALIZADO_EN)
             VALUES
-                (%s, %s, %s, %s, GETDATE(), GETDATE())
+                (%s, %s, %s, GETDATE(), GETDATE())
             """,
-            [nombre_terminal, tipo_documento, nombre_impresora, predeterminada],
+            [tipo_documento, nombre_impresora, predeterminada],
         )
 
 
@@ -1057,14 +1102,18 @@ def parametros_sistema_impresion_view(request):
         or has_perm(usuario_id, "ajustes", "ver_parametros_sistema")
     ):
         return render_denied(request, active_nav="ajustes")
+    from prefacturas_app.models import CodigoVariable
+
     ctx["formatos_impresion"] = _load_formatos_impresion()
     ctx["empresa_data"] = _load_empresa_parametros()
     ctx["impresoras_disponibles"] = _load_impresoras_disponibles()
     ctx["preferencias_impresora"] = _load_preferencias_impresora()
+    ctx["codigos_variables"] = CodigoVariable.objects.all().order_by("prefijo")
     ctx["tipos_documento_impresora"] = [
         (ImpresoraConfig.TIPO_CUENTAS_COBRAR, "Cuentas por Cobrar"),
         (ImpresoraConfig.TIPO_FACTURA, "Factura"),
         (ImpresoraConfig.TIPO_FINANCIAMIENTO, "Financiamiento"),
+        (ImpresoraConfig.TIPO_TICKET, "Venta POS"),
     ]
     return render(request, "ajustes/parametros_sistema_impresion.html", ctx)
 
@@ -1381,6 +1430,104 @@ def guardar_fact_stock_view(request):
                     )
     except Exception:
         pass
+    return redirect("ajustes:parametros_sistema_impresion")
+
+
+@require_http_methods(["POST"])
+def guardar_codigo_variable_view(request):
+    ctx = _base_context(request, page_title="Parametros - Sistema e impresion", active_nav="ajustes")
+    if not ctx:
+        return redirect("login")
+    usuario_id = ctx["auth_payload"]["usuario_id"]
+    if not (
+        has_perm(usuario_id, "ajustes", "ver_parametros")
+        or has_perm(usuario_id, "ajustes", "ver_parametros_sistema")
+    ):
+        return render_denied(request, active_nav="ajustes")
+
+    from prefacturas_app.models import CodigoVariable
+
+    id_config = (request.POST.get("id_config") or "").strip()
+    prefijo = (request.POST.get("prefijo") or "").strip()
+    try:
+        pos_producto = int(request.POST.get("pos_producto") or 2)
+    except (TypeError, ValueError):
+        pos_producto = 2
+    try:
+        len_producto = int(request.POST.get("len_producto") or 5)
+    except (TypeError, ValueError):
+        len_producto = 5
+    try:
+        pos_valor = int(request.POST.get("pos_valor") or 7)
+    except (TypeError, ValueError):
+        pos_valor = 7
+    try:
+        len_valor = int(request.POST.get("len_valor") or 5)
+    except (TypeError, ValueError):
+        len_valor = 5
+    try:
+        divisor_valor = Decimal(request.POST.get("divisor_valor") or "1000")
+    except Exception:
+        divisor_valor = Decimal("1000")
+    tipo = (request.POST.get("tipo") or "peso").strip()
+    activo = (request.POST.get("activo") or "Y").strip()
+
+    if not prefijo:
+        return redirect("ajustes:parametros_sistema_impresion")
+
+    try:
+        if id_config:
+            # Edit
+            config = CodigoVariable.objects.get(id_config=id_config)
+            config.prefijo = prefijo
+            config.pos_producto = pos_producto
+            config.len_producto = len_producto
+            config.pos_valor = pos_valor
+            config.len_valor = len_valor
+            config.divisor_valor = divisor_valor
+            config.tipo = tipo
+            config.activo = activo
+            config.save()
+        else:
+            # Create - validate prefix uniqueness
+            if CodigoVariable.objects.filter(prefijo=prefijo).exists():
+                from django.urls import reverse
+                return redirect(f"{reverse('ajustes:parametros_sistema_impresion')}?error=prefix_exists")
+            CodigoVariable.objects.create(
+                prefijo=prefijo,
+                pos_producto=pos_producto,
+                len_producto=len_producto,
+                pos_valor=pos_valor,
+                len_valor=len_valor,
+                divisor_valor=divisor_valor,
+                tipo=tipo,
+                activo=activo
+            )
+    except Exception:
+        pass
+    return redirect("ajustes:parametros_sistema_impresion")
+
+
+@require_http_methods(["POST"])
+def eliminar_codigo_variable_view(request):
+    ctx = _base_context(request, page_title="Parametros - Sistema e impresion", active_nav="ajustes")
+    if not ctx:
+        return redirect("login")
+    usuario_id = ctx["auth_payload"]["usuario_id"]
+    if not (
+        has_perm(usuario_id, "ajustes", "ver_parametros")
+        or has_perm(usuario_id, "ajustes", "ver_parametros_sistema")
+    ):
+        return render_denied(request, active_nav="ajustes")
+
+    from prefacturas_app.models import CodigoVariable
+
+    id_config = (request.POST.get("id_config") or "").strip()
+    if id_config:
+        try:
+            CodigoVariable.objects.filter(id_config=id_config).delete()
+        except Exception:
+            pass
     return redirect("ajustes:parametros_sistema_impresion")
 
 
@@ -2399,3 +2546,34 @@ def reportes_transunion_generar_view(request):
     response = HttpResponse(output.getvalue(), content_type="text/plain; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+@require_http_methods(["POST"])
+def toggle_permiso_activo_view(request):
+    auth_payload = _get_auth_payload(request)
+    if not auth_payload:
+        return JsonResponse({"detail": "No autenticado"}, status=401)
+    
+    from django.conf import settings
+    dev_user = getattr(settings, "DEVELOPER_USER", "fgomera")
+    if auth_payload.get("usuario_login", "").lower() != dev_user.lower():
+        return JsonResponse({"detail": "Acceso denegado"}, status=403)
+    
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        permiso_id = data.get("permiso_id")
+        activo = bool(data.get("activo"))
+        
+        permiso = SegPermiso.objects.get(id=permiso_id)
+        permiso.activo = activo
+        permiso.save()
+        
+        # If this is the main module viewing permission, toggle module active state as well
+        if permiso.codigo == "ver":
+            modulo = permiso.modulo
+            modulo.activo = activo
+            modulo.save()
+            
+        return JsonResponse({"ok": True, "activo": activo})
+    except Exception as e:
+        return JsonResponse({"detail": str(e)}, status=400)

@@ -28,6 +28,8 @@ from .views import (
     solicitudes_existencia_marcar_leida_view,
     solicitudes_existencia_resumen_view,
     stock_view,
+    articulos_list_view,
+    articulo_save_view,
 )
 
 app_name = "inventario"
@@ -72,4 +74,6 @@ urlpatterns = [
     path("salida-articulos/guardar/", salida_articulos_guardar_view, name="salida_articulos_guardar"),
     path("grupos/", grupos_view, name="grupos"),
     path("stock/", stock_view, name="stock"),
+    path("articulos/list/", articulos_list_view, name="articulos_list"),
+    path("articulos/save/", articulo_save_view, name="articulo_save"),
 ]

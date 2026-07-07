@@ -178,7 +178,7 @@
           <form id="user_perm_form" method="post" action="{% url 'ajustes:guardar_permisos_usuario' %}">
             {% csrf_token %}
             <input type="hidden" name="id_usuario" id="user_perm_id" />
-            <fieldset id="perm_table_fieldset" disabled>
+            <fieldset id="perm_table_fieldset" style="border: none; padding: 0; margin: 0;">
               <div class="table-scroll">
                 <table>
                   <thead>
@@ -187,6 +187,9 @@
                       <th>Codigo</th>
                       <th>Nombre</th>
                       <th>Permitido</th>
+                      {% if is_developer %}
+                      <th>Habilitado (Dev)</th>
+                      {% endif %}
                     </tr>
                   </thead>
                   <tbody>
@@ -198,6 +201,11 @@
                       <td class="check-cell">
                         <input type="checkbox" name="perm_ids" value="{{ p.id }}" class="perm-check" />
                       </td>
+                      {% if is_developer %}
+                      <td class="check-cell">
+                        <input type="checkbox" class="dev-toggle-active" data-perm-id="{{ p.id }}" {% if p.activo %}checked{% endif %} />
+                      </td>
+                      {% endif %}
                     </tr>
                     {% endfor %}
                   </tbody>
@@ -722,6 +730,11 @@
   const cajaPrefSaveBtn = document.getElementById("btn_save_caja_pref");
   const cajaPrefStatus = document.getElementById("caja_pref_status");
 
+  // Disable checkboxes initially
+  permCheckboxes.forEach((checkbox) => {
+    checkbox.disabled = true;
+  });
+
   const closeUserAdminModal = () => {
     if (!userAdminModal) return;
     userAdminModal.classList.remove("open");
@@ -924,7 +937,7 @@
       exampleSelect.value = "";
     }
     if (permFieldset) {
-      permFieldset.disabled = false;
+      permCheckboxes.forEach(cb => cb.disabled = false);
     }
     if (savePermsBtn) {
       savePermsBtn.disabled = false;
@@ -964,7 +977,7 @@
           exampleSelect.value = "";
         }
         if (permFieldset) {
-          permFieldset.disabled = true;
+          permCheckboxes.forEach(cb => cb.disabled = true);
         }
         if (savePermsBtn) {
           savePermsBtn.disabled = true;
@@ -1010,7 +1023,7 @@
         exampleSelect.value = "";
       }
       if (permFieldset) {
-        permFieldset.disabled = true;
+        permCheckboxes.forEach(cb => cb.disabled = true);
       }
       if (savePermsBtn) {
         savePermsBtn.disabled = true;
@@ -1077,6 +1090,40 @@
       }
     });
   }
+
+  // Developer Superuser AJAX toggle for modules and permissions active state
+  document.querySelectorAll(".dev-toggle-active").forEach(chk => {
+    chk.addEventListener("change", function() {
+      const permId = this.dataset.permId;
+      const activo = this.checked;
+      
+      fetch("{% url 'ajustes:toggle_permiso_activo' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({
+          permiso_id: permId,
+          activo: activo
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          window.alert("Configuración de módulo/permiso actualizada.");
+        } else {
+          window.alert(data.detail || "Error al actualizar la configuración.");
+          this.checked = !activo;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        window.alert("Error de conexión al servidor.");
+        this.checked = !activo;
+      });
+    });
+  });
 </script>
 
 {% endblock %}

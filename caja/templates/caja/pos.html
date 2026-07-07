@@ -34,24 +34,33 @@
         --pos-border: #334155;
     }
 
+    /* Lock the main container to 100% height and hide scrolling */
+    .main {
+        overflow: hidden !important;
+        height: 100%;
+        min-height: 0;
+    }
+
     /* Outer layout fixes */
     .pos-wrapper {
         display: grid;
         grid-template-rows: auto 1fr;
-        height: calc(100vh - 120px);
-        gap: 15px;
+        height: 100%;
+        min-height: 0;
+        gap: 10px;
         color: var(--pos-text);
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        box-sizing: border-box;
     }
 
     .pos-header-bar {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 20px;
+        padding: 8px 16px;
         background: var(--pos-header-bg);
         color: #ffffff;
-        border-radius: 16px;
+        border-radius: 12px;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
 
@@ -97,8 +106,8 @@
     /* Split Dashboard Panels */
     .pos-dashboard {
         display: grid;
-        grid-template-columns: 1.25fr 0.75fr;
-        gap: 15px;
+        grid-template-columns: 1.3fr 0.7fr;
+        gap: 10px;
         height: 100%;
         min-height: 0;
     }
@@ -106,14 +115,14 @@
     .pos-left-panel {
         display: grid;
         grid-template-rows: auto 1fr;
-        gap: 15px;
+        gap: 10px;
         min-height: 0;
     }
 
     .pos-right-panel {
         display: flex;
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
         min-height: 0;
         overflow-y: auto;
         padding-right: 5px;
@@ -126,8 +135,8 @@
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--pos-glass-border);
         box-shadow: var(--pos-glass-shadow);
-        border-radius: 16px;
-        padding: 18px;
+        border-radius: 12px;
+        padding: 14px;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -398,6 +407,82 @@
         text-align: center;
     }
 
+    .pos-summary-grid-compact {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .pos-summary-item-compact {
+        background: rgba(148, 163, 184, 0.05);
+        border-radius: 8px;
+        padding: 6px 8px;
+        border: 1px solid var(--pos-border);
+        text-align: center;
+    }
+
+    .pos-summary-item-compact.full-width {
+        grid-column: span 2;
+        background: rgba(15, 110, 220, 0.04);
+        border-color: rgba(15, 110, 220, 0.2);
+        padding: 10px 8px;
+    }
+
+    /* Search Modal List Layout */
+    .pos-search-results {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        width: 100% !important;
+        max-height: 380px;
+        overflow-y: auto;
+        padding: 10px 5px;
+        margin-top: 10px;
+    }
+    
+    .pos-product-list-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(148, 163, 184, 0.05);
+        border: 1px solid var(--pos-border);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        gap: 12px;
+    }
+    
+    .pos-product-list-row:hover,
+    .pos-product-list-row.selected {
+        background: rgba(15, 110, 220, 0.08);
+        border-color: var(--pos-primary);
+        box-shadow: 0 2px 6px rgba(15, 110, 220, 0.15);
+    }
+    
+    .pos-product-info {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+    }
+    
+    .pos-product-meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: var(--pos-text-muted);
+    }
+    
+    .pos-product-price-stock-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        white-space: nowrap;
+    }
+
     .pos-summary-item {
         background: rgba(148, 163, 184, 0.05);
         border-radius: 10px;
@@ -420,6 +505,11 @@
     .pos-summary-value.grand-total {
         color: var(--pos-primary);
         font-size: 22px;
+    }
+
+    #btn_header_search_past_sales:hover {
+        background: rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-1px);
     }
 
     /* Client & Payment Sections */
@@ -570,6 +660,11 @@
         transform: none;
     }
 
+    /* Make sidebar visible and clickable over the modal overlay */
+    .sidebar {
+        z-index: 1010 !important;
+    }
+
     /* Modals Overlay (Apertura / Cierre) */
     .pos-modal-overlay {
         position: fixed;
@@ -682,6 +777,7 @@
         gap: 10px;
         font-weight: 600;
         font-size: 14px;
+        white-space: pre-line;
         transform: translateY(100px);
         opacity: 0;
         transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -730,7 +826,11 @@
             <span>Cajero: <strong id="header_cajero_nombre">{{ auth_payload.usuario_nombre|default:auth_payload.usuario_login }}</strong></span>
             <span>Terminal: <strong id="header_terminal_nombre">EQ-DEFAULT</strong></span>
         </div>
-        <div class="pos-header-actions">
+        <div class="pos-header-actions" style="display: flex; gap: 10px; align-items: center;">
+            <button class="pos-btn" id="btn_header_search_past_sales" onclick="openPastSalesModal()" style="display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.1); color: white; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s ease;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                Buscar Venta [F4]
+            </button>
             <button id="btn_session_close" style="display: none;" onclick="openCloseSessionModal()">Cerrar Caja</button>
         </div>
     </header>
@@ -763,11 +863,11 @@
                     <div style="display: flex; gap: 8px;">
                         <button class="pos-btn" id="btn_remove_line" onclick="removeSelectedCartItem()" style="padding: 6px 12px; font-size: 11px; border-radius: 8px; display: flex; align-items: center; gap: 6px; border: none; background: linear-gradient(135deg, var(--pos-warning) 0%, HSL(35, 90%, 42%) 100%); color: white;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            Eliminar Línea
+                            Eliminar Línea [Supr]
                         </button>
                         <button class="pos-btn danger" id="btn_clear_cart" onclick="clearCart()" style="padding: 6px 12px; font-size: 11px; border-radius: 8px; display: flex; align-items: center; gap: 6px; border: none;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            Vaciar Carrito
+                            Vaciar Carrito [Backspace]
                         </button>
                     </div>
                 </div>
@@ -793,23 +893,21 @@
 
         <!-- Right Side: Totals, Client details & Payment -->
         <div class="pos-right-panel">
-            <!-- Consulta de Ventas Card -->
-            <div class="pos-glass-card">
+            <!-- Consulta de Ventas Card (Solo visible en consulta/lectura) -->
+            <div class="pos-glass-card" id="panel_consulta_ventas" style="display: none;">
                 <div style="font-size: 13px; font-weight: 700; color: var(--pos-text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Consulta de Ventas</div>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button class="pos-btn primary" id="btn_search_past_sales" onclick="openPastSalesModal()" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 10px; border: none; font-weight: 700; width: 100%;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        Buscar Venta [F4]
-                    </button>
-                    
-                    <!-- Cancellation panel (visible only in read-only mode) -->
-                    <div id="cancellation_panel" style="display: none; border-top: 1px solid var(--pos-border); padding-top: 10px; margin-top: 5px; flex-direction: column; gap: 10px;">
+                    <div id="cancellation_panel" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
                         <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 10px; font-size: 12px; color: var(--pos-danger); text-align: center; font-weight: 600;">
                             Modo Consulta (Lectura)
                         </div>
                         <button class="pos-btn danger" id="btn_cancel_sale" onclick="cancelConsultedSale()" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 10px; border: none; font-weight: 700; width: 100%;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
                             Cancelar esta Venta
+                        </button>
+                        <button class="pos-btn" id="btn_reprint_sale" onclick="reprintConsultedSale()" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 10px; border: none; font-weight: 700; width: 100%; background: #0b9bb3; color: white;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            Reimprimir Ticket
                         </button>
                         <button class="pos-btn" id="btn_new_sale_from_consult" onclick="exitConsultationMode()" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 10px; border: none; font-weight: 700; width: 100%; background: var(--pos-primary); color: white;">
                             Nueva Venta
@@ -818,11 +916,11 @@
                 </div>
             </div>
 
-            <!-- Checkout drawers and payment breakdown -->
+            <!-- Checkout details & Combined Summary Card -->
             <div class="pos-glass-card">
-                <div class="pos-checkout-details">
+                <div style="display: flex; flex-direction: column; gap: 14px;">
                     <!-- Client Selector -->
-                    <div class="pos-client-box">
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
                         <div class="pos-input-group">
                             <label for="pos_client_search">Cliente</label>
                             <div class="pos-client-search-wrap">
@@ -841,73 +939,97 @@
                         </div>
                     </div>
 
-                    <!-- Payment methods -->
-                    <div class="pos-payment-box">
-                        <div class="pos-input-group">
-                            <label>Método de Pago Principal</label>
-                            <div class="pos-payment-tabs">
-                                <div class="pos-payment-tab active" data-method="efectivo" onclick="setPaymentMethod('efectivo')">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
-                                    Efectivo
-                                </div>
-                                <div class="pos-payment-tab" data-method="tarjeta" onclick="setPaymentMethod('tarjeta')">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="3"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                                    Tarjeta
-                                </div>
-                                <div class="pos-payment-tab" data-method="transferencia" onclick="setPaymentMethod('transferencia')">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3L21 7L17 11"></path><path d="M3 21L7 17L3 13"></path><path d="M21 7H3"></path><path d="M3 17H21"></path></svg>
-                                    Transf.
-                                </div>
+                    <!-- Combined Totals Summary -->
+                    <div style="padding-top: 12px; border-top: 1px solid var(--pos-border);">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--pos-text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Resumen de Venta</div>
+                        <div class="pos-summary-grid-compact">
+                            <div class="pos-summary-item-compact">
+                                <div class="pos-summary-label">Subtotal</div>
+                                <div class="pos-summary-value" id="summary_subtotal" style="font-size: 13px;">RD$ 0.00</div>
                             </div>
-                        </div>
-
-                        <!-- Amount breakdowns -->
-                        <div class="pos-payment-split-grid" id="pos_payment_amounts_container">
-                            <div class="pos-input-group">
-                                <label for="pos_pay_monto">Monto Recibido</label>
-                                <input type="number" id="pos_pay_monto" class="pos-form-control" step="0.01" min="0" placeholder="RD$ 0.00" autocomplete="off">
+                            <div class="pos-summary-item-compact">
+                                <div class="pos-summary-label">ITBIS</div>
+                                <div class="pos-summary-value" id="summary_itbis" style="font-size: 13px;">RD$ 0.00</div>
                             </div>
-                            <div class="pos-input-group" id="change_group">
-                                <label>Cambio</label>
-                                <input type="text" id="pos_pay_cambio" class="pos-form-control" readonly value="RD$ 0.00" style="font-weight: 800; color: var(--pos-success);" autocomplete="off">
+                            <div class="pos-summary-item-compact full-width">
+                                <div class="pos-summary-label" style="font-weight: 800; color: var(--pos-text);">Total a pagar</div>
+                                <div class="pos-summary-value grand-total" id="summary_total" style="font-size: 20px; font-weight: 800; color: var(--pos-primary);">RD$ 0.00</div>
                             </div>
-                        </div>
-
-                        <div class="pos-input-group">
-                            <label for="pos_comentario">Comentario de Venta</label>
-                            <input type="text" id="pos_comentario" class="pos-form-control" placeholder="Comentario opcional...">
-                        </div>
-
-                        <button class="pos-checkout-btn" id="btn_complete_sale" onclick="submitPOSSale()">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            Completar Venta & Imprimir
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Resumen de Venta Card -->
-            <div class="pos-glass-card">
-                <div style="font-size: 13px; font-weight: 700; color: var(--pos-text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Resumen de Venta</div>
-                <div class="pos-checkout-panel" style="border-top: none; padding-top: 0;">
-                    <div class="pos-summary-grid">
-                        <div class="pos-summary-item">
-                            <div class="pos-summary-label">Subtotal</div>
-                            <div class="pos-summary-value" id="summary_subtotal">RD$ 0.00</div>
-                        </div>
-                        <div class="pos-summary-item">
-                            <div class="pos-summary-label">ITBIS</div>
-                            <div class="pos-summary-value" id="summary_itbis">RD$ 0.00</div>
-                        </div>
-                        <div class="pos-summary-item">
-                            <div class="pos-summary-label">Total a pagar</div>
-                            <div class="pos-summary-value grand-total" id="summary_total">RD$ 0.00</div>
                         </div>
                     </div>
+
+                    <!-- Action Button -->
+                    <button class="pos-checkout-btn" id="btn_complete_sale" onclick="openCheckoutModal()" style="margin-top: 5px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Proceder al Cobro [Enter]
+                    </button>
                 </div>
             </div>
         </div>
     </main>
+</div>
+
+<!-- Modal 2.5: Cobro de Venta (Active when clicking Proceder al Cobro) -->
+<div class="pos-modal-overlay" id="modal_checkout">
+    <div class="pos-modal-card" style="max-width: 500px; width: 90%;">
+        <div class="pos-modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pos-border); padding-bottom: 12px; margin-bottom: 15px;">
+            <div>
+                <h3 style="margin: 0;">Cobro de Venta</h3>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--pos-text-muted);">Seleccione el método de pago e introduzca el monto recibido.</p>
+            </div>
+            <button class="pos-qty-btn" onclick="closeCheckoutModal()" style="font-size: 20px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--pos-border); background: var(--pos-card-bg); color: var(--pos-text); cursor: pointer;">&times;</button>
+        </div>
+
+        <!-- Total Display -->
+        <div class="pos-summary-item-compact full-width" style="margin-bottom: 15px; padding: 12px 10px; background: rgba(15, 110, 220, 0.08); border-color: rgba(15, 110, 220, 0.3);">
+            <div class="pos-summary-label" style="font-weight: 800; color: var(--pos-text); font-size: 12px;">Total a Cobrar</div>
+            <div class="pos-summary-value grand-total" id="checkout_modal_total" style="font-size: 26px; font-weight: 800; color: var(--pos-primary);">RD$ 0.00</div>
+        </div>
+
+        <!-- Payment methods selection -->
+        <div class="pos-input-group" style="margin-bottom: 15px;">
+            <label>Método de Pago Principal</label>
+            <div class="pos-payment-tabs">
+                <div class="pos-payment-tab active" data-method="efectivo" onclick="setPaymentMethod('efectivo')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                    Efectivo
+                </div>
+                <div class="pos-payment-tab" data-method="tarjeta" onclick="setPaymentMethod('tarjeta')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="3"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                    Tarjeta
+                </div>
+                <div class="pos-payment-tab" data-method="transferencia" onclick="setPaymentMethod('transferencia')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3L21 7L17 11"></path><path d="M3 21L7 17L3 13"></path><path d="M21 7H3"></path><path d="M3 17H21"></path></svg>
+                    Transf.
+                </div>
+            </div>
+        </div>
+
+        <!-- Amount details -->
+        <div class="pos-payment-split-grid" id="pos_payment_amounts_container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+            <div class="pos-input-group">
+                <label for="pos_pay_monto">Monto Recibido</label>
+                <input type="number" id="pos_pay_monto" class="pos-form-control" step="0.01" min="0" placeholder="RD$ 0.00" style="font-size: 18px; font-weight: bold;" autocomplete="off">
+            </div>
+            <div class="pos-input-group" id="change_group">
+                <label>Cambio</label>
+                <input type="text" id="pos_pay_cambio" class="pos-form-control" readonly value="RD$ 0.00" style="font-size: 18px; font-weight: 800; color: var(--pos-success);" autocomplete="off">
+            </div>
+        </div>
+
+        <div class="pos-input-group" style="margin-bottom: 15px;">
+            <label for="pos_comentario">Comentario de Venta</label>
+            <input type="text" id="pos_comentario" class="pos-form-control" placeholder="Comentario opcional...">
+        </div>
+
+        <div class="pos-modal-actions" style="margin-top: 15px;">
+            <button class="pos-btn" onclick="closeCheckoutModal()">Cancelar [Esc]</button>
+            <button class="pos-checkout-btn" id="btn_confirm_checkout" onclick="submitPOSSale()" style="height: 44px; margin: 0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Confirmar y Registrar [Enter]
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- Modal 1: Apertura de Caja (Active if no session found) -->
@@ -925,7 +1047,7 @@
             <label for="open_observaciones">Observaciones</label>
             <textarea id="open_observaciones" class="pos-form-control" rows="3" placeholder="Comentarios opcionales para la apertura..."></textarea>
         </div>
-        <button class="pos-btn primary" onclick="submitOpenSession()">Confirmar Apertura</button>
+        <button class="pos-btn primary" onclick="submitOpenSession()">Confirmar Apertura [Enter]</button>
     </div>
 </div>
 
@@ -950,25 +1072,25 @@
                     </tr>
                     <tr>
                         <td>Ventas Efectivo</td>
-                        <td id="close_sum_efectivo" class="text-right">RD$ 0.00</td>
+                        <td id="close_sum_ventas_efectivo" class="text-right">RD$ 0.00</td>
                     </tr>
                     <tr>
                         <td>Ventas Tarjeta</td>
-                        <td id="close_sum_tarjeta" class="text-right">RD$ 0.00</td>
+                        <td id="close_sum_ventas_tarjeta" class="text-right">RD$ 0.00</td>
                     </tr>
                     <tr>
                         <td>Ventas Transferencia</td>
-                        <td id="close_sum_transferencia" class="text-right">RD$ 0.00</td>
+                        <td id="close_sum_ventas_transferencia" class="text-right">RD$ 0.00</td>
                     </tr>
                     <tr style="border-top: 2px solid var(--pos-border); font-weight: bold;">
-                        <td>Efectivo Esperado en Caja</td>
-                        <td id="close_sum_efectivo_esperado" class="text-right" style="color: var(--pos-primary);">RD$ 0.00</td>
+                        <td>Total Estimado en Caja</td>
+                        <td id="close_sum_total_estimado" class="text-right" style="color: var(--pos-primary);">RD$ 0.00</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="pos-input-group" style="margin-bottom: 15px;">
-                <label for="close_efectivo_real">Efectivo Real Arqueado (RD$)</label>
+                <label for="close_efectivo_real">Efectivo Real en Caja (RD$)</label>
                 <input type="number" id="close_efectivo_real" class="pos-form-control" style="font-size: 18px; font-weight: bold;" step="0.01" min="0" oninput="calculateClosingDifference()">
             </div>
 
@@ -985,7 +1107,7 @@
 
         <div class="pos-modal-actions">
             <button class="pos-btn" onclick="closeCloseSessionModal()">Cancelar</button>
-            <button class="pos-btn danger" id="btn_confirm_close_session" onclick="submitCloseSession()" disabled>Completar Cierre de Caja</button>
+            <button class="pos-btn danger" id="btn_confirm_close_session" onclick="submitCloseSession()" disabled>Completar Cierre de Caja [Enter]</button>
         </div>
     </div>
 </div>
@@ -1008,8 +1130,8 @@
                 <input type="text" id="pos_modal_search_input" class="pos-search-input" placeholder="Escribe descripción, referencia o código de barra..." autocomplete="off">
             </div>
         </div>
-        <div class="pos-search-results" id="pos_modal_search_results" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; padding: 10px 5px; margin-top: 10px;">
-            <div style="grid-column: 1/-1; text-align: center; color: var(--pos-text-muted); padding: 60px 0;">
+        <div class="pos-search-results" id="pos_modal_search_results">
+            <div style="text-align: center; color: var(--pos-text-muted); padding: 60px 0;">
                 Escribe en el buscador de arriba para ver resultados
             </div>
         </div>
@@ -1164,10 +1286,37 @@
 
     // Resolve current terminal
     async function initTerminal() {
-        if (window.CALocalPrint) {
-            terminalName = await window.CALocalPrint.getTerminalName();
-            document.getElementById("header_terminal_nombre").textContent = terminalName;
+        const storageKey = "prefacturas.caja.terminal_nombre";
+        const seedKey = "prefacturas.caja.terminal_seed";
+        
+        const getFallbackTerminalName = () => {
+            try {
+                const stored = String(window.localStorage.getItem(storageKey) || "").trim();
+                if (stored) return stored;
+                const existingSeed = String(window.localStorage.getItem(seedKey) || "").trim();
+                if (existingSeed) return `Equipo-${existingSeed}`;
+                const generated = `EQ-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+                window.localStorage.setItem(seedKey, generated);
+                return `Equipo-${generated}`;
+            } catch (error) {
+                return "EQ-DEFAULT";
+            }
+        };
+
+        try {
+            const stored = String(window.localStorage.getItem(storageKey) || "").trim();
+            if (stored) {
+                terminalName = stored;
+            } else if (window.CALocalPrint && typeof window.CALocalPrint.getTerminalName === "function") {
+                terminalName = await window.CALocalPrint.getTerminalName() || getFallbackTerminalName();
+            } else {
+                terminalName = getFallbackTerminalName();
+            }
+        } catch (error) {
+            terminalName = getFallbackTerminalName();
         }
+        
+        document.getElementById("header_terminal_nombre").textContent = terminalName;
     }
 
     // Check Active POS Session
@@ -1381,17 +1530,24 @@
     }
 
     // Article Search & Selection (Modal & Barcode)
+    let modalSearchResults = [];
+    let selectedSearchIndex = -1;
+
     function openSearchModal() {
         document.getElementById("modal_search_articles").classList.add("open");
         const input = document.getElementById("pos_modal_search_input");
         input.value = "";
+        modalSearchResults = [];
+        selectedSearchIndex = -1;
         document.getElementById("pos_modal_search_results").innerHTML = 
-            '<div style="grid-column: 1/-1; text-align: center; color: var(--pos-text-muted); padding: 40px 0;">Escribe en el buscador de arriba para ver resultados</div>';
+            '<div style="text-align: center; color: var(--pos-text-muted); padding: 40px 0;">Escribe en el buscador de arriba para ver resultados</div>';
         setTimeout(() => input.focus(), 200);
     }
 
     function closeSearchModal() {
         document.getElementById("modal_search_articles").classList.remove("open");
+        modalSearchResults = [];
+        selectedSearchIndex = -1;
         setTimeout(() => document.getElementById("pos_barcode_input").focus(), 100);
     }
 
@@ -1402,7 +1558,9 @@
     modalSearchInput.addEventListener("input", function() {
         const q = this.value.trim();
         if (q.length < 2) {
-            modalResultsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--pos-text-muted); padding: 40px 0;">Escribe en el buscador de arriba para ver resultados</div>';
+            modalSearchResults = [];
+            selectedSearchIndex = -1;
+            modalResultsContainer.innerHTML = '<div style="text-align: center; color: var(--pos-text-muted); padding: 40px 0;">Escribe en el buscador de arriba para ver resultados</div>';
             return;
         }
         
@@ -1418,7 +1576,9 @@
             if (data.results && data.results.length > 0) {
                 renderModalSearchResults(data.results);
             } else {
-                modalResultsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--pos-text-muted); padding: 40px 0;">No se encontraron artículos</div>';
+                modalSearchResults = [];
+                selectedSearchIndex = -1;
+                modalResultsContainer.innerHTML = '<div style="text-align: center; color: var(--pos-text-muted); padding: 40px 0;">No se encontraron artículos</div>';
             }
         } catch (error) {
             console.error("Error searching articles:", error);
@@ -1426,40 +1586,68 @@
     }
 
     function renderModalSearchResults(results) {
+        modalSearchResults = results;
+        selectedSearchIndex = results.length > 0 ? 0 : -1;
         modalResultsContainer.innerHTML = "";
-        results.forEach(art => {
-            const card = document.createElement("div");
-            card.className = "pos-product-card";
-            card.onclick = () => {
-                const idx = addToCart(art);
-                closeSearchModal();
-                selectedCartIndex = idx;
-                setTimeout(() => {
-                    const input = document.getElementById(`cart_qty_${idx}`);
-                    if (input) {
-                        input.focus();
-                        input.select();
-                    }
-                }, 150);
+        
+        results.forEach((art, idx) => {
+            const row = document.createElement("div");
+            row.className = "pos-product-list-row" + (idx === selectedSearchIndex ? " selected" : "");
+            
+            row.onclick = () => {
+                selectArticleFromModal(idx);
             };
-
+            
             const isOutOfStock = art.stock <= 0;
             const stockClass = isOutOfStock ? "pos-product-stock out" : "pos-product-stock";
             const stockText = isOutOfStock ? "Agotado" : `Stock: ${art.stock}`;
-
-            card.innerHTML = `
-                <div>
+            
+            row.innerHTML = `
+                <div class="pos-product-info">
                     <div class="pos-product-name" title="${art.descrip_art}">${art.descrip_art}</div>
-                    <div class="pos-product-meta">Ref: ${art.referencia || 'N/D'}</div>
-                    <div class="pos-product-meta" style="font-size: 10px;">Cod: ${art.cod_barra || 'N/D'}</div>
+                    <div class="pos-product-meta-row">
+                        <span class="pos-product-meta">Ref: ${art.referencia || 'N/D'}</span>
+                        <span class="pos-product-meta">Cod: ${art.cod_barra || 'N/D'}</span>
+                    </div>
                 </div>
-                <div class="pos-product-price-stock">
-                    <div class="pos-product-price">${formatCurrency(art.precio_det)}</div>
-                    <div class="${stockClass}">${stockText}</div>
+                <div class="pos-product-price-stock-row">
+                    <span class="${stockClass}">${stockText}</span>
+                    <span class="pos-product-price">${formatCurrency(art.precio_det)}</span>
                 </div>
             `;
-            modalResultsContainer.appendChild(card);
+            modalResultsContainer.appendChild(row);
         });
+        
+        if (selectedSearchIndex !== -1) {
+            updateModalSearchHighlight();
+        }
+    }
+
+    function updateModalSearchHighlight() {
+        const rows = document.querySelectorAll("#pos_modal_search_results .pos-product-list-row");
+        rows.forEach((row, idx) => {
+            if (idx === selectedSearchIndex) {
+                row.classList.add("selected");
+                row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            } else {
+                row.classList.remove("selected");
+            }
+        });
+    }
+
+    function selectArticleFromModal(index) {
+        if (index < 0 || index >= modalSearchResults.length) return;
+        const art = modalSearchResults[index];
+        const idx = addToCart(art);
+        closeSearchModal();
+        selectedCartIndex = idx;
+        setTimeout(() => {
+            const input = document.getElementById(`cart_qty_${idx}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 150);
     }
 
     // Barcode Input field on main page
@@ -1472,6 +1660,77 @@
             }
         }
     });
+
+    // Helper function to toggle focus between left and right panel
+    function togglePaneFocus() {
+        const activeEl = document.activeElement;
+        const isRightPanelActive = activeEl && (
+            activeEl.id === "pos_client_search" ||
+            activeEl.id === "pos_client_rnc" ||
+            activeEl.id === "pos_pay_monto" ||
+            activeEl.id === "pos_comentario" ||
+            activeEl.id === "btn_complete_sale"
+        );
+        
+        if (isRightPanelActive) {
+            const barcodeInput = document.getElementById("pos_barcode_input");
+            if (barcodeInput) {
+                barcodeInput.focus();
+                barcodeInput.select();
+            }
+        } else {
+            const clientSearch = document.getElementById("pos_client_search");
+            if (clientSearch) {
+                clientSearch.focus();
+                clientSearch.select();
+            }
+        }
+    }
+
+    // Helper function to navigate between form fields sequentially using + / -
+    function navigateFocus(direction) {
+        const modalCheckout = document.getElementById("modal_checkout");
+        const isCheckoutOpen = modalCheckout && modalCheckout.classList.contains("open");
+        
+        const focusableIds = isCheckoutOpen ? [
+            "pos_pay_monto",
+            "pos_comentario",
+            "btn_confirm_checkout"
+        ] : [
+            "pos_barcode_input",
+            "pos_client_search",
+            "pos_client_rnc",
+            "btn_complete_sale"
+        ];
+        
+        const visibleIds = focusableIds.filter(id => {
+            const el = document.getElementById(id);
+            if (!el) return false;
+            return el.offsetWidth > 0 && el.offsetHeight > 0 && !el.disabled;
+        });
+        
+        if (visibleIds.length === 0) return;
+        
+        const activeId = document.activeElement ? document.activeElement.id : null;
+        let index = visibleIds.indexOf(activeId);
+        
+        if (direction === "next") {
+            index = (index + 1) % visibleIds.length;
+        } else if (direction === "prev") {
+            index = index - 1;
+            if (index < 0) index = visibleIds.length - 1;
+        } else {
+            index = 0;
+        }
+        
+        const targetEl = document.getElementById(visibleIds[index]);
+        if (targetEl) {
+            targetEl.focus();
+            if (targetEl.select) {
+                targetEl.select();
+            }
+        }
+    }
 
     async function searchAndAddExactBarcode(barcode) {
         try {
@@ -1694,6 +1953,12 @@
         document.getElementById("summary_itbis").textContent = formatCurrency(computedTotalITBIS);
         document.getElementById("summary_total").textContent = formatCurrency(computedTotalDoc);
 
+        // Update total inside the checkout modal if it exists
+        const modalTotalDisplay = document.getElementById("checkout_modal_total");
+        if (modalTotalDisplay) {
+            modalTotalDisplay.textContent = formatCurrency(computedTotalDoc);
+        }
+
         // Autofill payment inputs if empty
         const payVal = document.getElementById("pos_pay_monto");
         if (activePaymentMethod !== "efectivo") {
@@ -1711,22 +1976,28 @@
 
     // Payment Logic
     function setPaymentMethod(method) {
+        if (isReadOnlyMode) return;
         activePaymentMethod = method;
+        
+        // Highlight active tab
         document.querySelectorAll(".pos-payment-tab").forEach(tab => {
             tab.classList.toggle("active", tab.dataset.method === method);
         });
 
         const payVal = document.getElementById("pos_pay_monto");
         const changeGroup = document.getElementById("change_group");
+        const payContainer = document.getElementById("pos_payment_amounts_container");
         
         if (method !== "efectivo") {
             payVal.value = computedTotalDoc.toFixed(2);
             payVal.disabled = true;
             changeGroup.style.display = "none";
+            if (payContainer) payContainer.style.gridTemplateColumns = "1fr";
         } else {
             payVal.value = "";
             payVal.disabled = false;
-            changeGroup.style.display = "grid";
+            changeGroup.style.display = "block";
+            if (payContainer) payContainer.style.gridTemplateColumns = "1fr 1fr";
         }
         calculateChange();
     }
@@ -1738,20 +2009,25 @@
         const total = computedTotalDoc;
         const paid = parseFloat(payInput.value) || 0;
         const changeVal = document.getElementById("pos_pay_cambio");
+        const btnConfirm = document.getElementById("btn_confirm_checkout");
+        const btnComplete = document.getElementById("btn_complete_sale");
         
         if (activePaymentMethod !== "efectivo") {
             changeVal.value = formatCurrency(0);
-            document.getElementById("btn_complete_sale").disabled = (total <= 0);
+            if (btnConfirm) btnConfirm.disabled = (total <= 0);
+            if (btnComplete) btnComplete.disabled = (total <= 0);
             return;
         }
 
         const diff = paid - total;
         if (diff >= 0) {
             changeVal.value = formatCurrency(diff);
-            document.getElementById("btn_complete_sale").disabled = (total <= 0);
+            if (btnConfirm) btnConfirm.disabled = (total <= 0);
+            if (btnComplete) btnComplete.disabled = (total <= 0);
         } else {
             changeVal.value = "FALTA RD$ " + Math.abs(diff).toFixed(2);
-            document.getElementById("btn_complete_sale").disabled = true;
+            if (btnConfirm) btnConfirm.disabled = true;
+            if (btnComplete) btnComplete.disabled = (total <= 0);
         }
     }
 
@@ -1811,6 +2087,52 @@
         }
     });
 
+    function openCheckoutModal() {
+        if (isReadOnlyMode) return;
+        if (cart.length === 0) {
+            showToast("Agrega al menos un artículo al carrito", "warning");
+            return;
+        }
+        
+        // Show modal
+        const modal = document.getElementById("modal_checkout");
+        if (modal) {
+            modal.classList.add("open");
+        }
+        
+        // Set total
+        const modalTotal = document.getElementById("checkout_modal_total");
+        if (modalTotal) {
+            modalTotal.textContent = formatCurrency(computedTotalDoc);
+        }
+        
+        // Settle payment tabs
+        setPaymentMethod(activePaymentMethod || "efectivo");
+        
+        // Focus pay amount
+        setTimeout(() => {
+            const payVal = document.getElementById("pos_pay_monto");
+            if (payVal) {
+                payVal.focus();
+                payVal.select();
+            }
+        }, 150);
+    }
+
+    function closeCheckoutModal() {
+        const modal = document.getElementById("modal_checkout");
+        if (modal) {
+            modal.classList.remove("open");
+        }
+        setTimeout(() => {
+            const barcodeInput = document.getElementById("pos_barcode_input");
+            if (barcodeInput) {
+                barcodeInput.focus();
+                barcodeInput.select();
+            }
+        }, 100);
+    }
+
     // Submit Sales Invoice (POST)
     async function submitPOSSale() {
         if (isReadOnlyMode) {
@@ -1822,9 +2144,30 @@
             return;
         }
 
-        const btn = document.getElementById("btn_complete_sale");
-        btn.disabled = true;
-        btn.textContent = "Procesando...";
+        // Open checkout modal first if it is not already visible
+        const modalCheckout = document.getElementById("modal_checkout");
+        if (modalCheckout && !modalCheckout.classList.contains("open")) {
+            openCheckoutModal();
+            return;
+        }
+
+        // Validate amount received covers the total if payment method is efectivo
+        const payVal = document.getElementById("pos_pay_monto");
+        const payAmount = parseFloat(payVal.value) || 0;
+        if (activePaymentMethod === "efectivo" && payAmount < computedTotalDoc) {
+            showToast("El monto recibido debe cubrir el total de la venta", "error");
+            if (payVal) {
+                payVal.focus();
+                payVal.select();
+            }
+            return;
+        }
+
+        const btn = document.getElementById("btn_confirm_checkout");
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = "Procesando...";
+        }
 
         const clientId = document.getElementById("pos_client_id").value;
         const clientNombre = document.getElementById("pos_client_nombre").value;
@@ -1835,7 +2178,6 @@
         let cashPaid = 0;
         let cardPaid = 0;
         let transferPaid = 0;
-        const payAmount = parseFloat(payInput.value) || 0;
 
         if (activePaymentMethod === "efectivo") {
             cashPaid = payAmount;
@@ -1878,6 +2220,9 @@
             if (res.ok && data.ok) {
                 showToast("Venta registrada exitosamente");
                 
+                // Close checkout modal
+                closeCheckoutModal();
+
                 // Trigger print
                 await printTicket(data.id_doc);
 
@@ -1890,9 +2235,10 @@
             console.error("Error submitting sale:", error);
             showToast("No se pudo procesar la transacción", "error");
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Completar Venta & Imprimir';
-            document.getElementById("pos_barcode_input").focus();
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Confirmar y Registrar [Enter]';
+            }
         }
     }
 
@@ -2006,10 +2352,10 @@
             }
         }
         
-        // Show/Hide cancellation panel in the lookup panel
-        const cancellationPanel = document.getElementById("cancellation_panel");
-        if (cancellationPanel) {
-            cancellationPanel.style.display = disabled ? "flex" : "none";
+        // Show/Hide lookup panel (contains reprint, cancel actions)
+        const lookupCard = document.getElementById("panel_consulta_ventas");
+        if (lookupCard) {
+            lookupCard.style.display = disabled ? "flex" : "none";
         }
     }
 
@@ -2242,59 +2588,196 @@
         }
     }
 
+    async function reprintConsultedSale() {
+        if (!isReadOnlyMode || !consultedSaleId) {
+            showToast("No hay ninguna venta cargada para reimprimir", "error");
+            return;
+        }
+        showToast("Preparando ticket para reimprimir...");
+        await printTicket(consultedSaleId);
+    }
+
     // Global barcode and shortcut listener
     let barcodeBuffer = "";
     let lastKeyTime = Date.now();
 
     window.addEventListener("keydown", function(e) {
+        const act = document.activeElement;
+        const isInput = act && (act.tagName === "INPUT" || act.tagName === "TEXTAREA" || act.contentEditable === "true");
+
+        // 1. Modales de Sesión (Apertura y Cierre) - Comportamiento de Enter
+        const modalOpen = document.getElementById("modal_open_session");
+        if (modalOpen && modalOpen.classList.contains("open")) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                submitOpenSession();
+                return;
+            }
+            return;
+        }
+
+        const modalClose = document.getElementById("modal_close_session");
+        if (modalClose && modalClose.classList.contains("open")) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                const btnConfirmClose = document.getElementById("btn_confirm_close_session");
+                if (btnConfirmClose && !btnConfirmClose.disabled) {
+                    submitCloseSession();
+                }
+                return;
+            }
+            return;
+        }
+
+        // 1.5. Modal de Cobro (Checkout) - Enter y Escape
+        const modalCheckout = document.getElementById("modal_checkout");
+        if (modalCheckout && modalCheckout.classList.contains("open")) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                submitPOSSale();
+                return;
+            }
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closeCheckoutModal();
+                return;
+            }
+        }
+
+        // 2. Modal de Búsqueda de Artículos - Navegación +/- y Enter
+        const modalArticles = document.getElementById("modal_search_articles");
+        if (modalArticles && modalArticles.classList.contains("open")) {
+            if (e.key === "+" || e.key === "-") {
+                e.preventDefault();
+                if (modalSearchResults.length === 0) return;
+                
+                if (e.key === "+") {
+                    selectedSearchIndex = (selectedSearchIndex + 1) % modalSearchResults.length;
+                } else {
+                    selectedSearchIndex = selectedSearchIndex - 1;
+                    if (selectedSearchIndex < 0) selectedSearchIndex = modalSearchResults.length - 1;
+                }
+                updateModalSearchHighlight();
+                return;
+            }
+            
+            if (e.key === "Enter") {
+                e.preventDefault();
+                if (selectedSearchIndex !== -1) {
+                    selectArticleFromModal(selectedSearchIndex);
+                }
+                return;
+            }
+            
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closeSearchModal();
+                return;
+            }
+            return;
+        }
+
+        // 3. Modal de Búsqueda de Ventas Pasadas
+        const modalSales = document.getElementById("modal_search_past_sales");
+        if (modalSales && modalSales.classList.contains("open")) {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closePastSalesModal();
+                return;
+            }
+            return;
+        }
+
+        // 4. Atajos Globales del Workspace POS (Caja Abierta)
+        
         // F2 Shortcut to open article search modal
         if (e.key === "F2") {
             e.preventDefault();
-            if (isReadOnlyMode) return; // cannot search/add articles in read-only mode
-            const modal = document.getElementById("modal_search_articles");
-            if (!modal.classList.contains("open")) {
-                openSearchModal();
-            } else {
-                document.getElementById("pos_modal_search_input").focus();
-            }
+            if (isReadOnlyMode) return;
+            openSearchModal();
             return;
         }
 
         // F4 Shortcut to open past sales search modal
         if (e.key === "F4") {
             e.preventDefault();
-            const modal = document.getElementById("modal_search_past_sales");
-            if (!modal.classList.contains("open")) {
-                openPastSalesModal();
-            } else {
-                closePastSalesModal();
-            }
+            openPastSalesModal();
             return;
         }
 
-        // F12 Shortcut to complete sale and print
-        if (e.key === "F12") {
+        // Enter: Abrir Modal de Cobro (o reenfocar código de barra si viene de campos de cantidad/descuento)
+        if (e.key === "Enter") {
+            // Si el foco está en inputs de cantidad o descuento del carrito
+            if (act && (act.classList.contains("pos-qty-input") || act.classList.contains("pos-discount-input"))) {
+                e.preventDefault();
+                const barcodeInput = document.getElementById("pos_barcode_input");
+                if (barcodeInput) {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }
+                return;
+            }
+            // Si el foco está en el buscador de códigos de barra
+            if (act && act.id === "pos_barcode_input") {
+                const val = act.value.trim();
+                if (val !== "") {
+                    return; // let standard barcode input search handle it
+                }
+            }
+            // Si el foco está en el buscador de clientes, no abrimos el modal de cobro
+            if (act && act.id === "pos_client_search") {
+                return;
+            }
+            
             e.preventDefault();
             if (isReadOnlyMode) {
                 showToast("No se puede completar venta en modo consulta", "error");
             } else {
-                submitPOSSale();
+                openCheckoutModal();
             }
             return;
         }
 
-        // Escape Shortcut to close modal
+        // Escape Shortcut to reset focus to barcode input
         if (e.key === "Escape") {
-            const modalArticles = document.getElementById("modal_search_articles");
-            if (modalArticles.classList.contains("open")) {
-                closeSearchModal();
-                return;
+            e.preventDefault();
+            const barcodeInput = document.getElementById("pos_barcode_input");
+            if (barcodeInput) {
+                barcodeInput.focus();
+                barcodeInput.select();
             }
-            const modalSales = document.getElementById("modal_search_past_sales");
-            if (modalSales.classList.contains("open")) {
-                closePastSalesModal();
-                return;
+            return;
+        }
+
+        // Backspace para vaciar carrito (Solo si NO estamos enfocando un input/textarea)
+        if (e.key === "Backspace" && !isInput) {
+            e.preventDefault();
+            if (!isReadOnlyMode) {
+                clearCart();
             }
+            return;
+        }
+
+        // Delete (Suprimir) para eliminar fila seleccionada del carrito (Solo si NO estamos enfocando un input/textarea)
+        if (e.key === "Delete" && !isInput) {
+            e.preventDefault();
+            if (!isReadOnlyMode) {
+                removeSelectedCartItem();
+            }
+            return;
+        }
+
+        // Salto de Áreas con '*' (Numpad o regular)
+        if (e.key === "*") {
+            e.preventDefault();
+            togglePaneFocus();
+            return;
+        }
+
+        // Navegación de Campos con '+' y '-' (Numpad o regular)
+        if (e.key === "+" || e.key === "-") {
+            e.preventDefault();
+            navigateFocus(e.key === "+" ? "next" : "prev");
             return;
         }
 
@@ -2302,28 +2785,22 @@
             return;
         }
 
-        // Ignore key inputs if focusing interactive inputs except barcode search inputs
-        const act = document.activeElement;
-        const isInput = act && (act.tagName === "INPUT" || act.tagName === "TEXTAREA" || act.contentEditable === "true");
-        
-        if (isInput && act.id !== "pos_barcode_input" && act.id !== "pos_modal_search_input") {
-            return; // let standard typing pass
+        // Ignore key inputs for scanner buffer if focusing other inputs
+        if (isInput && act.id !== "pos_barcode_input") {
+            return;
         }
 
         const currentTime = Date.now();
         const diff = currentTime - lastKeyTime;
         lastKeyTime = currentTime;
 
-        // Reset buffer if delay is too long
         if (diff > 50) {
             barcodeBuffer = "";
         }
 
-        // Process standard printable characters
         if (e.key.length === 1) {
             barcodeBuffer += e.key;
         } else if (e.key === "Enter") {
-            // Scanner outputs trigger Enter at the end of character sequences
             if (barcodeBuffer.length >= 3 && diff < 50) {
                 e.preventDefault();
                 const code = barcodeBuffer;

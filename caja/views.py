@@ -6555,14 +6555,14 @@ def caja_pos_view(request):
     ctx = _base_context(request, page_title="Caja - Venta POS", active_nav="pos")
     if not ctx:
         return redirect("login")
-    if not has_perm(ctx["auth_payload"]["usuario_id"], "caja", "ver_pos"):
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "venta_pos", "ver"):
         return render_denied(request, active_nav="caja")
     return render(request, "caja/pos.html", ctx)
 
 
 @require_GET
 def caja_pos_session_status_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
     
@@ -6600,7 +6600,7 @@ def caja_pos_session_status_view(request):
 
 @require_http_methods(["POST"])
 def caja_pos_session_open_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -6657,7 +6657,7 @@ def caja_pos_session_open_view(request):
 
 @require_http_methods(["POST"])
 def caja_pos_session_close_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -6757,7 +6757,7 @@ def caja_pos_session_close_view(request):
 
 @require_GET
 def caja_pos_buscar_articulo_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -6887,7 +6887,7 @@ def caja_pos_buscar_articulo_view(request):
 
 @require_http_methods(["POST"])
 def caja_pos_save_sale_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -6932,6 +6932,81 @@ def caja_pos_save_sale_view(request):
                     return JsonResponse({"detail": "No tienes una sesion de caja abierta en esta terminal. Abre caja primero."}, status=400)
                 
                 session_id = int(session_row[0])
+                
+                # Validar stock si está habilitada la facturación por stock
+                empresa = _get_empresa_data()
+                if empresa.get("habilitar_fact_stock"):
+                    requested_qty_by_target = {}
+                    item_details_map = {}
+                    
+                    for item in items:
+                        original_id = str(item.get("id_articulo") or "").strip()
+                        descrip_art = str(item.get("descrip_art") or "").strip()
+                        if not original_id:
+                            continue
+                        
+                        qty = _to_decimal(item.get("cantidad"), Decimal("1"))
+                        if qty <= 0:
+                            qty = Decimal("1")
+                            
+                        # Consultar si el artículo tiene equivalencia (conversión de stock)
+                        cursor.execute(
+                            "SELECT ID_ARTICULO_BASE, FACTOR FROM ARTICULO_CONVERSION WHERE ID_ARTICULO = %s",
+                            [original_id]
+                        )
+                        conv_row = cursor.fetchone()
+                        
+                        if conv_row:
+                            id_articulo_base = str(conv_row[0]).strip()
+                            factor = Decimal(str(conv_row[1])) if conv_row[1] else Decimal("1.0")
+                            if factor <= Decimal("0"):
+                                factor = Decimal("1.0")
+                            target_art_id = id_articulo_base
+                            target_qty = qty * factor
+                        else:
+                            target_art_id = original_id
+                            target_qty = qty
+                            
+                        requested_qty_by_target[target_art_id] = requested_qty_by_target.get(target_art_id, Decimal("0")) + target_qty
+                        if target_art_id not in item_details_map:
+                            item_details_map[target_art_id] = {
+                                "id_articulo": original_id,
+                                "descrip_art": descrip_art
+                            }
+                            
+                    # Consultar stock actual en TARJETERO para los artículos finales a descontar
+                    target_art_ids = list(requested_qty_by_target.keys())
+                    if target_art_ids:
+                        placeholders = ", ".join(["%s"] * len(target_art_ids))
+                        cursor.execute(
+                            f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                            target_art_ids
+                        )
+                        tarj_stock = {str(row[0]).strip(): Decimal(str(row[1] or 0)) for row in cursor.fetchall()}
+                        
+                        stock_errors = []
+                        for target_art_id, qty_solicitada in requested_qty_by_target.items():
+                            qty_disponible = tarj_stock.get(target_art_id, Decimal("0"))
+                            if qty_solicitada > qty_disponible:
+                                details = item_details_map[target_art_id]
+                                etiqueta = f"{details['id_articulo']} - {details['descrip_art']}".strip(" -")
+                                if details['id_articulo'] != target_art_id:
+                                    cursor.execute("SELECT DESCRIP_ART FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [target_art_id])
+                                    base_row = cursor.fetchone()
+                                    base_desc = str(base_row[0]).strip() if base_row else "Artículo Base"
+                                    etiqueta += f" (Equivalencia base: {target_art_id} - {base_desc})"
+                                    
+                                stock_errors.append(
+                                    f"- {etiqueta} | seleccionado: {qty_solicitada} | disponible: {qty_disponible}"
+                                )
+                                
+                        if stock_errors:
+                            return JsonResponse(
+                                {
+                                    "detail": "No hay inventario suficiente para facturar:\n" + "\n".join(stock_errors)
+                                },
+                                status=400
+                            )
                 
                 # Obtener max ID_DOC
                 cursor.execute("SELECT ISNULL(MAX(TRY_CAST(ID_DOC AS BIGINT)), 0) + 1 FROM CAB_POS WITH (UPDLOCK, HOLDLOCK)")
@@ -7020,6 +7095,38 @@ def caja_pos_save_sale_view(request):
                     
                     _insert_dynamic_row(cursor, "DET_POS", det_columns, det_values, skip_columns=["ID_DETALLE"])
                     
+                    # Check conversion
+                    cursor.execute(
+                        "SELECT ID_ARTICULO_BASE, FACTOR FROM ARTICULO_CONVERSION WHERE ID_ARTICULO = %s",
+                        [item["id_articulo"]]
+                    )
+                    conv_row = cursor.fetchone()
+                    
+                    if conv_row:
+                        id_articulo_base = str(conv_row[0]).strip()
+                        factor = Decimal(str(conv_row[1])) if conv_row[1] else Decimal("1.0")
+                        if factor <= Decimal("0"):
+                            factor = Decimal("1.0")
+                        
+                        target_art_id = id_articulo_base
+                        target_qty = qty * factor
+                        
+                        # Load cost and description of the base article
+                        cursor.execute("SELECT DESCRIP_ART, COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [id_articulo_base])
+                        base_art_row = cursor.fetchone()
+                        if base_art_row:
+                            target_desc = str(base_art_row[0]).strip()
+                            target_cost = _to_decimal(base_art_row[1], Decimal("1.0"))
+                        else:
+                            target_desc = item["descrip_art"]
+                            target_cost = cost
+                    else:
+                        target_art_id = item["id_articulo"]
+                        target_qty = qty
+                        target_desc = item["descrip_art"]
+                        target_cost = cost
+                        factor = Decimal("1.0")
+
                     # Descontar stock
                     cursor.execute(
                         """
@@ -7028,7 +7135,7 @@ def caja_pos_save_sale_view(request):
                             FECHA_ACT = GETDATE()
                         WHERE ID_ARTICULO = %s
                         """,
-                        [qty, item["id_articulo"]]
+                        [target_qty, target_art_id]
                     )
                     
                     # Insertar en TARJETERO
@@ -7037,12 +7144,12 @@ def caja_pos_save_sale_view(request):
                         "ID_DOC": str(new_id_doc),
                         "ID_SN": cliente_id,
                         "NOM_SN": cliente_nombre,
-                        "ID_ARTICULO": item["id_articulo"],
-                        "DESCRIP_ART": item["descrip_art"],
-                        "CANTIDAD": -qty,
-                        "COSTO": cost,
-                        "PRECIO": price,
-                        "TOTAL_COSTO": -qty * cost,
+                        "ID_ARTICULO": target_art_id,
+                        "DESCRIP_ART": target_desc,
+                        "CANTIDAD": -target_qty,
+                        "COSTO": target_cost,
+                        "PRECIO": price / factor,
+                        "TOTAL_COSTO": -target_qty * target_cost,
                         "TOTAL_PRECIO": -qty * price,
                         "CTA_INV": "11030101",
                         "LOTE": "No",
@@ -7065,7 +7172,7 @@ def caja_pos_save_sale_view(request):
 
 @require_GET
 def caja_pos_ticket_print_data_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7105,6 +7212,10 @@ def caja_pos_ticket_print_data_view(request):
         if transf > 0:
             pago_lineas.append({"label": "Transferencia", "monto": transf, "cambio": 0.0})
             
+        cajero_ref = header.get("ID_USUARIO")
+        cajero_meta = _load_usuario_meta(cajero_ref)
+        cajero_nombre = cajero_meta.get("nombre") or str(cajero_ref or "Cajero General").strip()
+
         print_data = {
             "empresa": empresa,
             "header": {
@@ -7118,7 +7229,7 @@ def caja_pos_ticket_print_data_view(request):
                 "total_desc": _to_float(header.get("TOTAL_DESC")),
                 "total_itbis": _to_float(header.get("TOTAL_ITBIS")),
                 "total_doc": _to_float(header.get("TOTAL_DOC")),
-                "cajero": str(header.get("ID_USUARIO") or "").strip(),
+                "cajero": cajero_nombre,
                 "terminal": str(header.get("TERMINAL") or "").strip(),
             },
             "detail": [
@@ -7143,7 +7254,7 @@ def caja_pos_ticket_print_data_view(request):
 
 @require_GET
 def caja_pos_session_print_close_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7219,7 +7330,7 @@ def caja_pos_session_print_close_view(request):
 
 @require_GET
 def caja_pos_buscar_cliente_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7246,7 +7357,7 @@ def caja_pos_buscar_cliente_view(request):
 
 @require_GET
 def caja_pos_sales_list_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7280,7 +7391,7 @@ def caja_pos_sales_list_view(request):
 
 @require_GET
 def caja_pos_sales_detail_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7331,23 +7442,29 @@ def caja_pos_sales_detail_view(request):
                     "precio_unit": _to_float(r.get("PRECIO")),
                     "porc_desc": _to_float(r.get("PORC_DESC")),
                     "id_impto_vt": _to_int_or_none(r.get("ID_IMPTO")) or 1,
-                    "tarifa_vt": 18.0,
+                    "tarifa_vt": _to_float(r.get("TARIFA") if r.get("TARIFA") is not None else r.get("ITBIS") if r.get("ITBIS") is not None else None),
                 }
                 for r in detail
             ]
         }
         
         if print_data["detail"]:
-            art_ids = [d["id_articulo"] for d in print_data["detail"]]
-            with connection.cursor() as cursor:
-                placeholders = ", ".join(["%s"] * len(art_ids))
-                cursor.execute(
-                    f"SELECT ID_ARTICULO, ISNULL(TARIFA_VT, 18.0) FROM MAESTRO_ARTICULO WHERE ID_ARTICULO IN ({placeholders})",
-                    art_ids
-                )
-                rates = {str(row[0]).strip(): float(row[1] or 18.0) for row in cursor.fetchall()}
-                for d in print_data["detail"]:
-                    d["tarifa_vt"] = rates.get(d["id_articulo"], 18.0)
+            missing_rate_art_ids = [d["id_articulo"] for d in print_data["detail"] if d["tarifa_vt"] is None]
+            if missing_rate_art_ids:
+                with connection.cursor() as cursor:
+                    placeholders = ", ".join(["%s"] * len(missing_rate_art_ids))
+                    cursor.execute(
+                        f"SELECT ID_ARTICULO, ISNULL(TARIFA_VT, 18.0) FROM MAESTRO_ARTICULO WHERE ID_ARTICULO IN ({placeholders})",
+                        missing_rate_art_ids
+                    )
+                    rates = {str(row[0]).strip(): float(row[1] or 18.0) for row in cursor.fetchall()}
+                    for d in print_data["detail"]:
+                        if d["tarifa_vt"] is None:
+                            d["tarifa_vt"] = rates.get(d["id_articulo"], 18.0)
+            
+            for d in print_data["detail"]:
+                if d["tarifa_vt"] is None:
+                    d["tarifa_vt"] = 18.0
                     
         return JsonResponse({"ok": True, "sale": print_data})
     except Exception as exc:
@@ -7356,7 +7473,7 @@ def caja_pos_sales_detail_view(request):
 
 @require_http_methods(["POST"])
 def caja_pos_sales_cancel_view(request):
-    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    auth_payload = _require_perm_json(request, "venta_pos", "ver")
     if isinstance(auth_payload, JsonResponse):
         return auth_payload
         
@@ -7404,6 +7521,40 @@ def caja_pos_sales_cancel_view(request):
                     if qty <= 0:
                         continue
                         
+                    # Check conversion
+                    cursor.execute(
+                        "SELECT ID_ARTICULO_BASE, FACTOR FROM ARTICULO_CONVERSION WHERE ID_ARTICULO = %s",
+                        [art_id]
+                    )
+                    conv_row = cursor.fetchone()
+                    
+                    if conv_row:
+                        id_articulo_base = str(conv_row[0]).strip()
+                        factor = Decimal(str(conv_row[1])) if conv_row[1] else Decimal("1.0")
+                        if factor <= Decimal("0"):
+                            factor = Decimal("1.0")
+                        
+                        target_art_id = id_articulo_base
+                        target_qty = qty * factor
+                        
+                        # Load cost and description of the base article
+                        cursor.execute("SELECT DESCRIP_ART, COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [id_articulo_base])
+                        base_art_row = cursor.fetchone()
+                        if base_art_row:
+                            target_desc = str(base_art_row[0]).strip()
+                            target_cost = _to_decimal(base_art_row[1], Decimal("1.0"))
+                        else:
+                            target_desc = desc
+                            target_cost = Decimal("1.0")
+                    else:
+                        target_art_id = art_id
+                        target_qty = qty
+                        target_desc = desc
+                        cursor.execute("SELECT COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [art_id])
+                        cost_row = cursor.fetchone()
+                        target_cost = _to_decimal(cost_row[0] if cost_row else Decimal("1.0"), Decimal("1.0"))
+                        factor = Decimal("1.0")
+
                     cursor.execute(
                         """
                         UPDATE MAESTRO_ARTICULO
@@ -7411,24 +7562,20 @@ def caja_pos_sales_cancel_view(request):
                             FECHA_ACT = GETDATE()
                         WHERE ID_ARTICULO = %s
                         """,
-                        [qty, art_id]
+                        [target_qty, target_art_id]
                     )
-                    
-                    cursor.execute("SELECT COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [art_id])
-                    cost_row = cursor.fetchone()
-                    cost = _to_decimal(cost_row[0] if cost_row else Decimal("1.0"), Decimal("1.0"))
                     
                     tarj_values = {
                         "TIPO_DOC": "POS_ANUL",
                         "ID_DOC": id_doc,
                         "ID_SN": "1",
                         "NOM_SN": "Devolucion POS",
-                        "ID_ARTICULO": art_id,
-                        "DESCRIP_ART": desc,
-                        "CANTIDAD": qty,
-                        "COSTO": cost,
-                        "PRECIO": price,
-                        "TOTAL_COSTO": qty * cost,
+                        "ID_ARTICULO": target_art_id,
+                        "DESCRIP_ART": target_desc,
+                        "CANTIDAD": target_qty,
+                        "COSTO": target_cost,
+                        "PRECIO": price / factor,
+                        "TOTAL_COSTO": target_qty * target_cost,
                         "TOTAL_PRECIO": qty * price,
                         "CTA_INV": "11030101",
                         "LOTE": "No",
