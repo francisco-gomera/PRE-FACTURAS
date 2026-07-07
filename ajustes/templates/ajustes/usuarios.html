@@ -1110,9 +1110,7 @@
       })
       .then(res => res.json())
       .then(data => {
-        if (data.ok) {
-          window.alert("Configuración de módulo/permiso actualizada.");
-        } else {
+        if (!data.ok) {
           window.alert(data.detail || "Error al actualizar la configuración.");
           this.checked = !activo;
         }
