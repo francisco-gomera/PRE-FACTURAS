@@ -89,6 +89,7 @@ def ensure_base_perms():
             ("cxc_modificar_fechas_pago", "Modificar Fechas de Pago en Cuentas por Cobrar"),
             ("ver_cuadre_caja", "Ver Cuadre de Caja"),
             ("ver_financiamiento", "Ver Financiamiento"),
+            ("ver_pos", "Ver Venta POS"),
         ],
         "chat_interno": [
             ("ver_usuarios", "Ver Usuarios de Chat"),

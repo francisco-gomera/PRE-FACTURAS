@@ -125,6 +125,16 @@ def _to_decimal(value, default=Decimal("0")):
         return default
 
 
+def _to_int_or_none(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(float(raw))
+    except Exception:
+        return None
+
+
 def _values_match(left, right, tolerance=Decimal("0.01")):
     return abs(_to_decimal(left) - _to_decimal(right)) <= tolerance
 
@@ -6684,3 +6694,908 @@ def financiamiento_guardar_view(request):
             "record": record,
         }
     )
+
+
+# ==============================================================================
+# POINT OF SALE (POS) VIEWS
+# ==============================================================================
+
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+@ensure_csrf_cookie
+def caja_pos_view(request):
+    ctx = _base_context(request, page_title="Caja - Venta POS", active_nav="pos")
+    if not ctx:
+        return redirect("login")
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "caja", "ver_pos"):
+        return render_denied(request, active_nav="caja")
+    return render(request, "caja/pos.html", ctx)
+
+
+@require_GET
+def caja_pos_session_status_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+    
+    cajero = auth_payload["usuario_id"]
+    terminal = _resolve_request_terminal(request)
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1 IDcuadre, Fecha, Caja, Fondo, Confirmado, Observaciones
+                FROM CuadreCaja
+                WHERE Cajero = %s AND Caja = %s AND ISNULL(Confirmado, 'N') <> 'Y'
+                ORDER BY Fecha DESC
+                """,
+                [cajero, terminal]
+            )
+            row = cursor.fetchone()
+            
+        if row:
+            session_data = {
+                "id": int(row[0]),
+                "fecha": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "",
+                "caja": str(row[2] or "").strip(),
+                "monto_inicial": float(row[3] or 0),
+                "confirmado": str(row[4] or "").strip(),
+                "observaciones": str(row[5] or "").strip()
+            }
+            return JsonResponse({"ok": True, "active": True, "session": session_data})
+        else:
+            return JsonResponse({"ok": True, "active": False})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error verificando caja: {exc}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def caja_pos_session_open_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    cajero = auth_payload["usuario_id"]
+    terminal = _resolve_request_terminal(request)
+    
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        monto_inicial = _to_decimal(payload.get("monto_inicial"), Decimal("0"))
+        observaciones = str(payload.get("observaciones") or "").strip()
+    except Exception:
+        return JsonResponse({"detail": "JSON invalido"}, status=400)
+        
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Verificar si ya existe abierta
+                cursor.execute(
+                    """
+                    SELECT TOP 1 IDcuadre FROM CuadreCaja
+                    WHERE Cajero = %s AND Caja = %s AND ISNULL(Confirmado, 'N') <> 'Y'
+                    """,
+                    [cajero, terminal]
+                )
+                if cursor.fetchone():
+                    return JsonResponse({"detail": "Ya existe una sesion de caja abierta en esta terminal."}, status=400)
+                
+                # Obtener max id
+                cursor.execute("SELECT ISNULL(MAX(IDcuadre), 0) + 1 FROM CuadreCaja WITH (UPDLOCK, HOLDLOCK)")
+                new_id = int(cursor.fetchone()[0] or 1)
+                
+                # Insertar
+                cursor.execute(
+                    """
+                    INSERT INTO CuadreCaja 
+                    (IDcuadre, Fecha, Caja, Cajero, Fondo, Confirmado, Observaciones,
+                     Efectivo, Cheque, Tarjeta, Credito, Regalo, NCredito, TotalVenta, TotalVentaPOS,
+                     FondoUS, EfectivoUS, ChequeUS, TarjetaUS, CreditoUS, RegaloUS, NCreditoUS, TotalVentaUS,
+                     FondoEU, EfectivoEU, ChequeEU, TarjetaEU, CreditoEU, RegaloEU, NCreditoEU, TotalVentaEU,
+                     TotalEfectivo, TotalRI, Diferencia)
+                    VALUES 
+                    (%s, GETDATE(), %s, %s, %s, 'N', %s,
+                     0, 0, 0, 0, 0, 0, 0, 0,
+                     0, 0, 0, 0, 0, 0, 0, 0,
+                     0, 0, 0, 0, 0, 0, 0, 0,
+                     0, 0, 0)
+                    """,
+                    [new_id, terminal, cajero, monto_inicial, observaciones]
+                )
+        return JsonResponse({"ok": True, "session_id": new_id})
+    except Exception as exc:
+        return JsonResponse({"detail": f"No se pudo abrir la caja: {exc}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def caja_pos_session_close_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    cajero = auth_payload["usuario_id"]
+    terminal = _resolve_request_terminal(request)
+    
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        monto_cierre = _to_decimal(payload.get("monto_cierre"), Decimal("0"))
+        observaciones = str(payload.get("observaciones") or "").strip()
+    except Exception:
+        return JsonResponse({"detail": "JSON invalido"}, status=400)
+        
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Obtener session activa
+                cursor.execute(
+                    """
+                    SELECT TOP 1 IDcuadre, Fecha, Fondo FROM CuadreCaja
+                    WHERE Cajero = %s AND Caja = %s AND ISNULL(Confirmado, 'N') <> 'Y'
+                    ORDER BY Fecha DESC
+                    """,
+                    [cajero, terminal]
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return JsonResponse({"detail": "No hay una sesion de caja abierta en esta terminal."}, status=400)
+                
+                session_id = int(row[0])
+                fecha_apertura = row[1]
+                fondo = _to_decimal(row[2], Decimal("0"))
+                
+                # Sumar ventas pos
+                cursor.execute(
+                    """
+                    SELECT 
+                        COALESCE(SUM(EFECTIVO - CAMBIO), 0) AS total_efectivo,
+                        COALESCE(SUM(TARJETA), 0) AS total_tarjeta,
+                        COALESCE(SUM(TRANSFERENCIA), 0) AS total_transferencia,
+                        COALESCE(SUM(TOTAL_DOC), 0) AS total_ventas
+                    FROM CAB_POS
+                    WHERE ID_USUARIO = %s AND TERMINAL = %s AND FECHA_CREACION >= %s AND ISNULL(CANCELADO, 'N') <> 'Y'
+                    """,
+                    [cajero, terminal, fecha_apertura]
+                )
+                sales_row = cursor.fetchone()
+                total_efectivo = _to_decimal(sales_row[0], Decimal("0"))
+                total_tarjeta = _to_decimal(sales_row[1], Decimal("0"))
+                total_transferencia = _to_decimal(sales_row[2], Decimal("0"))
+                total_ventas = _to_decimal(sales_row[3], Decimal("0"))
+                
+                expected_cash = fondo + total_efectivo
+                difference = monto_cierre - expected_cash
+                
+                # Actualizar CuadreCaja
+                cursor.execute(
+                    """
+                    UPDATE CuadreCaja
+                    SET Confirmado = 'Y',
+                        Efectivo = %s,
+                        Tarjeta = %s,
+                        TotalRI = %s,
+                        TotalVenta = %s,
+                        TotalVentaPOS = %s,
+                        TotalEfectivo = %s,
+                        Diferencia = %s,
+                        Observaciones = %s
+                    WHERE IDcuadre = %s
+                    """,
+                    [
+                        total_efectivo,
+                        total_tarjeta,
+                        total_transferencia,
+                        total_ventas,
+                        total_ventas,
+                        monto_cierre,
+                        difference,
+                        observaciones,
+                        session_id
+                    ]
+                )
+                
+        summary = {
+            "fondo": float(fondo),
+            "efectivo_ventas": float(total_efectivo),
+            "tarjeta_ventas": float(total_tarjeta),
+            "transferencia_ventas": float(total_transferencia),
+            "total_ventas": float(total_ventas),
+            "monto_cierre": float(monto_cierre),
+            "diferencia": float(difference)
+        }
+        return JsonResponse({"ok": True, "session_id": session_id, "summary": summary})
+    except Exception as exc:
+        return JsonResponse({"detail": f"No se pudo cerrar la caja: {exc}"}, status=500)
+
+
+@require_GET
+def caja_pos_buscar_articulo_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+        
+    from django.db.models import Q
+    from prefacturas_app.models_existing import MaestroArticulo
+    from prefacturas_app.models import CodigoVariable
+    
+    scale_rule = None
+    parsed_code = None
+    parsed_value = None
+    
+    # 1. Comprobar si el query coincide con alguna regla de balanza activa
+    if q.isdigit() and len(q) >= 8:
+        rules = CodigoVariable.objects.filter(activo="Y")
+        for rule in rules:
+            if q.startswith(rule.prefijo):
+                scale_rule = rule
+                break
+                
+    if scale_rule:
+        try:
+            start_p = scale_rule.pos_producto
+            len_p = scale_rule.len_producto
+            parsed_code = q[start_p : start_p + len_p]
+            
+            start_v = scale_rule.pos_valor
+            len_v = scale_rule.len_valor
+            val_str = q[start_v : start_v + len_v]
+            
+            raw_val = float(val_str)
+            parsed_value = raw_val / float(scale_rule.divisor_valor)
+        except Exception:
+            scale_rule = None
+            
+    # 2. Realizar la búsqueda
+    qs = MaestroArticulo.objects.exclude(bloqueado__iexact="Y")
+    
+    articles = []
+    
+    if scale_rule and parsed_code:
+        # Búsqueda por balanza
+        candidates = [parsed_code]
+        stripped = parsed_code.lstrip("0")
+        if stripped and stripped not in candidates:
+            candidates.append(stripped)
+            
+        exact_match = qs.filter(Q(cod_barra__in=candidates) | Q(id_articulo__in=candidates))
+        if exact_match.exists():
+            matched_list = list(exact_match)
+            matched_list.sort(key=lambda a: 0 if a.cod_barra.strip() in candidates else 1)
+            articles = matched_list[:1]
+        else:
+            # Fallback a búsqueda normal
+            scale_rule = None
+            
+    if not scale_rule or not articles:
+        # Búsqueda estándar
+        candidates = [q]
+        q_clean = q.strip()
+        if q_clean.isdigit():
+            stripped = q_clean.lstrip("0")
+            if stripped and stripped not in candidates:
+                candidates.append(stripped)
+            if len(q_clean) > 1:
+                wo_last = q_clean[:-1]
+                if wo_last not in candidates:
+                    candidates.append(wo_last)
+                stripped_wo_last = stripped[:-1]
+                if stripped_wo_last and stripped_wo_last not in candidates:
+                    candidates.append(stripped_wo_last)
+                    
+        exact_match = qs.filter(cod_barra__in=candidates)
+        if exact_match.exists():
+            matched_list = list(exact_match)
+            matched_list.sort(key=lambda a: candidates.index(a.cod_barra.strip()) if a.cod_barra.strip() in candidates else 999)
+            articles = matched_list[:1]
+        else:
+            articles = list(qs.filter(Q(referencia__icontains=q) | Q(descrip_art__icontains=q))[:40])
+            
+    if not articles:
+        return JsonResponse({"results": []})
+        
+    articulo_ids = [a.id_articulo for a in articles]
+    tarj_stock = {}
+    if articulo_ids:
+        with connection.cursor() as cursor:
+            placeholders = ", ".join(["%s"] * len(articulo_ids))
+            cursor.execute(
+                f"SELECT ID_ARTICULO, COALESCE(SUM(CANTIDAD), 0) FROM TARJETERO WHERE ID_ARTICULO IN ({placeholders}) GROUP BY ID_ARTICULO",
+                articulo_ids
+            )
+            tarj_stock = {str(row[0]).strip(): float(row[1] or 0) for row in cursor.fetchall()}
+            
+    results = []
+    for a in articles:
+        art_id = a.id_articulo.strip()
+        
+        es_pesado = False
+        cantidad_pesada = 1.0
+        tipo_variable = "normal"
+        
+        if scale_rule and parsed_code:
+            es_pesado = True
+            cantidad_pesada = parsed_value
+            tipo_variable = scale_rule.tipo
+            
+        results.append({
+            "id_articulo": art_id,
+            "descrip_art": a.descrip_art.strip() if a.descrip_art else "",
+            "referencia": a.referencia.strip() if a.referencia else "",
+            "cod_barra": a.cod_barra.strip() if a.cod_barra else "",
+            "precio_det": float(a.precio_det or 0),
+            "tarifa_vt": float(a.tarifa_vt or 0),
+            "stock": tarj_stock.get(art_id, 0.0),
+            "id_impto_vt": a.id_impto_vt,
+            "es_pesado": es_pesado,
+            "cantidad_pesada": cantidad_pesada,
+            "tipo_variable": tipo_variable,
+        })
+        
+    return JsonResponse({"results": results})
+
+
+@require_http_methods(["POST"])
+def caja_pos_save_sale_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    cajero = auth_payload["usuario_id"]
+    terminal = _resolve_request_terminal(request)
+    
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        cliente_id = str(payload.get("cliente_id") or "1").strip()
+        cliente_nombre = str(payload.get("cliente_nombre") or "Cliente General").strip()
+        cliente_rnc = str(payload.get("cliente_rnc") or "").strip()
+        items = payload.get("items") or []
+        efectivo_pagado = _to_decimal(payload.get("efectivo_pagado"), Decimal("0"))
+        tarjeta_pagado = _to_decimal(payload.get("tarjeta_pagado"), Decimal("0"))
+        transferencia_pagado = _to_decimal(payload.get("transferencia_pagado"), Decimal("0"))
+        cambio = _to_decimal(payload.get("cambio"), Decimal("0"))
+        subtotal = _to_decimal(payload.get("subtotal"), Decimal("0"))
+        total_desc = _to_decimal(payload.get("total_desc"), Decimal("0"))
+        total_itbis = _to_decimal(payload.get("total_itbis"), Decimal("0"))
+        total_doc = _to_decimal(payload.get("total_doc"), Decimal("0"))
+        comentario = str(payload.get("comentario") or "").strip()
+    except Exception:
+        return JsonResponse({"detail": "JSON invalido"}, status=400)
+        
+    if not items:
+        return JsonResponse({"detail": "Debes agregar al menos un articulo."}, status=400)
+        
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Validar caja abierta
+                cursor.execute(
+                    """
+                    SELECT TOP 1 IDcuadre, Fecha FROM CuadreCaja
+                    WHERE Cajero = %s AND Caja = %s AND ISNULL(Confirmado, 'N') <> 'Y'
+                    ORDER BY Fecha DESC
+                    """,
+                    [cajero, terminal]
+                )
+                session_row = cursor.fetchone()
+                if not session_row:
+                    return JsonResponse({"detail": "No tienes una sesion de caja abierta en esta terminal. Abre caja primero."}, status=400)
+                
+                session_id = int(session_row[0])
+                
+                # Obtener max ID_DOC
+                cursor.execute("SELECT ISNULL(MAX(TRY_CAST(ID_DOC AS BIGINT)), 0) + 1 FROM CAB_POS WITH (UPDLOCK, HOLDLOCK)")
+                new_id_doc = int(cursor.fetchone()[0] or 1)
+                
+                # Insertar en CAB_POS
+                cab_columns = _load_table_columns("CAB_POS")
+                cab_values = {}
+                _assign_existing_values(cab_values, cab_columns, new_id_doc, "ID_DOC")
+                _assign_existing_values(cab_values, cab_columns, new_id_doc, "ID_DOC_BASE", "NO_DOC", "NO_ED", "NO_RECIBO")
+                _assign_existing_values(cab_values, cab_columns, "FC", "TIPO_DOC", "TIPO")
+                _assign_existing_values(cab_values, cab_columns, "N", "CANCELADO")
+                _assign_existing_values(cab_values, cab_columns, "N", "IMPRESO")
+                _assign_existing_values(cab_values, cab_columns, "Cerrado", "EST_DOC", "ESTATUS")
+                _assign_existing_values(cab_values, cab_columns, cliente_id, "ID_SN")
+                _assign_existing_values(cab_values, cab_columns, cliente_nombre, "NOM_SOCIO")
+                _assign_existing_values(cab_values, cab_columns, cliente_rnc, "RNC_CED")
+                _assign_existing_values(cab_values, cab_columns, timezone.localdate(), "FECHA_CONT", "FECHA_DOC", "FECHA_VENC")
+                _assign_existing_values(cab_values, cab_columns, subtotal, "SUBTOTAL")
+                _assign_existing_values(cab_values, cab_columns, total_desc, "TOTAL_DESC")
+                _assign_existing_values(cab_values, cab_columns, total_itbis, "TOTAL_ITBIS")
+                _assign_existing_values(cab_values, cab_columns, total_doc, "TOTAL_DOC")
+                _assign_existing_values(cab_values, cab_columns, "RD$", "MON_DOC")
+                _assign_existing_values(cab_values, cab_columns, efectivo_pagado, "EFECTIVO", "RECIBO_E")
+                _assign_existing_values(cab_values, cab_columns, tarjeta_pagado, "TARJETA", "RECIBO_T")
+                _assign_existing_values(cab_values, cab_columns, transferencia_pagado, "TRANSFERENCIA", "RECIBO_F")
+                _assign_existing_values(cab_values, cab_columns, cambio, "CAMBIO")
+                _assign_existing_values(cab_values, cab_columns, comentario, "COMENTARIO")
+                _assign_existing_values(cab_values, cab_columns, cajero, "ID_USUARIO")
+                _assign_existing_values(cab_values, cab_columns, terminal, "TERMINAL")
+                _assign_existing_values(cab_values, cab_columns, timezone.localtime(), "FECHA_CREACION")
+                _assign_existing_values(cab_values, cab_columns, "Y", "POSTEADO")
+                _assign_existing_values(cab_values, cab_columns, timezone.localdate().year, "EJERCICIO")
+                _assign_existing_values(cab_values, cab_columns, str(timezone.localdate().month), "PERIODO_CONT")
+                
+                _insert_dynamic_row(cursor, "CAB_POS", cab_columns, cab_values)
+                
+                # Insertar en DET_POS, actualizar stock, insertar en TARJETERO
+                det_columns = _load_table_columns("DET_POS")
+                tarjetero_columns = _load_table_columns("TARJETERO")
+                
+                for idx, item in enumerate(items, start=1):
+                    qty = _to_decimal(item["cantidad"], Decimal("1"))
+                    price = _to_decimal(item["precio_unit"], Decimal("0"))
+                    desc_pct = _to_decimal(item.get("porc_desc"), Decimal("0"))
+                    impto_pct = _to_decimal(item.get("tarifa_vt"), Decimal("18"))
+                    id_impto = _to_int_or_none(item.get("id_impto_vt")) or 1
+                    
+                    total_precio = qty * price
+                    total_desc_monto = total_precio * (desc_pct / Decimal("100"))
+                    total_precio_neto = total_precio - total_desc_monto
+                    itbis_line = total_precio_neto * (impto_pct / Decimal("100"))
+                    total_linea = total_precio_neto + itbis_line
+                    
+                    # Cargar costo
+                    cursor.execute("SELECT COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [item["id_articulo"]])
+                    cost_row = cursor.fetchone()
+                    cost = _to_decimal(cost_row[0] if cost_row else Decimal("1.0"), Decimal("1.0"))
+                    
+                    det_values = {}
+                    _assign_existing_values(det_values, det_columns, new_id_doc, "ID_DOC")
+                    _assign_existing_values(det_values, det_columns, idx, "No_LINEA", "LINEA")
+                    _assign_existing_values(det_values, det_columns, "POS", "CLASE_DOC_BASE")
+                    _assign_existing_values(det_values, det_columns, new_id_doc, "REF_DOC_BASE")
+                    _assign_existing_values(det_values, det_columns, "C", "ESTATUS_LINEA")
+                    _assign_existing_values(det_values, det_columns, item["id_articulo"], "ID_ARTICULO")
+                    _assign_existing_values(det_values, det_columns, item["descrip_art"], "DESCRIP_ART")
+                    _assign_existing_values(det_values, det_columns, qty, "CANTIDAD", "CANT_ENT")
+                    _assign_existing_values(det_values, det_columns, Decimal("0"), "CANT_PEND")
+                    _assign_existing_values(det_values, det_columns, price, "PRECIO", "PRECIO_BRUTO")
+                    _assign_existing_values(det_values, det_columns, desc_pct, "PORC_DESC")
+                    _assign_existing_values(det_values, det_columns, id_impto, "ID_IMPTO")
+                    _assign_existing_values(det_values, det_columns, impto_pct, "TARIFA", "ITBIS")
+                    _assign_existing_values(det_values, det_columns, itbis_line, "TOTAL_ITBIS")
+                    _assign_existing_values(det_values, det_columns, total_desc_monto, "TOTAL_DESC")
+                    _assign_existing_values(det_values, det_columns, total_precio, "TOTAL_PRECIO")
+                    _assign_existing_values(det_values, det_columns, total_precio_neto, "TOTAL_PRECIO_NETO")
+                    _assign_existing_values(det_values, det_columns, total_linea, "TOTAL_LINEA")
+                    _assign_existing_values(det_values, det_columns, cost, "COSTO")
+                    _assign_existing_values(det_values, det_columns, cost * qty, "TOTAL_COSTO")
+                    _assign_existing_values(det_values, det_columns, 1, "ID_ALMACEN")
+                    _assign_existing_values(det_values, det_columns, cajero, "ID_VENDEDOR")
+                    _assign_existing_values(det_values, det_columns, timezone.localdate(), "FECHA_CONT")
+                    _assign_existing_values(det_values, det_columns, str(timezone.localdate().month), "PERIODO_CONT")
+                    _assign_existing_values(det_values, det_columns, timezone.localdate().year, "EJERCICIO")
+                    
+                    _insert_dynamic_row(cursor, "DET_POS", det_columns, det_values, skip_columns=["ID_DETALLE"])
+                    
+                    # Descontar stock
+                    cursor.execute(
+                        """
+                        UPDATE MAESTRO_ARTICULO
+                        SET STOCK = ISNULL(STOCK, 0) - %s,
+                            FECHA_ACT = GETDATE()
+                        WHERE ID_ARTICULO = %s
+                        """,
+                        [qty, item["id_articulo"]]
+                    )
+                    
+                    # Insertar en TARJETERO
+                    tarj_values = {
+                        "TIPO_DOC": "POS",
+                        "ID_DOC": str(new_id_doc),
+                        "ID_SN": cliente_id,
+                        "NOM_SN": cliente_nombre,
+                        "ID_ARTICULO": item["id_articulo"],
+                        "DESCRIP_ART": item["descrip_art"],
+                        "CANTIDAD": -qty,
+                        "COSTO": cost,
+                        "PRECIO": price,
+                        "TOTAL_COSTO": -qty * cost,
+                        "TOTAL_PRECIO": -qty * price,
+                        "CTA_INV": "11030101",
+                        "LOTE": "No",
+                        "FECHA_CONT": timezone.localdate(),
+                        "FECHA_VENC": timezone.localdate(),
+                        "FECHA_DOC": timezone.localdate(),
+                        "FECHA_CREACION": timezone.localtime(),
+                        "MONEDA": "RD$",
+                        "ID_ALMACEN": 1,
+                        "ID_USUARIO": cajero,
+                        "PERIODO_CONT": timezone.localdate().month,
+                        "EJERCICIO": timezone.localdate().year,
+                    }
+                    _insert_dynamic_row(cursor, "TARJETERO", tarjetero_columns, tarj_values)
+                    
+        return JsonResponse({"ok": True, "id_doc": new_id_doc})
+    except Exception as exc:
+        return JsonResponse({"detail": f"No se pudo guardar la venta: {exc}"}, status=500)
+
+
+@require_GET
+def caja_pos_ticket_print_data_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    id_doc = (request.GET.get("id_doc") or "").strip()
+    if not id_doc:
+        return JsonResponse({"detail": "Parametro id_doc requerido"}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            # Cargar cabecera
+            cursor.execute("SELECT * FROM CAB_POS WHERE CAST(ID_DOC AS VARCHAR(50)) = %s", [id_doc])
+            cab_cols = [col[0] for col in cursor.description]
+            cab_row = cursor.fetchone()
+            if not cab_row:
+                return JsonResponse({"detail": "Venta POS no encontrada."}, status=404)
+            header = _normalize_result_row(cab_cols, cab_row)
+            
+            # Cargar detalle
+            cursor.execute("SELECT * FROM DET_POS WHERE CAST(ID_DOC AS VARCHAR(50)) = %s ORDER BY No_LINEA", [id_doc])
+            det_cols = [col[0] for col in cursor.description]
+            det_rows = cursor.fetchall()
+            detail = [_normalize_result_row(det_cols, r) for r in det_rows]
+            
+        empresa = _get_empresa_data()
+        
+        # Desglose de formas de pago
+        pago_lineas = []
+        efectivo = _to_float(header.get("EFECTIVO"))
+        tarjeta = _to_float(header.get("TARJETA"))
+        transf = _to_float(header.get("TRANSFERENCIA"))
+        cambio = _to_float(header.get("CAMBIO"))
+        
+        if efectivo > 0:
+            pago_lineas.append({"label": "Efectivo", "monto": efectivo, "cambio": cambio})
+        if tarjeta > 0:
+            pago_lineas.append({"label": "Tarjeta", "monto": tarjeta, "cambio": 0.0})
+        if transf > 0:
+            pago_lineas.append({"label": "Transferencia", "monto": transf, "cambio": 0.0})
+            
+        print_data = {
+            "empresa": empresa,
+            "header": {
+                "id_doc": _stringify_doc(header.get("ID_DOC")),
+                "fecha": header.get("FECHA_CREACION").strftime("%d/%m/%Y %I:%M %p") if header.get("FECHA_CREACION") else "",
+                "cliente_nombre": str(header.get("NOM_SOCIO") or "Cliente General").strip(),
+                "cliente_rnc": str(header.get("RNC_CED") or "").strip(),
+                "tipo_doc": str(header.get("TIPO_DOC") or "POS").strip(),
+                "comentario": str(header.get("COMENTARIO") or "").strip(),
+                "subtotal": _to_float(header.get("SUBTOTAL")),
+                "total_desc": _to_float(header.get("TOTAL_DESC")),
+                "total_itbis": _to_float(header.get("TOTAL_ITBIS")),
+                "total_doc": _to_float(header.get("TOTAL_DOC")),
+                "cajero": str(header.get("ID_USUARIO") or "").strip(),
+                "terminal": str(header.get("TERMINAL") or "").strip(),
+            },
+            "detail": [
+                {
+                    "id_articulo": str(r.get("ID_ARTICULO") or "").strip(),
+                    "descrip_art": str(r.get("DESCRIP_ART") or "").strip(),
+                    "cantidad": _to_float(r.get("CANTIDAD")),
+                    "precio": _to_float(r.get("PRECIO")),
+                    "total_linea": _to_float(r.get("TOTAL_LINEA")),
+                    "porc_desc": _to_float(r.get("PORC_DESC")),
+                }
+                for r in detail
+            ],
+            "pagos": pago_lineas
+        }
+        if request.GET.get("format") == "html":
+            return render(request, "caja/pos_ticket.html", {"print_data": print_data})
+        return JsonResponse({"print_data": print_data})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error cargando ticket de venta: {exc}"}, status=500)
+
+
+@require_GET
+def caja_pos_session_print_close_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    session_id = (request.GET.get("session_id") or "").strip()
+    if not session_id:
+        return JsonResponse({"detail": "Parametro session_id requerido"}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 
+                    IDcuadre, Fecha, Caja, Cajero, Fondo,
+                    Efectivo, Tarjeta, TotalRI, TotalVenta,
+                    TotalEfectivo, Diferencia, Observaciones
+                FROM CuadreCaja
+                WHERE CAST(IDcuadre AS VARCHAR(50)) = %s
+                """,
+                [session_id]
+            )
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({"detail": "Cierre de caja no encontrado."}, status=404)
+                
+            cols = [col[0] for col in cursor.description]
+            data = _normalize_result_row(cols, row)
+            
+        empresa = _get_empresa_data()
+        
+        # Cargar nombre del cajero
+        cajero_meta = _load_usuario_meta(data.get("CAJERO"))
+        cajero_nombre = cajero_meta.get("nombre") or str(data.get("CAJERO") or "").strip()
+        
+        fondo = _to_float(data.get("FONDO"))
+        efectivo_ventas = _to_float(data.get("EFECTIVO"))
+        tarjeta_ventas = _to_float(data.get("TARJETA"))
+        transferencia_ventas = _to_float(data.get("TOTALRI"))
+        total_ventas = _to_float(data.get("TOTALVENTA"))
+        monto_cierre = _to_float(data.get("TOTALEFECTIVO"))
+        diferencia = _to_float(data.get("DIFERENCIA"))
+        
+        expected_cash = fondo + efectivo_ventas
+        
+        fecha_apert = data.get("FECHA")
+        fecha_cierr = timezone.localtime()
+        
+        print_data = {
+            "empresa": empresa,
+            "session_id": str(data.get("IDCUADRE")),
+            "cajero": cajero_nombre,
+            "terminal": str(data.get("CAJA") or "Caja-1").strip(),
+            "fecha_apertura": fecha_apert.strftime("%d/%m/%Y %I:%M %p") if fecha_apert else "",
+            "fecha_cierre": fecha_cierr.strftime("%d/%m/%Y %I:%M %p") if fecha_cierr else "",
+            "observaciones": str(data.get("OBSERVACIONES") or "").strip(),
+            "expected_cash": expected_cash,
+            "summary": {
+                "fondo": fondo,
+                "efectivo_ventas": efectivo_ventas,
+                "tarjeta_ventas": tarjeta_ventas,
+                "transferencia_ventas": transferencia_ventas,
+                "total_ventas": total_ventas,
+                "monto_cierre": monto_cierre,
+                "diferencia": diferencia
+            }
+        }
+        
+        if request.GET.get("format") == "html":
+            return render(request, "caja/pos_cierre_ticket.html", {"print_data": print_data})
+        return JsonResponse({"print_data": print_data})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error cargando ticket de cierre: {exc}"}, status=500)
+
+
+@require_GET
+def caja_pos_buscar_cliente_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+        
+    from django.db.models import Q
+    from prefacturas_app.models_existing import MaestroSn
+    
+    clientes = MaestroSn.objects.exclude(bloqueado__iexact="Y")
+    clientes = clientes.filter(Q(id_sn__icontains=q) | Q(nom_socio__icontains=q) | Q(rnc_ced__icontains=q))[:40]
+    
+    results = []
+    for c in clientes:
+        results.append({
+            "id_sn": c.id_sn.strip() if c.id_sn else "",
+            "nom_socio": c.nom_socio.strip() if c.nom_socio else "",
+            "rnc_ced": c.rnc_ced.strip() if c.rnc_ced else "",
+        })
+        
+    return JsonResponse({"results": results})
+
+
+@require_GET
+def caja_pos_sales_list_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 100 
+                    ID_DOC, FECHA_CREACION, NOM_SOCIO, TOTAL_DOC, ISNULL(CANCELADO, 'N') AS CANCELADO, ID_USUARIO
+                FROM CAB_POS
+                ORDER BY FECHA_CREACION DESC
+                """
+            )
+            cols = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+            sales = []
+            for r in rows:
+                normalized = _normalize_result_row(cols, r)
+                sales.append({
+                    "id_doc": _stringify_doc(normalized.get("ID_DOC")),
+                    "fecha": normalized.get("FECHA_CREACION").strftime("%d/%m/%Y %I:%M %p") if normalized.get("FECHA_CREACION") else "",
+                    "cliente": str(normalized.get("NOM_SOCIO") or "Cliente General").strip(),
+                    "total": _to_float(normalized.get("TOTAL_DOC")),
+                    "cancelado": str(normalized.get("CANCELADO") or "N").strip(),
+                    "cajero": str(normalized.get("ID_USUARIO") or "").strip(),
+                })
+        return JsonResponse({"ok": True, "sales": sales})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error listando ventas: {exc}"}, status=500)
+
+
+@require_GET
+def caja_pos_sales_detail_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    id_doc = (request.GET.get("id_doc") or "").strip()
+    if not id_doc:
+        return JsonResponse({"detail": "Parametro id_doc requerido"}, status=400)
+        
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM CAB_POS WHERE CAST(ID_DOC AS VARCHAR(50)) = %s", [id_doc])
+            cab_cols = [col[0] for col in cursor.description]
+            cab_row = cursor.fetchone()
+            if not cab_row:
+                return JsonResponse({"detail": "Venta POS no encontrada."}, status=404)
+            header = _normalize_result_row(cab_cols, cab_row)
+            
+            cursor.execute("SELECT * FROM DET_POS WHERE CAST(ID_DOC AS VARCHAR(50)) = %s ORDER BY No_LINEA", [id_doc])
+            det_cols = [col[0] for col in cursor.description]
+            det_rows = cursor.fetchall()
+            detail = [_normalize_result_row(det_cols, r) for r in det_rows]
+            
+        print_data = {
+            "header": {
+                "id_doc": _stringify_doc(header.get("ID_DOC")),
+                "fecha": header.get("FECHA_CREACION").strftime("%d/%m/%Y %I:%M %p") if header.get("FECHA_CREACION") else "",
+                "cliente_id": str(header.get("ID_SN") or "1").strip(),
+                "cliente_nombre": str(header.get("NOM_SOCIO") or "Cliente General").strip(),
+                "cliente_rnc": str(header.get("RNC_CED") or "").strip(),
+                "tipo_doc": str(header.get("TIPO_DOC") or "POS").strip(),
+                "comentario": str(header.get("COMENTARIO") or "").strip(),
+                "subtotal": _to_float(header.get("SUBTOTAL")),
+                "total_desc": _to_float(header.get("TOTAL_DESC")),
+                "total_itbis": _to_float(header.get("TOTAL_ITBIS")),
+                "total_doc": _to_float(header.get("TOTAL_DOC")),
+                "cajero": str(header.get("ID_USUARIO") or "").strip(),
+                "terminal": str(header.get("TERMINAL") or "").strip(),
+                "cancelado": str(header.get("CANCELADO") or "N").strip(),
+                "efectivo": _to_float(header.get("EFECTIVO")),
+                "tarjeta": _to_float(header.get("TARJETA")),
+                "transferencia": _to_float(header.get("TRANSFERENCIA")),
+                "cambio": _to_float(header.get("CAMBIO")),
+            },
+            "detail": [
+                {
+                    "id_articulo": str(r.get("ID_ARTICULO") or "").strip(),
+                    "descrip_art": str(r.get("DESCRIP_ART") or "").strip(),
+                    "cantidad": _to_float(r.get("CANTIDAD")),
+                    "precio_unit": _to_float(r.get("PRECIO")),
+                    "porc_desc": _to_float(r.get("PORC_DESC")),
+                    "id_impto_vt": _to_int_or_none(r.get("ID_IMPTO")) or 1,
+                    "tarifa_vt": 18.0,
+                }
+                for r in detail
+            ]
+        }
+        
+        if print_data["detail"]:
+            art_ids = [d["id_articulo"] for d in print_data["detail"]]
+            with connection.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(art_ids))
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, ISNULL(TARIFA_VT, 18.0) FROM MAESTRO_ARTICULO WHERE ID_ARTICULO IN ({placeholders})",
+                    art_ids
+                )
+                rates = {str(row[0]).strip(): float(row[1] or 18.0) for row in cursor.fetchall()}
+                for d in print_data["detail"]:
+                    d["tarifa_vt"] = rates.get(d["id_articulo"], 18.0)
+                    
+        return JsonResponse({"ok": True, "sale": print_data})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error cargando detalle de venta: {exc}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def caja_pos_sales_cancel_view(request):
+    auth_payload = _require_perm_json(request, "caja", "ver_pos")
+    if isinstance(auth_payload, JsonResponse):
+        return auth_payload
+        
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        id_doc = str(payload.get("id_doc") or "").strip()
+    except Exception:
+        return JsonResponse({"detail": "JSON invalido"}, status=400)
+        
+    if not id_doc:
+        return JsonResponse({"detail": "Parametro id_doc requerido"}, status=400)
+        
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT ID_DOC, ISNULL(CANCELADO, 'N') FROM CAB_POS WITH (UPDLOCK, HOLDLOCK) WHERE CAST(ID_DOC AS VARCHAR(50)) = %s", [id_doc])
+                header_row = cursor.fetchone()
+                if not header_row:
+                    return JsonResponse({"detail": "Venta POS no encontrada."}, status=404)
+                if header_row[1] == "Y":
+                    return JsonResponse({"detail": "Esta venta ya ha sido cancelada previamente."}, status=400)
+                
+                cursor.execute(
+                    """
+                    UPDATE CAB_POS
+                    SET CANCELADO = 'Y',
+                        EST_DOC = 'Cancelado'
+                    WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
+                    """,
+                    [id_doc]
+                )
+                
+                cursor.execute("SELECT ID_ARTICULO, DESCRIP_ART, CANTIDAD, PRECIO FROM DET_POS WHERE CAST(ID_DOC AS VARCHAR(50)) = %s", [id_doc])
+                lines = cursor.fetchall()
+                
+                tarjetero_columns = _load_table_columns("TARJETERO")
+                cajero = auth_payload["usuario_id"]
+                
+                for line in lines:
+                    art_id = str(line[0]).strip()
+                    desc = str(line[1] or "").strip()
+                    qty = _to_decimal(line[2], Decimal("0"))
+                    price = _to_decimal(line[3], Decimal("0"))
+                    
+                    if qty <= 0:
+                        continue
+                        
+                    cursor.execute(
+                        """
+                        UPDATE MAESTRO_ARTICULO
+                        SET STOCK = ISNULL(STOCK, 0) + %s,
+                            FECHA_ACT = GETDATE()
+                        WHERE ID_ARTICULO = %s
+                        """,
+                        [qty, art_id]
+                    )
+                    
+                    cursor.execute("SELECT COSTO FROM MAESTRO_ARTICULO WHERE ID_ARTICULO = %s", [art_id])
+                    cost_row = cursor.fetchone()
+                    cost = _to_decimal(cost_row[0] if cost_row else Decimal("1.0"), Decimal("1.0"))
+                    
+                    tarj_values = {
+                        "TIPO_DOC": "POS_ANUL",
+                        "ID_DOC": id_doc,
+                        "ID_SN": "1",
+                        "NOM_SN": "Devolucion POS",
+                        "ID_ARTICULO": art_id,
+                        "DESCRIP_ART": desc,
+                        "CANTIDAD": qty,
+                        "COSTO": cost,
+                        "PRECIO": price,
+                        "TOTAL_COSTO": qty * cost,
+                        "TOTAL_PRECIO": qty * price,
+                        "CTA_INV": "11030101",
+                        "LOTE": "No",
+                        "FECHA_CONT": timezone.localdate(),
+                        "FECHA_VENC": timezone.localdate(),
+                        "FECHA_DOC": timezone.localdate(),
+                        "FECHA_CREACION": timezone.localtime(),
+                        "MONEDA": "RD$",
+                        "ID_ALMACEN": 1,
+                        "ID_USUARIO": cajero,
+                        "PERIODO_CONT": timezone.localdate().month,
+                        "EJERCICIO": timezone.localdate().year,
+                    }
+                    _insert_dynamic_row(cursor, "TARJETERO", tarjetero_columns, tarj_values)
+                    
+        return JsonResponse({"ok": True})
+    except Exception as exc:
+        return JsonResponse({"detail": f"Error cancelando venta: {exc}"}, status=500)

@@ -42,3 +42,18 @@ class EtiquetaFormatoUsuario(models.Model):
 
     class Meta:
         db_table = "ETIQUETA_FORMATO_USUARIO"
+
+
+class CodigoVariable(models.Model):
+    id_config = models.AutoField(db_column="ID_CONFIG", primary_key=True)
+    prefijo = models.CharField(db_column="PREFIJO", max_length=10, unique=True)
+    pos_producto = models.IntegerField(db_column="POS_PRODUCTO", default=2)
+    len_producto = models.IntegerField(db_column="LEN_PRODUCTO", default=5)
+    pos_valor = models.IntegerField(db_column="POS_VALOR", default=7)
+    len_valor = models.IntegerField(db_column="LEN_VALOR", default=5)
+    divisor_valor = models.DecimalField(db_column="DIVISOR_VALOR", max_digits=10, decimal_places=4, default=1000)
+    tipo = models.CharField(db_column="TIPO", max_length=20, default="peso")  # "peso" o "precio"
+    activo = models.CharField(db_column="ACTIVO", max_length=1, default="Y")
+
+    class Meta:
+        db_table = "CODIGO_VARIABLE"
