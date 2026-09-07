@@ -323,8 +323,35 @@ def _fmt_decimal(value):
     return str(value) if value is not None else ""
 
 
+def _get_cancelled_vacation_stats(record):
+    if not (
+        record.tipo_accion == EmpleadoAccionPersonal.TIPO_CAMBIO
+        and record.cambio_motivo == "VACACIONES"
+        and record.fecha_desde
+        and record.fecha_hasta
+    ):
+        return 0, 0
+    if record.estatus != EmpleadoAccionPersonal.ESTATUS_CANCELADA:
+        today = timezone.localdate()
+    else:
+        today = timezone.localtime(record.actualizado_en).date()
+
+    if today > record.fecha_hasta:
+        returned_days = 0
+    else:
+        remaining_from = max(today, record.fecha_desde)
+        returned_days = _count_vacation_days(remaining_from, record.fecha_hasta)
+    
+    total_days = int(record.cantidad_dias or 0)
+    elapsed_days = max(0, total_days - returned_days)
+    return returned_days, elapsed_days
+
+
 def _accion_payload(record):
     empleado = record.empleado
+    dias_devueltos, dias_transcurridos = 0, 0
+    if record.tipo_accion == EmpleadoAccionPersonal.TIPO_CAMBIO and record.cambio_motivo == "VACACIONES":
+        dias_devueltos, dias_transcurridos = _get_cancelled_vacation_stats(record)
     return {
         "id_accion": record.id_accion,
         "id_empleado": empleado.id_empleado,
@@ -355,6 +382,8 @@ def _accion_payload(record):
         "fecha_desde": _fmt_date(record.fecha_desde),
         "fecha_hasta": _fmt_date(record.fecha_hasta),
         "cantidad_dias": record.cantidad_dias or "",
+        "dias_devueltos": dias_devueltos,
+        "dias_transcurridos": dias_transcurridos,
     }
 
 
@@ -792,6 +821,12 @@ def acciones_personal_guardar(request):
                 record = existing_record
             else:
                 record = EmpleadoAccionPersonal.objects.create(empleado=empleado, **data)
+                id_plan = _parse_int(payload.get("id_plan"))
+                if id_plan:
+                    try:
+                        EmpleadoVacacionPlanificada.objects.filter(id_plan=id_plan).delete()
+                    except Exception:
+                        pass
             if record.aplicado and not was_applied:
                 _apply_personal_action(record)
                 record.empleado.refresh_from_db()

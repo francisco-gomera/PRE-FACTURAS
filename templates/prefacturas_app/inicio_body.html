@@ -649,14 +649,15 @@
                     <table>
                         <thead>
                             <tr>
-                                <th style="width:120px;">Articulo</th>
+                                <th style="width:130px;">Codigo del articulo</th>
+                                <th style="width:130px;">Referencia</th>
                                 <th>Descripcion</th>
-                                <th style="width:120px;">Referencia</th>
-                                <th style="width:90px;">Stock</th>
+                                <th style="width:100px; text-align:right;">Precio</th>
+                                <th style="width:90px; text-align:right;">Stock</th>
                             </tr>
                         </thead>
                         <tbody id="stock_articulos_results_body">
-                            <tr><td colspan="4" class="result-empty">Cargando...</td></tr>
+                            <tr><td colspan="5" class="result-empty">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2254,14 +2255,15 @@
 
         function renderStockArticulosResults(rows) {
             if (!rows.length) {
-                stockArticulosResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se encontraron articulos.</td></tr>";
+                stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>No se encontraron articulos.</td></tr>";
                 return;
             }
             stockArticulosResultsBody.innerHTML = rows.map((r) => `
                 <tr>
                     <td>${escapeHtml(r.id_articulo || "")}</td>
-                    <td>${escapeHtml(r.descrip_art || "")}</td>
                     <td>${escapeHtml(r.referencia || "")}</td>
+                    <td>${escapeHtml(r.descrip_art || "")}</td>
+                    <td style="text-align:right;">${escapeHtml(formatStockNumber(r.precio_det ?? r.precio ?? 0))}</td>
                     <td style="text-align:right;">${escapeHtml(formatStockNumber(r.stock))}</td>
                 </tr>
             `).join("");
@@ -2272,17 +2274,17 @@
             const stockDesde = (stockArticulosDesde.value || "").trim();
             const stockHasta = (stockArticulosHasta.value || "").trim();
             const url = `/articulos/stock/buscar/?q=${encodeURIComponent(q)}&stock_desde=${encodeURIComponent(stockDesde)}&stock_hasta=${encodeURIComponent(stockHasta)}`;
-            stockArticulosResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Buscando...</td></tr>";
+            stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>Buscando...</td></tr>";
             try {
                 const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
                 if (!res.ok) {
-                    stockArticulosResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se pudo consultar stock.</td></tr>";
+                    stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>No se pudo consultar stock.</td></tr>";
                     return;
                 }
                 const data = await res.json();
                 renderStockArticulosResults(Array.isArray(data.results) ? data.results : []);
             } catch (error) {
-                stockArticulosResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Error de conexion.</td></tr>";
+                stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>Error de conexion.</td></tr>";
             }
         }
 

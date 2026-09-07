@@ -1,9 +1,12 @@
 import base64
 import json
+import logging
 import socket
 import hmac
 from decimal import Decimal
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from django.core.cache import cache
 from django.db import connection, transaction
@@ -235,7 +238,15 @@ def _format_decimal_display(value):
     return text or "0"
 
 
+_TABLE_COLUMNS_CACHE = {}
+_IDENTITY_COLUMNS_CACHE = {}
+_TABLE_COLUMN_LENGTHS_CACHE = {}
+
+
 def _load_table_columns(cursor, table_name):
+    table_key = str(table_name or "").strip().upper()
+    if table_key in _TABLE_COLUMNS_CACHE:
+        return _TABLE_COLUMNS_CACHE[table_key]
     cursor.execute(
         """
         SELECT COLUMN_NAME
@@ -245,7 +256,43 @@ def _load_table_columns(cursor, table_name):
         """,
         [table_name],
     )
-    return [str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]]
+    cols = [str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]]
+    if cols:
+        _TABLE_COLUMNS_CACHE[table_key] = cols
+    return cols
+
+
+def _load_table_column_lengths(cursor, table_name):
+    table_key = str(table_name or "").strip().upper()
+    if table_key in _TABLE_COLUMN_LENGTHS_CACHE:
+        return _TABLE_COLUMN_LENGTHS_CACHE[table_key]
+    cursor.execute(
+        """
+        SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = %s
+          AND CHARACTER_MAXIMUM_LENGTH IS NOT NULL
+          AND CHARACTER_MAXIMUM_LENGTH > 0
+        """,
+        [table_name],
+    )
+    lengths = {
+        str(row[0]).strip().upper(): int(row[1])
+        for row in cursor.fetchall()
+        if row and row[0] and row[1] is not None and int(row[1]) > 0
+    }
+    if lengths:
+        _TABLE_COLUMN_LENGTHS_CACHE[table_key] = lengths
+    return lengths
+
+
+def _fit_column_value(column_name, value, column_lengths):
+    if isinstance(value, str) and column_lengths:
+        col_key = str(column_name or "").strip().upper()
+        max_len = column_lengths.get(col_key)
+        if max_len and len(value) > max_len:
+            return value[:max_len]
+    return value
 
 
 def _pick_existing_column(columns, *candidates):
@@ -272,6 +319,9 @@ def _assign_existing_values(target, columns, value, *candidates):
 
 
 def _load_identity_columns(cursor, table_name):
+    table_key = str(table_name or "").strip().upper()
+    if table_key in _IDENTITY_COLUMNS_CACHE:
+        return _IDENTITY_COLUMNS_CACHE[table_key]
     cursor.execute(
         """
         SELECT COLUMN_NAME
@@ -281,7 +331,11 @@ def _load_identity_columns(cursor, table_name):
         """,
         [table_name],
     )
-    return {str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]}
+    cols = {str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]}
+    if cols:
+        _IDENTITY_COLUMNS_CACHE[table_key] = cols
+    return cols
+
 
 
 def _insert_dynamic_row(cursor, table_name, table_columns, values_by_column, *, output_column=None, skip_columns=None):
@@ -289,13 +343,14 @@ def _insert_dynamic_row(cursor, table_name, table_columns, values_by_column, *, 
     insert_columns = [column for column in table_columns if column in values_by_column and column not in skip_columns]
     if not insert_columns:
         raise ValueError(f"No hay columnas para insertar en {table_name}")
+    col_lengths = _load_table_column_lengths(cursor, table_name)
     placeholders = ", ".join(["%s"] * len(insert_columns))
     output_sql = f" OUTPUT INSERTED.[{output_column}]" if output_column else ""
     sql = (
         f"INSERT INTO {table_name} ({', '.join(f'[{column}]' for column in insert_columns)})"
         f"{output_sql} VALUES ({placeholders})"
     )
-    cursor.execute(sql, [values_by_column[column] for column in insert_columns])
+    cursor.execute(sql, [_fit_column_value(column, values_by_column[column], col_lengths) for column in insert_columns])
     if output_column:
         row = cursor.fetchone()
         return row[0] if row else None
@@ -305,9 +360,10 @@ def _insert_dynamic_row(cursor, table_name, table_columns, values_by_column, *, 
 def _update_dynamic_row(cursor, table_name, set_values, where_sql, where_params):
     if not set_values:
         return 0
+    col_lengths = _load_table_column_lengths(cursor, table_name)
     columns = list(set_values.keys())
     sql = f"UPDATE {table_name} SET " + ", ".join(f"[{column}] = %s" for column in columns) + f" WHERE {where_sql}"
-    cursor.execute(sql, [set_values[column] for column in columns] + list(where_params))
+    cursor.execute(sql, [_fit_column_value(column, set_values[column], col_lengths) for column in columns] + list(where_params))
     return cursor.rowcount or 0
 
 
@@ -325,6 +381,7 @@ def _next_table_numeric_value(cursor, table_name, column_name):
 
 def _update_existing_columns(cursor, table_name, key_column, key_value, assignments):
     table_columns = _load_table_columns(cursor, table_name)
+    col_lengths = _load_table_column_lengths(cursor, table_name)
     update_clauses = []
     params = []
     for candidates, value in assignments:
@@ -332,7 +389,7 @@ def _update_existing_columns(cursor, table_name, key_column, key_value, assignme
         if not column:
             continue
         update_clauses.append(f"[{column}] = %s")
-        params.append(value)
+        params.append(_fit_column_value(column, value, col_lengths))
     if not update_clauses:
         return
     params.append(key_value)
@@ -344,6 +401,7 @@ def _update_existing_columns(cursor, table_name, key_column, key_value, assignme
 
 def _update_existing_columns_where(cursor, table_name, where_sql, where_params, assignments):
     table_columns = _load_table_columns(cursor, table_name)
+    col_lengths = _load_table_column_lengths(cursor, table_name)
     update_clauses = []
     params = []
     for candidates, value in assignments:
@@ -351,7 +409,7 @@ def _update_existing_columns_where(cursor, table_name, where_sql, where_params, 
         if not column:
             continue
         update_clauses.append(f"[{column}] = %s")
-        params.append(value)
+        params.append(_fit_column_value(column, value, col_lengths))
     if not update_clauses:
         return
     cursor.execute(
@@ -628,26 +686,26 @@ def _create_factura_ed_entries(
     _assign_existing_values(cab_ed_values, cab_ed_columns, fecha_cont, "FECHA_CONT", "F_CONT")
     _assign_existing_values(cab_ed_values, cab_ed_columns, fecha_doc, "FECHA_DOC", "FECHA_APLIC")
     _assign_existing_values(cab_ed_values, cab_ed_columns, fecha_venc, "FECHA_VENC", "F_VENC")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, id_sn, "ID_SN", "CLIENTE", "COD_CLIENTE")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, nombre_cliente, "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, rnc_ced, "RNC_CED", "RNC", "CEDULA")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(id_sn, 12), "ID_SN", "CLIENTE", "COD_CLIENTE")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(nombre_cliente, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(rnc_ced, 13), "RNC_CED", "RNC", "CEDULA")
     _assign_existing_values(cab_ed_values, cab_ed_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
     _assign_existing_values(cab_ed_values, cab_ed_columns, total_factura, "TOTAL_DOC", "MONTO", "IMPORTE")
     _assign_existing_values(cab_ed_values, cab_ed_columns, Decimal("0"), "ABONO")
     _assign_existing_values(cab_ed_values, cab_ed_columns, total_factura, "SALDO")
     _assign_existing_values(cab_ed_values, cab_ed_columns, "RD$", "MON_DOC", "MONEDA")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(comentario_ed, 200), "COMENTARIO", "OBSERVACION")
     _assign_existing_values(cab_ed_values, cab_ed_columns, "Abierto", "EST_DOC", "ESTADO", "ESTATUS")
     _assign_existing_values(cab_ed_values, cab_ed_columns, factura_id, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, prefactura_id or None, "REFERENCIA1")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(prefactura_id, 30) or None, "REFERENCIA1")
     _assign_existing_values(cab_ed_values, cab_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, terminal, "TERMINAL")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(terminal, 50), "TERMINAL")
     _assign_existing_values(cab_ed_values, cab_ed_columns, timezone.localdate(), "FECHA_CREACION")
     _assign_existing_values(cab_ed_values, cab_ed_columns, timezone.localtime(), "FECHA_ACT")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, periodo_cont, "PERIODO_CONT")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(periodo_cont, 2), "PERIODO_CONT")
     _assign_existing_values(cab_ed_values, cab_ed_columns, ejercicio, "EJERCICIO")
-    _assign_existing_values(cab_ed_values, cab_ed_columns, cta_asociada, "CTA_ASOCIADA")
+    _assign_existing_values(cab_ed_values, cab_ed_columns, _clip_str(cta_asociada, 20), "CTA_ASOCIADA")
 
     inserted_ed_id = _insert_dynamic_row(
         cursor,
@@ -684,14 +742,14 @@ def _create_factura_ed_entries(
         if id_sn_value is None and det_cliente_col:
             det_ed_values[det_cliente_col] = None
         else:
-            _assign_existing_values(det_ed_values, det_ed_columns, id_sn_value, "ID_SN", "CLIENTE", "COD_CLIENTE")
-        _assign_existing_values(det_ed_values, det_ed_columns, nombre_cliente, "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
-        _assign_existing_values(det_ed_values, det_ed_columns, rnc_ced, "RNC_CED", "RNC", "CEDULA")
-        _assign_existing_values(det_ed_values, det_ed_columns, cuenta_num, "CTA_LM", "NUM_CTA", "CTA")
+            _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(id_sn_value, 12), "ID_SN", "CLIENTE", "COD_CLIENTE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(nombre_cliente, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(rnc_ced, 13), "RNC_CED", "RNC", "CEDULA")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(cuenta_num, 20), "CTA_LM", "NUM_CTA", "CTA")
         _assign_existing_values(
             det_ed_values,
             det_ed_columns,
-            cuenta_nombre,
+            _clip_str(cuenta_nombre, 100),
             "NOM_CTA",
             "NOMBRE_CTA",
             "NOM_CUENTA",
@@ -700,16 +758,16 @@ def _create_factura_ed_entries(
         )
         _assign_existing_values(det_ed_values, det_ed_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
         _assign_existing_values(det_ed_values, det_ed_columns, factura_id, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-        _assign_existing_values(det_ed_values, det_ed_columns, prefactura_id or None, "REFERENCIA1")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(prefactura_id, 20) or None, "REFERENCIA1")
         _assign_existing_values(det_ed_values, det_ed_columns, debito, "DEBITO", "DEBE")
         _assign_existing_values(det_ed_values, det_ed_columns, credito, "CREDITO", "HABER")
         _assign_existing_values(det_ed_values, det_ed_columns, "RD$", "MON_DOC", "MONEDA")
-        _assign_existing_values(det_ed_values, det_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
-        _assign_existing_values(det_ed_values, det_ed_columns, cta_asociada, "CTA_ASOCIADA")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(comentario_ed, 150), "COMENTARIO", "OBSERVACION")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(cta_asociada, 20), "CTA_ASOCIADA")
         _assign_existing_values(det_ed_values, det_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-        _assign_existing_values(det_ed_values, det_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-        _assign_existing_values(det_ed_values, det_ed_columns, terminal, "TERMINAL")
-        _assign_existing_values(det_ed_values, det_ed_columns, periodo_cont, "PERIODO_CONT")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(terminal, 50), "TERMINAL")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(periodo_cont, 2), "PERIODO_CONT")
         _assign_existing_values(det_ed_values, det_ed_columns, ejercicio, "EJERCICIO")
         if str(cuenta_num or "").strip() in {"41010101", "51010101"}:
             _assign_existing_values(det_ed_values, det_ed_columns, "C01", "CECO")
@@ -850,26 +908,26 @@ def _sync_factura_ed_entries(
     _assign_existing_values(cab_ed_updates, cab_ed_columns, fecha_cont, "FECHA_CONT", "F_CONT")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, fecha_doc, "FECHA_DOC", "FECHA_APLIC")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, fecha_venc, "FECHA_VENC", "F_VENC")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, id_sn, "ID_SN", "CLIENTE", "COD_CLIENTE")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, nombre_cliente, "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, rnc_ced, "RNC_CED", "RNC", "CEDULA")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(id_sn, 12), "ID_SN", "CLIENTE", "COD_CLIENTE")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(nombre_cliente, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(rnc_ced, 13), "RNC_CED", "RNC", "CEDULA")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, total_factura, "TOTAL_DOC", "MONTO", "IMPORTE")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, Decimal("0"), "ABONO")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, total_factura, "SALDO")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, "RD$", "MON_DOC", "MONEDA")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(comentario_ed, 200), "COMENTARIO", "OBSERVACION")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, "Abierto", "EST_DOC", "ESTADO", "ESTATUS")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, factura_id, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, prefactura_id or None, "REFERENCIA1")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(prefactura_id, 30) or None, "REFERENCIA1")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, terminal, "TERMINAL")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(terminal, 50), "TERMINAL")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, timezone.localdate(), "FECHA_CREACION")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, timezone.localtime(), "FECHA_ACT")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, periodo_cont, "PERIODO_CONT")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(periodo_cont, 2), "PERIODO_CONT")
     _assign_existing_values(cab_ed_updates, cab_ed_columns, ejercicio, "EJERCICIO")
-    _assign_existing_values(cab_ed_updates, cab_ed_columns, cta_asociada, "CTA_ASOCIADA")
+    _assign_existing_values(cab_ed_updates, cab_ed_columns, _clip_str(cta_asociada, 20), "CTA_ASOCIADA")
 
     _update_dynamic_row(
         cursor,
@@ -918,23 +976,32 @@ def _sync_factura_ed_entries(
         if id_sn_value is None and det_cliente_col:
             det_ed_values[det_cliente_col] = None
         else:
-            _assign_existing_values(det_ed_values, det_ed_columns, id_sn_value, "ID_SN", "CLIENTE", "COD_CLIENTE")
-        _assign_existing_values(det_ed_values, det_ed_columns, nombre_cliente, "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
-        _assign_existing_values(det_ed_values, det_ed_columns, rnc_ced, "RNC_CED", "RNC", "CEDULA")
-        _assign_existing_values(det_ed_values, det_ed_columns, cuenta_num, "CTA_LM", "NUM_CTA", "CTA")
-        _assign_existing_values(det_ed_values, det_ed_columns, cuenta_nombre, "NOM_CTA", "NOMBRE_CTA", "NOM_CUENTA", "NOMBRE_CUENTA", "NOMBRE")
+            _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(id_sn_value, 12), "ID_SN", "CLIENTE", "COD_CLIENTE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(nombre_cliente, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE", "NOM_CLIENTE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(rnc_ced, 13), "RNC_CED", "RNC", "CEDULA")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(cuenta_num, 20), "CTA_LM", "NUM_CTA", "CTA")
+        _assign_existing_values(
+            det_ed_values,
+            det_ed_columns,
+            _clip_str(cuenta_nombre, 100),
+            "NOM_CTA",
+            "NOMBRE_CTA",
+            "NOM_CUENTA",
+            "NOMBRE_CUENTA",
+            "NOMBRE",
+        )
         _assign_existing_values(det_ed_values, det_ed_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
         _assign_existing_values(det_ed_values, det_ed_columns, factura_id, "ORIGEN", "REFERENCIA", "NO_RECIBO")
-        _assign_existing_values(det_ed_values, det_ed_columns, prefactura_id or None, "REFERENCIA1")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(prefactura_id, 20) or None, "REFERENCIA1")
         _assign_existing_values(det_ed_values, det_ed_columns, debito, "DEBITO", "DEBE")
         _assign_existing_values(det_ed_values, det_ed_columns, credito, "CREDITO", "HABER")
         _assign_existing_values(det_ed_values, det_ed_columns, "RD$", "MON_DOC", "MONEDA")
-        _assign_existing_values(det_ed_values, det_ed_columns, comentario_ed, "COMENTARIO", "OBSERVACION")
-        _assign_existing_values(det_ed_values, det_ed_columns, cta_asociada, "CTA_ASOCIADA")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(comentario_ed, 150), "COMENTARIO", "OBSERVACION")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(cta_asociada, 20), "CTA_ASOCIADA")
         _assign_existing_values(det_ed_values, det_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-        _assign_existing_values(det_ed_values, det_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-        _assign_existing_values(det_ed_values, det_ed_columns, terminal, "TERMINAL")
-        _assign_existing_values(det_ed_values, det_ed_columns, periodo_cont, "PERIODO_CONT")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(terminal, 50), "TERMINAL")
+        _assign_existing_values(det_ed_values, det_ed_columns, _clip_str(periodo_cont, 2), "PERIODO_CONT")
         _assign_existing_values(det_ed_values, det_ed_columns, ejercicio, "EJERCICIO")
         if str(cuenta_num or "").strip() in {"41010101", "51010101"}:
             _assign_existing_values(det_ed_values, det_ed_columns, "C01", "CECO")
@@ -1154,7 +1221,7 @@ def _create_factura_cancel_ed_entries(
     cancel_comment = _append_cancelled_comment(_pick_row_text(original_cab_ed, "COMENTARIO", "OBSERVACION"))
     original_cab_ed_updates = {}
     _assign_existing_values(original_cab_ed_updates, cab_ed_columns, "Cancelado", "EST_DOC", "ESTADO", "ESTATUS")
-    _assign_existing_values(original_cab_ed_updates, cab_ed_columns, cancel_comment, "COMENTARIO", "OBSERVACION")
+    _assign_existing_values(original_cab_ed_updates, cab_ed_columns, _clip_str(cancel_comment, 200), "COMENTARIO", "OBSERVACION")
     _assign_existing_values(original_cab_ed_updates, cab_ed_columns, timezone.localtime(), "FECHA_ACT")
     original_cab_ed_lookup_col = cab_ed_key_col if original_cab_ed_id else cab_ed_no_col
     original_cab_ed_lookup_value = original_cab_ed_id if original_cab_ed_id else original_cab_ed_no
@@ -1185,10 +1252,10 @@ def _create_factura_cancel_ed_entries(
         cancel_cab_ed_values.pop("NO_ED", None)
         _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, next_ed_no, "NO_DOC", "NO_ED")
     _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, "Cancelado", "EST_DOC", "ESTADO", "ESTATUS")
-    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, cancel_comment, "COMENTARIO", "OBSERVACION")
+    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, _clip_str(cancel_comment, 200), "COMENTARIO", "OBSERVACION")
     _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, terminal, "TERMINAL")
+    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+    _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, _clip_str(terminal, 50), "TERMINAL")
     _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, timezone.localdate(), "FECHA_CREACION")
     _assign_existing_values(cancel_cab_ed_values, cab_ed_columns, timezone.localtime(), "FECHA_ACT")
 
@@ -1249,10 +1316,10 @@ def _create_factura_cancel_ed_entries(
             _assign_existing_values(cancel_det_ed_values, det_ed_columns, line_no, det_ed_line_col)
         _assign_existing_values(cancel_det_ed_values, det_ed_columns, credito_original, "DEBITO", "DEBE")
         _assign_existing_values(cancel_det_ed_values, det_ed_columns, debito_original, "CREDITO", "HABER")
-        _assign_existing_values(cancel_det_ed_values, det_ed_columns, cancel_comment, "COMENTARIO", "OBSERVACION")
+        _assign_existing_values(cancel_det_ed_values, det_ed_columns, _clip_str(cancel_comment, 150), "COMENTARIO", "OBSERVACION")
         _assign_existing_values(cancel_det_ed_values, det_ed_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
-        _assign_existing_values(cancel_det_ed_values, det_ed_columns, usuario_nombre, "USUARIO", "USUARIO_NOMBRE")
-        _assign_existing_values(cancel_det_ed_values, det_ed_columns, terminal, "TERMINAL")
+        _assign_existing_values(cancel_det_ed_values, det_ed_columns, _clip_str(usuario_nombre, 100), "USUARIO", "USUARIO_NOMBRE")
+        _assign_existing_values(cancel_det_ed_values, det_ed_columns, _clip_str(terminal, 50), "TERMINAL")
         _assign_existing_values(cancel_det_ed_values, det_ed_columns, timezone.localdate(), "FECHA_CREACION")
         _assign_existing_values(cancel_det_ed_values, det_ed_columns, timezone.localtime(), "FECHA_ACT")
         _insert_dynamic_row(
@@ -3532,7 +3599,7 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                         _clip_str(cta_asociada, 20),
                         ejercicio,
                         manual_id_gasto,
-                        terminal,
+                        _clip_str(terminal, 50),
                         _to_int_or_none(payload.get("id_precio")),
                         factura_id,
                     ],
@@ -3599,7 +3666,7 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                         _clip_str(cta_asociada, 20),
                         ejercicio,
                         manual_id_gasto,
-                        terminal,
+                        _clip_str(terminal, 50),
                         _to_int_or_none(payload.get("id_precio")),
                     ],
                 )
@@ -3693,6 +3760,10 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                     "DELETE FROM DET_FACTURA WHERE TRY_CAST(ID_DOC AS BIGINT) = %s",
                     [factura_id],
                 )
+                cursor.execute(
+                    "DELETE FROM TARJETERO WHERE TRY_CAST(ID_DOC AS BIGINT) = %s AND UPPER(ISNULL(TIPO_DOC, '')) IN ('FC', 'TD')",
+                    [factura_id],
+                )
 
             tarjetero_columns = _load_table_columns(cursor, "TARJETERO")
             tarjetero_identity_columns = (
@@ -3704,7 +3775,7 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                 id_articulo = _clip_str(detalle.get("id_articulo"), 20).strip()
                 if not id_articulo:
                     continue
-                descrip_art = _clip_str(detalle.get("descrip_art"), 500)
+                descrip_art = _clip_str(detalle.get("descrip_art"), 200)
                 medida = _clip_str(detalle.get("uom"), 50)
                 cantidad = _to_decimal(detalle.get("cantidad"), Decimal("1"))
                 if cantidad <= 0:
@@ -3799,14 +3870,16 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                     tarj_values = {}
                     _assign_existing_values(tarj_values, tarjetero_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
                     _assign_existing_values(tarj_values, tarjetero_columns, factura_id, "ID_DOC", "NO_DOC", "NO", "DOCUMENTO")
+                    _assign_existing_values(tarj_values, tarjetero_columns, index, "No_LINEA", "LINEA", "NO_ITEM", "ORDEN", "SECUENCIA", "ID_DETALLE")
                     _assign_existing_values(tarj_values, tarjetero_columns, cab_tipo_doc_base, "TIPO_DOC_BASE")
                     _assign_existing_values(tarj_values, tarjetero_columns, cab_id_doc_base, "ID_DOC_BASE")
-                    _assign_existing_values(tarj_values, tarjetero_columns, cab_referencia, "REFERENCIA1")
-                    _assign_existing_values(tarj_values, tarjetero_columns, id_sn, "ID_SN", "ID_CLIENTE")
-                    _assign_existing_values(tarj_values, tarjetero_columns, nom_socio, "NOM_SN", "NOM_SOCIO", "NOMBRE_SN")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(cab_referencia, 100), "REFERENCIA1")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(id_sn, 12), "ID_SN", "ID_CLIENTE")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(nom_socio, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE_SN")
                     _assign_existing_values(tarj_values, tarjetero_columns, _clip_str("11020101", 20), "CTA_ASOCIADA")
-                    _assign_existing_values(tarj_values, tarjetero_columns, id_articulo, "ID_ARTICULO", "ARTICULO", "COD_ART")
-                    _assign_existing_values(tarj_values, tarjetero_columns, descrip_art, "DESCRIP_ART", "DESCRIPCION", "DESCRIP")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(id_articulo, 20), "ID_ARTICULO", "ARTICULO", "COD_ART")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(descrip_art, 500), "DESCRIP_ART", "DESCRIPCION", "DESCRIP")
+                    _assign_existing_values(tarj_values, tarjetero_columns, _clip_str(detalle.get("uom"), 15), "MEDIDA", "UM", "UNIDAD")
                     _assign_existing_values(tarj_values, tarjetero_columns, cantidad_neg, "CANTIDAD", "CANT")
                     _assign_existing_values(tarj_values, tarjetero_columns, total_costo_t, "TOTAL_COSTO")
                     _assign_existing_values(tarj_values, tarjetero_columns, costo_t, "COSTO", "COSTO_UNIT", "COSTO_UNITARIO")
@@ -3864,15 +3937,15 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                 mov_values = {}
                 _assign_existing_values(mov_values, mov_doc_columns, "FC", "TIPO_DOC", "TD", "CLASE_DOC", "TIPO")
                 _assign_existing_values(mov_values, mov_doc_columns, factura_id, "ID_DOC", "NO_DOC", "NO", "DOCUMENTO")
-                _assign_existing_values(mov_values, mov_doc_columns, id_sn, "ID_SN", "ID_CLIENTE")
-                _assign_existing_values(mov_values, mov_doc_columns, nom_socio, "NOM_SN", "NOM_SOCIO", "NOMBRE_SN")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(id_sn, 12), "ID_SN", "ID_CLIENTE")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(nom_socio, 100), "NOM_SN", "NOM_SOCIO", "NOMBRE_SN")
                 _assign_existing_values(mov_values, mov_doc_columns, _clip_str(payload.get("rnc_ced"), 13), "RNC_CED", "RNC")
                 _assign_existing_values(mov_values, mov_doc_columns, fecha_cont, "FECHA_CONT", "F_CONT")
                 _assign_existing_values(mov_values, mov_doc_columns, fecha_venc, "FECHA_VENC", "F_VENC")
                 _assign_existing_values(mov_values, mov_doc_columns, fecha_doc, "FECHA_DOC", "F_DOC")
-                _assign_existing_values(mov_values, mov_doc_columns, cab_tipo_doc_base, "CLASE_DOC_BASE", "TIPO_DOC_BASE")
-                _assign_existing_values(mov_values, mov_doc_columns, cab_referencia, "REF_DOC_BASE", "DOC_BASE", "ID_DOC_BASE", "REFERENCIA")
-                _assign_existing_values(mov_values, mov_doc_columns, cab_referencia, "REFERENCIA", "REFERENCIA1")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(cab_tipo_doc_base, 2), "CLASE_DOC_BASE", "TIPO_DOC_BASE")
+                _assign_existing_values(mov_values, mov_doc_columns, _to_int_or_none(cab_id_doc_base) or _to_int_or_none(cab_referencia), "REF_DOC_BASE", "DOC_BASE", "ID_DOC_BASE")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(cab_referencia, 30), "REFERENCIA", "REFERENCIA1")
                 _assign_existing_values(mov_values, mov_doc_columns, subtotal, "TOTAL_BASE", "BASE")
                 _assign_existing_values(mov_values, mov_doc_columns, "Abierto", "EST_DOC", "ESTATUS", "ESTADO")
                 _assign_existing_values(mov_values, mov_doc_columns, total_doc, "TOTAL_DOC", "TOTAL", "MONTO", "IMPORTE", "VALOR")
@@ -3881,10 +3954,10 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                 _assign_existing_values(mov_values, mov_doc_columns, _clip_str("RD$", 50), "MON_DOC", "MONEDA")
                 _assign_existing_values(mov_values, mov_doc_columns, total_doc, "SALDO")
                 _assign_existing_values(mov_values, mov_doc_columns, _clip_str("11020101", 20), "CTA_ASOCIADA")
-                _assign_existing_values(mov_values, mov_doc_columns, "-1", "NO_RECIBO", "ID_RECIBO")
+                _assign_existing_values(mov_values, mov_doc_columns, -1, "NO_RECIBO", "ID_RECIBO")
                 _assign_existing_values(mov_values, mov_doc_columns, datetime(1900, 1, 1), "FECHA_REC", "FECHA_RECIBO")
-                _assign_existing_values(mov_values, mov_doc_columns, no_ed, "NO_ED", "ID_ED")
-                _assign_existing_values(mov_values, mov_doc_columns, int(fecha_cont.month), "PERIODO_CONT")
+                _assign_existing_values(mov_values, mov_doc_columns, _to_int_or_none(no_ed), "NO_ED", "ID_ED")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(str(fecha_cont.month), 2), "PERIODO_CONT")
                 _assign_existing_values(mov_values, mov_doc_columns, int(fecha_cont.year), "EJERCICIO")
                 _assign_existing_values(mov_values, mov_doc_columns, usuario_id, "ID_USUARIO", "USUARIO_ID")
                 _assign_existing_values(mov_values, mov_doc_columns, id_vendedor_selected, "ID_VENDEDOR", "VENDEDOR")
@@ -3892,7 +3965,7 @@ def _emitir_factura_manual_desde_payload(*, request, auth_payload, payload):
                 _assign_existing_values(mov_values, mov_doc_columns, _clip_str(payload.get("condicion"), 15), "CONDICION")
                 _assign_existing_values(mov_values, mov_doc_columns, _to_int_or_none(payload.get("dia")), "DIA")
                 _assign_existing_values(mov_values, mov_doc_columns, "N", "CANCELADO", "ANULADO")
-                _assign_existing_values(mov_values, mov_doc_columns, terminal, "TERMINAL")
+                _assign_existing_values(mov_values, mov_doc_columns, _clip_str(terminal, 50), "TERMINAL")
                 _assign_existing_values(mov_values, mov_doc_columns, _clip_str(payload.get("comentario"), 500) or "Factura", "COMENTARIO", "OBSERVACION", "NOTA")
                 _insert_dynamic_row(
                     cursor,
@@ -3942,25 +4015,29 @@ def emitir_factura_manual_view(request):
     except Exception:
         return JsonResponse({"detail": "JSON invalido"}, status=400)
 
-    if payload.get("detalles") or payload.get("id_sn"):
-        result, error = _emitir_factura_manual_desde_payload(
-            request=request,
-            auth_payload=auth_payload,
-            payload=payload,
-        )
-    else:
-        result, error = _emitir_factura_desde_prefactura(
-            request=request,
-            auth_payload=auth_payload,
-            prefactura_id=payload.get("prefactura_id"),
-            tipo_ecf="",
-            lock_owner=payload.get("lock_owner"),
-            event_id=payload.get("event_id"),
-            terminal_cliente=payload.get("terminal_cliente"),
-        )
-    if error:
-        return error
-    return JsonResponse(result)
+    try:
+        if payload.get("detalles") or payload.get("id_sn"):
+            result, error = _emitir_factura_manual_desde_payload(
+                request=request,
+                auth_payload=auth_payload,
+                payload=payload,
+            )
+        else:
+            result, error = _emitir_factura_desde_prefactura(
+                request=request,
+                auth_payload=auth_payload,
+                prefactura_id=payload.get("prefactura_id"),
+                tipo_ecf="",
+                lock_owner=payload.get("lock_owner"),
+                event_id=payload.get("event_id"),
+                terminal_cliente=payload.get("terminal_cliente"),
+            )
+        if error:
+            return error
+        return JsonResponse(result)
+    except Exception as exc:
+        logger.exception("Error emitir_factura_manual_view: %s", exc)
+        return JsonResponse({"detail": f"No se pudo grabar la factura: {str(exc)}"}, status=500)
 
 
 @require_http_methods(["POST"])
@@ -3974,18 +4051,22 @@ def emitir_factura_view(request):
     except Exception:
         return JsonResponse({"detail": "JSON invalido"}, status=400)
 
-    result, error = _emitir_factura_desde_prefactura(
-        request=request,
-        auth_payload=auth_payload,
-        prefactura_id=payload.get("prefactura_id"),
-        tipo_ecf=payload.get("tipo_ecf") or "32",
-        lock_owner=payload.get("lock_owner"),
-        event_id=payload.get("event_id"),
-        terminal_cliente=payload.get("terminal_cliente"),
-    )
-    if error:
-        return error
-    return JsonResponse(result)
+    try:
+        result, error = _emitir_factura_desde_prefactura(
+            request=request,
+            auth_payload=auth_payload,
+            prefactura_id=payload.get("prefactura_id"),
+            tipo_ecf=payload.get("tipo_ecf") or "32",
+            lock_owner=payload.get("lock_owner"),
+            event_id=payload.get("event_id"),
+            terminal_cliente=payload.get("terminal_cliente"),
+        )
+        if error:
+            return error
+        return JsonResponse(result)
+    except Exception as exc:
+        logger.exception("Error emitir_factura_view: %s", exc)
+        return JsonResponse({"detail": f"No se pudo emitir la factura: {str(exc)}"}, status=500)
 
 
 @require_http_methods(["GET"])
@@ -4036,7 +4117,7 @@ def factura_print_view(request):
                 ),
                 ID_SN, NOM_SOCIO, RNC_CED, CONTACTO, FECHA_DOC, FECHA_VENC,
                 ENT_FACTURA, ENT_MERCANCIA, COMENTARIO, SUBTOTAL, TOTAL_DESC, TOTAL_ITBIS,
-                TOTAL_DOC, NCF, ID_NCF, TIPO, CONDICION, DIA, UPPER(ISNULL(CANCELADO, 'N')), ISNULL(NCF_NC, '')
+                TOTAL_DOC, NCF, ID_NCF, TIPO, CONDICION, DIA, UPPER(ISNULL(CANCELADO, 'N')), ISNULL(NCF_NC, ''), MONICA
             FROM CAB_FACTURA
             WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
             """,
@@ -4068,6 +4149,7 @@ def factura_print_view(request):
                 "dia": _to_int(row[19], 0),
                 "cancelado": str(row[20] or "").strip().upper() == "Y",
                 "ncf_nc": str(row[21] or ""),
+                "monica": Decimal(str(row[22])) if row[22] is not None else None,
             }
 
             cursor.execute(

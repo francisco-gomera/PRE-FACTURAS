@@ -25,6 +25,16 @@
     <p>Gestiona la configuracion y el acceso a reportes de credito TransUnion.</p>
     <a href="{% url 'ajustes:reportes_transunion' %}">Abrir integracion</a>
   </div>
+  <div class="info-card">
+    <h3>Detalles de Cuentas Rechazadas</h3>
+    <p>Visualiza y analiza de forma amigable los archivos de cuentas rechazadas de TransUnion.</p>
+    <a href="{% url 'ajustes:reportes_transunion_rechazados' %}">Abrir detalles</a>
+  </div>
+  <div class="info-card">
+    <h3>Comparación de Reportes TransUnion</h3>
+    <p>Compara dos archivos de reportes TransUnion para detectar diferencias o cuentas omitidas.</p>
+    <a href="{% url 'ajustes:reportes_transunion_comparar' %}">Comparar reportes</a>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

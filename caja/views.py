@@ -996,6 +996,7 @@ def _create_cxc_cancel_ed_entries(
     usuario_id,
     usuario_nombre,
     terminal,
+    comentario=None,
 ):
     cab_ed_columns = _load_table_columns("CAB_ED")
     det_ed_columns = _load_table_columns("DET_ED")
@@ -1048,7 +1049,10 @@ def _create_cxc_cancel_ed_entries(
     if not original_cab_ed_id and not original_cab_ed_no:
         raise ValueError("No se pudo identificar el CAB_ED del recibo.")
 
-    cancel_comment = _append_cancelled_comment(_pick_row_text(original_cab_ed, "COMENTARIO", "OBSERVACION"))
+    if comentario is not None:
+        cancel_comment = _append_cancelled_comment(comentario)
+    else:
+        cancel_comment = _append_cancelled_comment(_pick_row_text(original_cab_ed, "COMENTARIO", "OBSERVACION"))
     next_ed_no = None
     if cab_ed_no_col and cab_ed_no_col not in cab_ed_identity_columns:
         next_ed_no = _next_table_numeric_value(cursor, "CAB_ED", cab_ed_no_col)
@@ -2030,6 +2034,34 @@ def _load_cxc_factura_historial_pago(no_doc):
         ri_rows = [_normalize_result_row(raw_ri_columns, raw_row) for raw_row in cursor.fetchall()]
 
     pagos = []
+    monica_raw = _pick_row_value(factura_row, "MONICA", "monica")
+    if monica_raw is not None:
+        monica_val = _to_float(monica_raw)
+        total_doc_val = _to_float(_pick_row_value(factura_row, total_col, default=0.0))
+        fecha_doc_str = _fmt_date(_pick_row_value(factura_row, fecha_col))
+
+        pagos.append({
+            "recibo_id": "MONICA",
+            "no_recibo": f"MONICA (Monto Original: RD$ {monica_val:,.2f})",
+            "fecha_rec": fecha_doc_str,
+            "pago_abono": 0.0,
+            "descuento": 0.0,
+            "mora": 0.0,
+            "total_pago": 0.0,
+            "estado": "Original",
+        })
+
+        pagos.append({
+            "recibo_id": "TRASPASO",
+            "no_recibo": f"TRASPASO (Monto Traspasado: RD$ {total_doc_val:,.2f})",
+            "fecha_rec": fecha_doc_str,
+            "pago_abono": 0.0,
+            "descuento": 0.0,
+            "mora": 0.0,
+            "total_pago": 0.0,
+            "estado": "Traspasado",
+        })
+
     for row in ri_rows:
         cab_ri = _split_prefixed_row(row, "C__")
         det_ri = _split_prefixed_row(row, "D__")
@@ -3471,6 +3503,7 @@ def index(request):
         "cuentas_por_cobrar": has_perm(ctx["auth_payload"]["usuario_id"], "caja", "ver_cuentas_por_cobrar"),
         "cuadre_caja": has_perm(ctx["auth_payload"]["usuario_id"], "caja", "ver_cuadre_caja"),
         "financiamiento": has_perm(ctx["auth_payload"]["usuario_id"], "caja", "ver_financiamiento"),
+        "pos": has_perm(ctx["auth_payload"]["usuario_id"], "venta_pos", "ver"),
     }
     return render(request, "caja/index.html", ctx)
 
@@ -5267,7 +5300,11 @@ def cuentas_por_cobrar_cancelar_view(request):
                 total_recibo = _to_decimal(
                     _pick_row_value(header_row, "TOTAL_COBRO", "TOTAL_DOC", "IMPORTE", "MONTO", default=0)
                 )
-                header_comment = _append_cancelled_comment(_pick_row_text(header_row, "COMENTARIO", "OBSERVACION"))
+                custom_comment = payload.get("comentario")
+                if custom_comment is not None:
+                    header_comment = _append_cancelled_comment(str(custom_comment).strip())
+                else:
+                    header_comment = _append_cancelled_comment(_pick_row_text(header_row, "COMENTARIO", "OBSERVACION"))
                 header_updates = {}
                 _assign_existing_values(header_updates, cab_columns, "Cancelado", "EST_DOC", "ESTATUS", "ESTADO")
                 _assign_existing_values(header_updates, cab_columns, "Y", "CANCELADO")
@@ -5417,6 +5454,7 @@ def cuentas_por_cobrar_cancelar_view(request):
                     usuario_id=usuario_id,
                     usuario_nombre=usuario_nombre,
                     terminal=terminal,
+                    comentario=header_comment,
                 )
 
                 _adjust_catalogo_saldo_actual(

@@ -1,3 +1,4 @@
+import json
 from django.db import connection, transaction
 from django.db.models import Q
 from django.shortcuts import redirect, render
@@ -241,7 +242,7 @@ def _build_estado_cuenta_context(id_sn):
     }
 
 
-def _build_alertas_context(min_days, max_days=None, sector_id=None):
+def _build_alertas_context(min_days, max_days=None, sector_id=None, vista_compacta=False):
     min_days = max(int(min_days or 0), 0)
     max_days = None if max_days in (None, "") else max(int(max_days), 0)
     if max_days is not None and max_days < min_days:
@@ -261,7 +262,10 @@ def _build_alertas_context(min_days, max_days=None, sector_id=None):
                 f.ID_DOC,
                 f.TOTAL_DOC,
                 f.SALDO,
-                f.FECHA_VENC
+                f.FECHA_VENC,
+                s.CONTACTO AS APODO,
+                f.MONICA,
+                s.DIR_FACTURA
             FROM CAB_FACTURA f
             INNER JOIN MAESTRO_SN s ON s.ID_SN = f.ID_SN
             LEFT JOIN Territorio t ON t.ID_CODIGO = s.ID_SECTOR
@@ -309,9 +313,12 @@ def _build_alertas_context(min_days, max_days=None, sector_id=None):
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT d.NO_DOC, MAX(d.FECHA_CONT)
+                    SELECT d.NO_DOC, MAX(COALESCE(c.FECHA_DOC, c.FECHA_CONT, d.FECHA_CONT, c.FECHA_CREACION))
                     FROM DET_RECIBO_INGRESO d
+                    LEFT JOIN CAB_RECIBO_INGRESO c ON c.ID_RECIBO = d.ID_RECIBO
                     WHERE d.NO_DOC IN ({placeholders})
+                      AND ISNULL(c.CANCELADO, 'N') <> 'Y'
+                      AND UPPER(ISNULL(c.EST_DOC, '')) <> 'CANCELADO'
                     GROUP BY d.NO_DOC
                     """,
                     docs_chunk,
@@ -319,8 +326,27 @@ def _build_alertas_context(min_days, max_days=None, sector_id=None):
                 for no_doc, fecha_pago in cursor.fetchall():
                     ult_pago_by_doc[no_doc] = _fmt_date(fecha_pago)
 
+    articles_by_doc = {}
+    if vista_compacta and docs:
+        unique_docs = list(dict.fromkeys(docs))
+        for docs_chunk in _chunked(unique_docs, 300):
+            placeholders = ", ".join(["%s"] * len(docs_chunk))
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT ID_DOC, DESCRIP_ART
+                    FROM DET_FACTURA
+                    WHERE ID_DOC IN ({placeholders})
+                    """,
+                    docs_chunk,
+                )
+                for doc_id, descrip_art in cursor.fetchall():
+                    art_clean = str(descrip_art or "").strip()
+                    if art_clean:
+                        articles_by_doc.setdefault(str(doc_id).strip(), []).append(art_clean)
+
     for row in rows:
-        id_sn, nom_socio, tel1, _, sector, fecha_doc, id_doc, total_doc, saldo_doc, fecha_venc = row
+        id_sn, nom_socio, tel1, _, sector, fecha_doc, id_doc, total_doc, saldo_doc, fecha_venc, apodo, monica_val, direccion = row
         cuotas = cuotas_by_doc.get(id_doc, [])
         cliente_key = (sector, id_sn)
 
@@ -336,52 +362,96 @@ def _build_alertas_context(min_days, max_days=None, sector_id=None):
                     "id_sn": id_sn,
                     "nombre": nom_socio or id_sn or "",
                     "telefono": tel1 or "",
+                    "apodo": apodo or "",
+                    "direccion": direccion or "",
                     "items": [],
                 }
                 clientes_map[cliente_key] = cliente
             return cliente
 
-        if cuotas:
-            for cuota in cuotas:
-                saldo_cuota = cuota.get("balance")
-                if saldo_cuota is None:
-                    saldo_cuota = cuota.get("saldo_insoluto")
-                saldo_val = _to_float(saldo_cuota)
+        if vista_compacta:
+            is_overdue = False
+            max_dias = 0
+            if cuotas:
+                for cuota in cuotas:
+                    saldo_cuota = cuota.get("balance")
+                    if saldo_cuota is None:
+                        saldo_cuota = cuota.get("saldo_insoluto")
+                    saldo_val = _to_float(saldo_cuota)
+                    if saldo_val <= 0:
+                        continue
+                    fecha_venc_cuota = cuota.get("fecha_venc") or fecha_venc
+                    dias = _days_overdue(fecha_venc_cuota)
+                    if dias >= min_days and (max_days is None or dias <= max_days):
+                        is_overdue = True
+                        if dias > max_dias:
+                            max_dias = dias
+            else:
+                saldo_val = _to_float(saldo_doc)
+                if saldo_val > 0:
+                    dias = _days_overdue(fecha_venc)
+                    if dias >= min_days and (max_days is None or dias <= max_days):
+                        is_overdue = True
+                        max_dias = dias
+
+            if is_overdue:
+                cliente = _ensure_cliente()
+                m_apertura = _to_float(monica_val) if (monica_val is not None and _to_float(monica_val) > 0) else _to_float(total_doc)
+                arts_list = list(dict.fromkeys(articles_by_doc.get(str(id_doc).strip(), [])))
+                articulos_str = ", ".join(arts_list)
+                cliente["items"].append(
+                    {
+                        "id_doc": id_doc,
+                        "fecha_factura": _fmt_date(fecha_doc),
+                        "monto_total": m_apertura,
+                        "monto_pendiente": _to_float(saldo_doc),
+                        "fecha_ultimo_pago": ult_pago_by_doc.get(id_doc, ""),
+                        "dias_atraso": max_dias,
+                        "articulos": articulos_str,
+                    }
+                )
+        else:
+            if cuotas:
+                for cuota in cuotas:
+                    saldo_cuota = cuota.get("balance")
+                    if saldo_cuota is None:
+                        saldo_cuota = cuota.get("saldo_insoluto")
+                    saldo_val = _to_float(saldo_cuota)
+                    if saldo_val <= 0:
+                        continue
+                    fecha_venc_cuota = cuota.get("fecha_venc") or fecha_venc
+                    dias = _days_overdue(fecha_venc_cuota)
+                    if dias < min_days or (max_days is not None and dias > max_days):
+                        continue
+                    cliente = _ensure_cliente()
+                    cliente["items"].append(
+                        {
+                            "id_doc": f"{id_doc}-{cuota.get('no_cuota')}" if cuota.get("no_cuota") is not None else id_doc,
+                            "monto_total": _to_float(cuota.get("cuota")),
+                            "fecha_factura": _fmt_date(cuota.get("fecha") or fecha_doc),
+                            "fecha_ultimo_pago": ult_pago_by_doc.get(id_doc, ""),
+                            "monto_pendiente": saldo_val,
+                            "dias_atraso": dias,
+                        }
+                    )
+            else:
+                saldo_val = _to_float(saldo_doc)
                 if saldo_val <= 0:
                     continue
-                fecha_venc_cuota = cuota.get("fecha_venc") or fecha_venc
-                dias = _days_overdue(fecha_venc_cuota)
+                dias = _days_overdue(fecha_venc)
                 if dias < min_days or (max_days is not None and dias > max_days):
                     continue
                 cliente = _ensure_cliente()
                 cliente["items"].append(
                     {
-                        "id_doc": f"{id_doc}-{cuota.get('no_cuota')}" if cuota.get("no_cuota") is not None else id_doc,
-                        "monto_total": _to_float(cuota.get("cuota")),
-                        "fecha_factura": _fmt_date(cuota.get("fecha") or fecha_doc),
+                        "id_doc": id_doc,
+                        "monto_total": _to_float(total_doc),
+                        "fecha_factura": _fmt_date(fecha_doc),
                         "fecha_ultimo_pago": ult_pago_by_doc.get(id_doc, ""),
                         "monto_pendiente": saldo_val,
                         "dias_atraso": dias,
                     }
                 )
-        else:
-            saldo_val = _to_float(saldo_doc)
-            if saldo_val <= 0:
-                continue
-            dias = _days_overdue(fecha_venc)
-            if dias < min_days or (max_days is not None and dias > max_days):
-                continue
-            cliente = _ensure_cliente()
-            cliente["items"].append(
-                {
-                    "id_doc": id_doc,
-                    "monto_total": _to_float(total_doc),
-                    "fecha_factura": _fmt_date(fecha_doc),
-                    "fecha_ultimo_pago": ult_pago_by_doc.get(id_doc, ""),
-                    "monto_pendiente": saldo_val,
-                    "dias_atraso": dias,
-                }
-            )
 
     grupos = []
     total_items = 0
@@ -438,6 +508,7 @@ def _build_financiamientos_atraso_context(cuotas_desde=None, cuotas_hasta=None, 
             s.DIR_FACTURA,
             s.ID_SECTOR,
             ISNULL(t.DESCRIPCION, 'SIN SECTOR') AS SECTOR,
+            s.CONTACTO,
             f.ID_DOC,
             f.FECHA_DOC,
             f.TOTAL_DOC,
@@ -488,6 +559,7 @@ def _build_financiamientos_atraso_context(cuotas_desde=None, cuotas_hasta=None, 
             dir_factura,
             _id_sector,
             sector,
+            contacto,
             id_doc,
             fecha_doc,
             total_doc,
@@ -518,6 +590,7 @@ def _build_financiamientos_atraso_context(cuotas_desde=None, cuotas_hasta=None, 
                 "telefono": tel1 or "",
                 "direccion": dir_factura or "",
                 "sector": sector or "SIN SECTOR",
+                "apodo": contacto or "",
                 "id_doc": id_doc,
                 "fecha_doc": _fmt_date(fecha_doc),
                 "fecha_venc": _fmt_date(fecha_venc_doc),
@@ -557,10 +630,13 @@ def _build_financiamientos_atraso_context(cuotas_desde=None, cuotas_hasta=None, 
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT NO_DOC, MAX(FECHA_CONT)
-                    FROM DET_RECIBO_INGRESO
-                    WHERE NO_DOC IN ({placeholders})
-                    GROUP BY NO_DOC
+                    SELECT d.NO_DOC, MAX(COALESCE(c.FECHA_DOC, c.FECHA_CONT, d.FECHA_CONT, c.FECHA_CREACION))
+                    FROM DET_RECIBO_INGRESO d
+                    LEFT JOIN CAB_RECIBO_INGRESO c ON c.ID_RECIBO = d.ID_RECIBO
+                    WHERE d.NO_DOC IN ({placeholders})
+                      AND ISNULL(c.CANCELADO, 'N') <> 'Y'
+                      AND UPPER(ISNULL(c.EST_DOC, '')) <> 'CANCELADO'
+                    GROUP BY d.NO_DOC
                     """,
                     docs_chunk,
                 )
@@ -666,10 +742,13 @@ def _build_cuentas_sin_financiamiento_atraso_context(dias_desde=None, dias_hasta
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT NO_DOC, MAX(FECHA_CONT)
-                    FROM DET_RECIBO_INGRESO
-                    WHERE NO_DOC IN ({placeholders})
-                    GROUP BY NO_DOC
+                    SELECT d.NO_DOC, MAX(COALESCE(c.FECHA_DOC, c.FECHA_CONT, d.FECHA_CONT, c.FECHA_CREACION))
+                    FROM DET_RECIBO_INGRESO d
+                    LEFT JOIN CAB_RECIBO_INGRESO c ON c.ID_RECIBO = d.ID_RECIBO
+                    WHERE d.NO_DOC IN ({placeholders})
+                      AND ISNULL(c.CANCELADO, 'N') <> 'Y'
+                      AND UPPER(ISNULL(c.EST_DOC, '')) <> 'CANCELADO'
+                    GROUP BY d.NO_DOC
                     """,
                     docs_chunk,
                 )
@@ -749,6 +828,7 @@ def _build_financiamiento_aviso_context(request, no_doc, auth_payload, embed=Fal
             "direccion": "",
             "telefono": "",
             "sector": "",
+            "apodo": "",
             "cuotas": [],
             "balance_atraso": 0.0,
         }
@@ -759,6 +839,23 @@ def _build_financiamiento_aviso_context(request, no_doc, auth_payload, embed=Fal
     sello_b64 = empresa.get("sello_b64") or ""
     firma_b64 = _load_firma_b64(auth_payload["usuario_id"])
     total_mora = 0.0
+
+    articulos_list = []
+    if no_doc:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT DESCRIP_ART
+                    FROM DET_FACTURA
+                    WHERE ID_DOC = %s
+                    """,
+                    [no_doc]
+                )
+                art_rows = cursor.fetchall()
+            articulos_list = [r[0].strip() for r in art_rows if r[0]]
+        except Exception:
+            pass
 
     return {
         "embed": embed,
@@ -775,7 +872,9 @@ def _build_financiamiento_aviso_context(request, no_doc, auth_payload, embed=Fal
         "cliente_rnc": record.get("rnc_ced", ""),
         "cliente_direccion": record.get("direccion", ""),
         "cliente_telefono": record.get("telefono", ""),
+        "cliente_apodo": record.get("apodo", ""),
         "ciudad_impresion": record.get("sector", ""),
+        "articulos_atraso": ", ".join(articulos_list),
         "fecha": timezone.localdate().strftime("%d/%m/%Y"),
         "hora": timezone.localtime().strftime("%I:%M:%S %p").lstrip("0"),
         "aviso_asunto": f"Financiamiento {no_doc} con cuotas en atraso",
@@ -821,6 +920,10 @@ def index(request):
         "financiamientos_atraso": _can_view_financiamientos_atraso(ctx["auth_payload"]["usuario_id"]),
         "cuentas_sin_financiamiento_atraso": _can_view_cuentas_sin_financiamiento_atraso(ctx["auth_payload"]["usuario_id"]),
         "acuerdos": has_perm(ctx["auth_payload"]["usuario_id"], "cobros", "ver_acuerdos"),
+        "pagos_recuperados": (
+            has_perm(ctx["auth_payload"]["usuario_id"], "cobros", "ver_pagos_recuperados")
+            or has_perm(ctx["auth_payload"]["usuario_id"], "cobros", "ver_acuerdos")
+        ),
         "cartas_enviadas": has_perm(ctx["auth_payload"]["usuario_id"], "cobros", "ver_cartas_enviadas"),
     }
     return render(request, "cobros/index.html", ctx)
@@ -981,7 +1084,8 @@ def acuerdos_view(request):
                     transaction.on_commit(
                         lambda: broadcast_notification_refresh(reason="payment-agreement-updated")
                     )
-                    return redirect("cobros:acuerdos")
+                    success_message = "Acuerdo guardado correctamente."
+                    selected = None
             else:
                 CobroAcuerdo.objects.create(
                     id_sn=id_sn,
@@ -999,19 +1103,21 @@ def acuerdos_view(request):
                     lambda: broadcast_notification_refresh(reason="payment-agreement-created")
                 )
                 success_message = "Acuerdo guardado correctamente."
+                selected = None
 
-        selected = {
-            "id_acuerdo": acuerdo_id,
-            "id_sn": id_sn,
-            "cliente_nombre": cliente_nombre,
-            "telefono": telefono,
-            "sector": sector,
-            "tipo": tipo,
-            "fecha_compromiso": fecha_compromiso_raw,
-            "monto_compromiso": monto_compromiso_raw,
-            "nota": nota,
-            "estado": estado,
-        }
+        if error_message:
+            selected = {
+                "id_acuerdo": acuerdo_id,
+                "id_sn": id_sn,
+                "cliente_nombre": cliente_nombre,
+                "telefono": telefono,
+                "sector": sector,
+                "tipo": tipo,
+                "fecha_compromiso": fecha_compromiso_raw,
+                "monto_compromiso": monto_compromiso_raw,
+                "nota": nota,
+                "estado": estado,
+            }
     elif edit_id:
         selected = CobroAcuerdo.objects.filter(id_acuerdo=edit_id).first()
 
@@ -1057,6 +1163,200 @@ def acuerdos_view(request):
         ("CANCELADO", "Cancelado"),
     ]
     return render(request, "cobros/acuerdos.html", ctx)
+
+
+def _load_pagos_recuperados(fecha_desde=None, fecha_hasta=None, q="", event_ids=None):
+    _ensure_cobro_acuerdo_table()
+    where_clauses = ["q.TIPO_EVENTO = 'agreement_payment_received'"]
+    params = []
+
+    if event_ids:
+        safe_ids = []
+        for raw_id in event_ids:
+            try:
+                safe_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+        if safe_ids:
+            placeholders = ", ".join(["%s"] * len(safe_ids))
+            where_clauses.append(f"q.ID_EVENTO IN ({placeholders})")
+            params.extend(safe_ids)
+
+    if fecha_desde:
+        where_clauses.append("q.FECHA_EVENTO >= %s")
+        params.append(f"{fecha_desde} 00:00:00")
+
+    if fecha_hasta:
+        where_clauses.append("q.FECHA_EVENTO <= %s")
+        params.append(f"{fecha_hasta} 23:59:59")
+
+    where_sql = " AND ".join(where_clauses)
+
+    sql = f"""
+        SELECT
+            q.ID_EVENTO,
+            q.FECHA_EVENTO,
+            q.DOCUMENT_ID,
+            q.PAYLOAD_JSON,
+            a.ID_ACUERDO,
+            a.ESTADO,
+            a.TELEFONO,
+            a.SECTOR,
+            a.NOTA,
+            a.MONTO_COMPROMISO
+        FROM WS_EVENT_QUEUE q
+        LEFT JOIN COBRO_ACUERDO a
+            ON TRY_CAST(JSON_VALUE(q.PAYLOAD_JSON, '$.acuerdo_id') AS INT) = a.ID_ACUERDO
+        WHERE {where_sql}
+        ORDER BY q.FECHA_EVENTO DESC, q.ID_EVENTO DESC
+    """
+
+    records = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+    except Exception:
+        rows = []
+
+    q_lower = str(q or "").strip().lower()
+
+    for row in rows:
+        event_id, fecha_evento, doc_id, payload_raw, ac_id, ac_estado, ac_tel, ac_sec, ac_nota, ac_monto_comp = row
+        payload = {}
+        if payload_raw:
+            try:
+                payload = json.loads(str(payload_raw))
+            except Exception:
+                payload = {}
+
+        no_recibo = str(payload.get("no_recibo") or payload.get("document_id") or doc_id or "").strip()
+        id_sn = str(payload.get("id_sn") or payload.get("cliente_codigo") or "").strip()
+        cliente_nombre = str(payload.get("cliente_nombre") or "").strip()
+        tipo_acuerdo = str(payload.get("tipo_acuerdo") or "PROMESA_PAGO").strip()
+        fecha_compromiso = str(payload.get("fecha_compromiso") or "").strip()
+        monto_pago = _to_float(payload.get("monto_pago"))
+        acuerdo_id = str(payload.get("acuerdo_id") or ac_id or "").strip()
+        telefono = str(ac_tel or "").strip()
+        sector = str(ac_sec or "").strip()
+        estado = str(ac_estado or "PENDIENTE").strip().upper()
+        nota = str(ac_nota or "").strip()
+        monto_compromiso = _to_float(ac_monto_comp) if ac_monto_comp is not None else None
+
+        if q_lower:
+            searchable = " ".join([
+                cliente_nombre,
+                id_sn,
+                no_recibo,
+                telefono,
+                sector,
+                tipo_acuerdo,
+                acuerdo_id,
+            ]).lower()
+            if q_lower not in searchable:
+                continue
+
+        records.append({
+            "id_evento": event_id,
+            "fecha_evento": fecha_evento,
+            "no_recibo": no_recibo,
+            "id_sn": id_sn,
+            "cliente_nombre": cliente_nombre,
+            "tipo_acuerdo": tipo_acuerdo,
+            "tipo_label": tipo_acuerdo.replace("_", " ").title(),
+            "fecha_compromiso": fecha_compromiso,
+            "monto_pago": monto_pago,
+            "acuerdo_id": acuerdo_id,
+            "telefono": telefono,
+            "sector": sector,
+            "estado": estado,
+            "nota": nota,
+            "monto_compromiso": monto_compromiso,
+        })
+
+    return records
+
+
+def pagos_recuperados_view(request):
+    ctx = _base_context(request, page_title="Cobros - Pagos Recuperados", active_nav="cobros")
+    if not ctx:
+        return redirect("login")
+    usuario_id = ctx["auth_payload"]["usuario_id"]
+    if not (has_perm(usuario_id, "cobros", "ver_pagos_recuperados") or has_perm(usuario_id, "cobros", "ver_acuerdos")):
+        return render_denied(request, active_nav="cobros")
+
+    today = timezone.localdate()
+    default_desde = today.replace(day=1).strftime("%Y-%m-%d")
+    default_hasta = today.strftime("%Y-%m-%d")
+
+    fecha_desde = request.GET.get("fecha_desde")
+    if fecha_desde is None:
+        fecha_desde = default_desde
+    else:
+        fecha_desde = fecha_desde.strip()
+
+    fecha_hasta = request.GET.get("fecha_hasta")
+    if fecha_hasta is None:
+        fecha_hasta = default_hasta
+    else:
+        fecha_hasta = fecha_hasta.strip()
+
+    q = (request.GET.get("q") or "").strip()
+
+    records = _load_pagos_recuperados(fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, q=q)
+    total_monto = sum(r["monto_pago"] for r in records)
+    total_records = len(records)
+
+    ctx["records"] = records
+    ctx["total_records"] = total_records
+    ctx["total_monto"] = total_monto
+    ctx["fecha_desde"] = fecha_desde
+    ctx["fecha_hasta"] = fecha_hasta
+    ctx["q"] = q
+    ctx["hoy"] = today
+    return render(request, "cobros/pagos_recuperados.html", ctx)
+
+
+@xframe_options_sameorigin
+def pagos_recuperados_impresion_view(request):
+    ctx = _base_context(request, page_title="Registro de Pagos Recuperados", active_nav="cobros")
+    if not ctx:
+        return redirect("login")
+    usuario_id = ctx["auth_payload"]["usuario_id"]
+    if not (has_perm(usuario_id, "cobros", "ver_pagos_recuperados") or has_perm(usuario_id, "cobros", "ver_acuerdos")):
+        return render_denied(request, active_nav="cobros")
+
+    if request.method == "POST":
+        selected_ids = request.POST.getlist("selected_ids")
+        fecha_desde = (request.POST.get("fecha_desde") or "").strip()
+        fecha_hasta = (request.POST.get("fecha_hasta") or "").strip()
+        q = (request.POST.get("q") or "").strip()
+    else:
+        selected_ids = request.GET.getlist("selected_ids")
+        fecha_desde = (request.GET.get("fecha_desde") or "").strip()
+        fecha_hasta = (request.GET.get("fecha_hasta") or "").strip()
+        q = (request.GET.get("q") or "").strip()
+
+    records = _load_pagos_recuperados(
+        fecha_desde=fecha_desde if not selected_ids else None,
+        fecha_hasta=fecha_hasta if not selected_ids else None,
+        q=q if not selected_ids else "",
+        event_ids=selected_ids if selected_ids else None,
+    )
+
+    total_monto = sum(r["monto_pago"] for r in records)
+    empresa = _build_empresa_payload(ctx)
+
+    ctx["records"] = records
+    ctx["total_records"] = len(records)
+    ctx["total_monto"] = total_monto
+    ctx["fecha_desde"] = fecha_desde
+    ctx["fecha_hasta"] = fecha_hasta
+    ctx["fecha_impresion"] = timezone.localtime()
+    ctx["usuario_nombre"] = ctx["auth_payload"].get("nombre") or ctx["auth_payload"].get("usuario") or ""
+    ctx["empresa"] = empresa
+    return render(request, "cobros/pagos_recuperados_print.html", ctx)
+
 
 
 def cartas_enviadas_view(request):
@@ -1288,10 +1588,14 @@ def alertas_print_view(request):
     except ValueError:
         sector_id = None
 
+    vista = (request.GET.get("vista") or "").strip().lower()
+    vista_compacta = (vista == "compacta")
+
     embed = (request.GET.get("embed") or "").strip() == "1"
-    ctx = _build_alertas_context(min_days, max_days, sector_id)
+    ctx = _build_alertas_context(min_days, max_days, sector_id, vista_compacta=vista_compacta)
     ctx["auth_payload"] = auth_payload
     ctx["embed"] = embed
+    ctx["vista_compacta"] = vista_compacta
     return render(request, "cobros/alertas_print.html", ctx)
 
 

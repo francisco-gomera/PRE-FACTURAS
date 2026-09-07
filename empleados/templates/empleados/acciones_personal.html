@@ -790,7 +790,7 @@
       <button id="pa_btn_buscar_accion" type="button" class="pa-action">Buscar</button>
       <button id="pa_btn_cancelar" type="button" class="pa-action is-muted" disabled>Cancelar</button>
       <button id="pa_btn_grabar" type="button" class="pa-action" disabled>Grabar</button>
-      <button type="button" class="pa-action is-muted" disabled>Imprimir</button>
+      <button id="pa_btn_imprimir" type="button" class="pa-action is-muted" disabled>Imprimir</button>
     </div>
     <a href="{% url 'empleados:index' %}" class="pa-action is-muted pa-close-link">Cerrar</a>
   </footer>
@@ -891,6 +891,7 @@
     const btnBuscarAccion = document.getElementById("pa_btn_buscar_accion");
     const btnCancelar = document.getElementById("pa_btn_cancelar");
     const btnGrabar = document.getElementById("pa_btn_grabar");
+    const btnImprimir = document.getElementById("pa_btn_imprimir");
     const pickButton = document.querySelector(".pa-pick-btn");
     const backdrop = document.getElementById("pa_employee_backdrop");
     const searchInput = document.getElementById("pa_employee_q");
@@ -954,6 +955,7 @@
     let employeeVacationDays = 0;
     let selectedEmployeeId = "";
     let currentEmployeeActive = false;
+    let prefillPlanId = null;
 
     function escapeHtml(value) {
       return String(value || "").replace(/[&<>"']/g, (char) => ({
@@ -1222,7 +1224,7 @@
 
     function showMessage(message, title = "Mensaje") {
       messageTitle.textContent = title;
-      messageBody.textContent = message;
+      messageBody.innerHTML = message;
       messageBackdrop.classList.add("open");
       messageBackdrop.setAttribute("aria-hidden", "false");
       messageCloseButton.focus();
@@ -1340,7 +1342,7 @@
         if (cambioMotivo === "VACACIONES") {
           const diasDevueltos = Number(data.dias_devueltos || 0);
           const diasTranscurridos = Number(data.dias_transcurridos || 0);
-          return `Acción ${actionId} de vacaciones cancelada. Días transcurridos: ${diasTranscurridos}. Días devueltos: ${diasDevueltos}.`;
+          return `Acción ${actionId} de vacaciones cancelada.<br/><br/><strong>Días consumidos:</strong> ${diasTranscurridos}<br/><strong>Días devueltos a disponibilidad:</strong> ${diasDevueltos}<br/><br/>Puedes imprimir el comprobante correspondiente presionando el botón <strong>Imprimir</strong> en la parte inferior de la pantalla.`;
         }
         if (cambioMotivo === "LICENCIA MEDICA" || cambioMotivo === "PERMISO") {
           return `Acción ${actionId} de ${cambioMotivo.toLowerCase()} cancelada.`;
@@ -1767,11 +1769,38 @@
             field("Dias disponibles", empleado.vacaciones_disponibles || 0),
             field("Dias solicitados", action.cantidad_dias || 0)
           );
+          if (estatusTexto === "CANCELADA") {
+            detailFields.push(
+              field("Dias consumidos", action.dias_transcurridos || 0),
+              field("Dias devueltos", action.dias_devueltos || 0)
+            );
+          }
         }
       }
 
       if (!primaryFields.length) primaryFields.push(field("Detalle", docMotivo));
       if (!detailFields.length) detailFields.push(field("Referencia", "Sin detalle adicional", "is-muted"));
+
+      let cancellationSection = "";
+      if (estatusTexto === "CANCELADA" && cambioMotivo === "VACACIONES") {
+        cancellationSection = `
+          <section class="pa-print-section" style="border-color: #b91c1c; background-color: #fef2f2; margin-top: 9px; page-break-inside: avoid;">
+            <div class="pa-print-section-title" style="background-color: #fca5a5; color: #7f1d1d; border-bottom-color: #b91c1c; font-weight: bold;">
+              Detalle de Cancelación de Vacaciones
+            </div>
+            <div class="pa-print-body" style="padding: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+              <div style="border: 1px solid #fca5a5; background: #fff; padding: 6px; border-radius: 4px;">
+                <span style="color: #7f1d1d; font-size: 8.7px; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 2px;">Días Consumidos</span>
+                <strong style="color: #b91c1c; font-size: 15px;">${action.dias_transcurridos || 0}</strong>
+              </div>
+              <div style="border: 1px solid #fca5a5; background: #fff; padding: 6px; border-radius: 4px;">
+                <span style="color: #7f1d1d; font-size: 8.7px; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 2px;">Días Devueltos al Balance</span>
+                <strong style="color: #16a34a; font-size: 15px;">${action.dias_devueltos || 0}</strong>
+              </div>
+            </div>
+          </section>
+        `;
+      }
 
       return `
         <style>
@@ -2012,6 +2041,8 @@
               <div class="pa-print-grid two">${detailFields.join("")}</div>
             </div>
           </section>
+
+          ${cancellationSection}
 
           <section class="pa-print-section">
             <div class="pa-print-section-title">Comentario o Justificacion</div>
@@ -2270,6 +2301,8 @@
       const isApplied = !!action.aplicado;
       const isReadOnly = isCanceled || isApplied;
       btnGrabar.disabled = isReadOnly;
+      btnImprimir.disabled = !action.id_accion;
+      btnImprimir.classList.toggle("is-muted", !action.id_accion);
       setFormReadOnly(isReadOnly);
     }
 
@@ -2277,6 +2310,7 @@
       selectedEmployeeId = "";
       currentEmployeeActive = false;
       employeeVacationDays = 0;
+      prefillPlanId = null;
       document.querySelectorAll("#pa_form_layout input, #pa_form_layout select, #pa_form_layout textarea").forEach((field) => {
         if (field.type === "checkbox" || field.type === "radio") field.checked = false;
         else field.value = "";
@@ -2285,6 +2319,8 @@
       document.getElementById("pa_estatus").value = "";
       setEmployeePhotoPreview(null);
       setFormReadOnly(false);
+      btnImprimir.disabled = true;
+      btnImprimir.classList.add("is-muted");
       syncActionAvailability();
     }
 
@@ -2312,6 +2348,7 @@
         fecha_desde: cambioMotivo === "SUSPENCION" ? cambioSuspensionDesdeField.value : cambioMotivo === "VACACIONES" ? cambioVacacionesDesdeField.value : cambioMotivo === "LICENCIA MEDICA" || cambioMotivo === "PERMISO" ? cambioLicenciaMedicaDesdeField.value : "",
         fecha_hasta: cambioMotivo === "SUSPENCION" ? cambioSuspensionHastaField.value : cambioMotivo === "VACACIONES" ? cambioVacacionesHastaField.value : cambioMotivo === "LICENCIA MEDICA" || cambioMotivo === "PERMISO" ? cambioLicenciaMedicaHastaField.value : "",
         cantidad_dias: cambioMotivo === "VACACIONES" ? cambioVacacionesSolicitadosField.value : cambioMotivo === "LICENCIA MEDICA" || cambioMotivo === "PERMISO" ? cambioLicenciaMedicaDiasField.value : "",
+        id_plan: prefillPlanId,
       };
     }
 
@@ -2366,6 +2403,12 @@
     btnBuscarAccion.addEventListener("click", openActionModal);
     btnCancelar.addEventListener("click", clearForm);
     btnGrabar.addEventListener("click", saveAction);
+    btnImprimir.addEventListener("click", () => {
+      const actionId = document.getElementById("pa_no").value;
+      if (actionId) {
+        showActionPreview(actionId);
+      }
+    });
     tipoAccionField.addEventListener("change", syncTipoAccion);
     entradaMotivoField.addEventListener("change", syncEntradaMotivo);
     cambioMotivoField.addEventListener("change", syncCambioMotivo);
@@ -2423,6 +2466,8 @@
     (async function handlePrefill() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("prefill") !== "1") return;
+      const planId = params.get("id_plan");
+      if (planId) prefillPlanId = planId;
       const empId = params.get("id_empleado");
       if (!empId) return;
       try {

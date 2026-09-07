@@ -1,0 +1,751 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<style>
+  .comp-title-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .comp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+  .file-box { background: #fff; border: 2px dashed #c9d7ef; border-radius: 14px; padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s ease; position: relative; }
+  .file-box:hover { border-color: #1f5fbf; background: #f8fbff; }
+  .file-box.has-file { border-style: solid; border-color: #3b82f6; background: #f0f7ff; }
+  .file-box input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file-box h4 { margin: 0 0 6px; color: #173d7a; }
+  .file-box p { margin: 0; color: #5c6b84; font-size: 0.88rem; }
+  .file-icon { font-size: 2.2rem; color: #3b82f6; margin-bottom: 8px; }
+  .file-icon.success { color: #10b981; }
+
+  .comp-card { background: #fff; border: 1px solid #d9e3f3; border-radius: 14px; padding: 18px; box-shadow: 0 10px 24px rgba(23,43,77,.06); margin-bottom: 20px; }
+  .comp-card h3 { margin: 0 0 10px; color: #173d7a; }
+  .comp-sub { margin: 0 0 16px; color: #5c6b84; font-size: 0.88rem; }
+
+  .comp-toolbar { display: flex; gap: 12px; align-items: end; margin-bottom: 16px; flex-wrap: wrap; }
+  .comp-field { display: grid; gap: 6px; min-width: 220px; flex-grow: 1; }
+  .comp-field label { font-size: .82rem; color: #51627c; font-weight: 700; }
+  .comp-field input, .comp-field select { width: 100%; height: 40px; box-sizing: border-box; border: 1px solid #c9d7ef; border-radius: 10px; padding: 8px 10px; font: inherit; }
+  
+  .tu-btn { min-height: 40px; box-sizing: border-box; border: 1px solid #1a66ce; border-radius: 10px; padding: 10px 18px; background: #1f5fbf; color: #fff; cursor: pointer; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; transition: all 0.2s; }
+  .tu-btn:hover { background: #1a54ab; }
+  .tu-btn.secondary { background: #e9f1ff; color: #1f4f9d; border-color: #c8d9f6; }
+  .tu-btn.secondary:hover { background: #d7e6ff; }
+  .tu-btn.refresh { background: #e6f7ee; color: #1a6b3a; border-color: #b3dfca; }
+  .tu-btn.refresh:hover { background: #d0f0de; }
+  .tu-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+  .diff-badge { padding: 2px 6px; border-radius: 4px; font-size: 0.76rem; font-weight: bold; }
+  .diff-badge.danger { background: #ffebeb; color: #b91c1c; }
+  .diff-badge.success { background: #ecfdf5; color: #047857; }
+  .diff-badge.warning { background: #fef3c7; color: #d97706; }
+
+  .comparison-table-wrap { overflow-x: auto; border: 1px solid #edf2fb; border-radius: 10px; max-height: 520px; }
+  .comparison-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left; }
+  .comparison-table th, .comparison-table td { padding: 10px 12px; border-bottom: 1px solid #edf2fb; vertical-align: middle; }
+  .comparison-table th { background: #f8fbff; color: #3b5680; position: sticky; top: 0; z-index: 10; font-weight: 700; }
+  .comparison-table tbody tr:hover { background: #f9fbfd; }
+  
+  .val-comparison { display: flex; flex-direction: column; font-size: 0.82rem; }
+  .val-comparison span { white-space: nowrap; }
+  .val-comparison .a-val { color: #dc2626; font-weight: 500; }
+  .val-comparison .b-val { color: #16a34a; font-weight: 500; }
+  .val-comparison .equal-val { color: #475569; }
+
+  /* Modal Styles */
+  .tu-modal-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(15,23,42,.55); backdrop-filter: blur(3px); align-items: center; justify-content: center; }
+  .tu-modal-overlay.is-visible { display: flex; }
+  .tu-modal { background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(15,23,42,.18); max-width: 800px; width: 90vw; max-height: 90vh; padding: 24px; display: flex; flex-direction: column; animation: tuModalIn .22s ease-out; }
+  @keyframes tuModalIn { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+  .tu-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+  .tu-modal-header h3 { margin: 0; color: #173d7a; font-size: 1.15rem; }
+  .tu-modal-body { overflow-y: auto; flex-grow: 1; padding-right: 6px; }
+  .tu-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+
+  .details-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; text-align: left; }
+  .details-table th, .details-table td { padding: 6px 10px; border-bottom: 1px solid #edf2fb; }
+  .details-table th { background: #f8fbff; font-weight: 700; }
+  .details-table tr.has-diff { background: #fffbeb; }
+  .details-table tr.has-diff td:nth-child(2) { color: #dc2626; font-weight: bold; }
+  .details-table tr.has-diff td:nth-child(3) { color: #16a34a; font-weight: bold; }
+
+  @media (max-width: 768px) {
+    .comp-grid { grid-template-columns: 1fr; }
+    .comp-toolbar { flex-direction: column; align-items: stretch; }
+    .comp-field { min-width: 0; }
+  }
+</style>
+
+<div class="comp-title-bar">
+  <div>
+    <h2 class="page-title">Comparación de Reportes TransUnion</h2>
+    <p class="page-subtitle">Sube dos archivos de reportes (.txt o .csv) para comparar, detectar cuentas omitidas y generar un archivo de cierre.</p>
+  </div>
+  <a href="{% url 'ajustes:reportes_transunion' %}" class="tu-btn secondary">Volver a Reportes</a>
+</div>
+
+<div class="comp-grid">
+  <div class="file-box" id="box_a">
+    <div class="file-icon" id="icon_a">&#x1F4C4;</div>
+    <h4 id="title_a">Archivo A (Anterior / Base)</h4>
+    <p id="desc_a">Arrastra o haz clic para subir</p>
+    <input type="file" id="file_a" accept=".txt,.csv" />
+  </div>
+  <div class="file-box" id="box_b">
+    <div class="file-icon" id="icon_b">&#x1F4C4;</div>
+    <h4 id="title_b">Archivo B (Nuevo / Reciente)</h4>
+    <p id="desc_b">Arrastra o haz clic para subir</p>
+    <input type="file" id="file_b" accept=".txt,.csv" />
+  </div>
+</div>
+
+<div class="comp-card" style="display: none;" id="comparison_panel">
+  <h3>Resultados de la Comparación</h3>
+  <div class="comp-toolbar">
+    <div class="comp-field">
+      <label for="compare_type">Tipo de Comparación</label>
+      <select id="compare_type">
+        <option value="only_a" selected>Cuentas sólo en Archivo A (Omitidas / A cerrar)</option>
+        <option value="only_b">Cuentas sólo en Archivo B (Nuevas)</option>
+        <option value="common_diff">Cuentas comunes con diferencias en datos</option>
+        <option value="common">Cuentas en común</option>
+        <option value="all">Todas las cuentas</option>
+      </select>
+    </div>
+    <div class="comp-field">
+      <label for="compare_search">Buscar</label>
+      <input id="compare_search" type="text" placeholder="Número de cuenta o Cliente..." />
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button id="btn_generate_closure" class="tu-btn secondary" disabled>Generar Reporte de Cierre para Selección</button>
+      <button id="btn_generate_combined" class="tu-btn refresh" disabled>Generar Reporte B Completo + Omitidas de A</button>
+    </div>
+  </div>
+
+  <div class="comp-sub" id="summary_text">Cargando comparación...</div>
+
+  <div class="comparison-table-wrap">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th style="width: 30px;"><input type="checkbox" id="select_all" checked /></th>
+          <th style="width: 90px;">Cuenta</th>
+          <th>Cliente</th>
+          <th style="width: 140px;">Estatus A vs B</th>
+          <th style="width: 140px;">Estado A vs B</th>
+          <th style="width: 130px;">Balance A vs B</th>
+          <th style="width: 80px; text-align: center;">Detalle</th>
+        </tr>
+      </thead>
+      <tbody id="comparison_rows">
+        <tr>
+          <td colspan="7" style="text-align: center; color: #667892; padding: 20px;">
+            Sube ambos archivos para realizar la comparación.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="detail_modal" class="tu-modal-overlay">
+  <div class="tu-modal">
+    <div class="tu-modal-header">
+      <h3 id="modal_account_title">Detalle de la Cuenta</h3>
+      <button id="modal_close_x" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b;">&times;</button>
+    </div>
+    <div class="tu-modal-body">
+      <table class="details-table">
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Archivo A</th>
+            <th>Archivo B</th>
+          </tr>
+        </thead>
+        <tbody id="modal_details_rows">
+        </tbody>
+      </table>
+    </div>
+    <div class="tu-modal-actions">
+      <button id="modal_close_btn" type="button" class="tu-btn secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+{{ transunion_fields|json_script:"tu-fields-data" }}
+
+<script>
+  (function() {
+    const fields = JSON.parse(document.getElementById("tu-fields-data").textContent || "[]");
+    
+    // File contents and parsed maps
+    let fileAData = null;
+    let fileBData = null;
+    let parsedA = new Map();
+    let parsedB = new Map();
+    let comparisonResults = [];
+    
+    const fileAInput = document.getElementById("file_a");
+    const fileBInput = document.getElementById("file_b");
+    const boxA = document.getElementById("box_a");
+    const boxB = document.getElementById("box_b");
+    const comparisonPanel = document.getElementById("comparison_panel");
+    const comparisonRows = document.getElementById("comparison_rows");
+    const summaryText = document.getElementById("summary_text");
+    const compareTypeSelect = document.getElementById("compare_type");
+    const compareSearchInput = document.getElementById("compare_search");
+    const selectAllCheckbox = document.getElementById("select_all");
+    const btnGenerateClosure = document.getElementById("btn_generate_closure");
+    
+    // Modal elements
+    const detailModal = document.getElementById("detail_modal");
+    const modalAccountTitle = document.getElementById("modal_account_title");
+    const modalDetailsRows = document.getElementById("modal_details_rows");
+    const modalCloseX = document.getElementById("modal_close_x");
+    const modalCloseBtn = document.getElementById("modal_close_btn");
+
+    function parseDelimited(text, delimiter) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quoted = false;
+      const value = String(text || "").replace(/^\uFEFF/, "");
+      for (let index = 0; index < value.length; index += 1) {
+        const ch = value[index];
+        const next = value[index + 1];
+        if (quoted) {
+          if (ch === '"' && next === '"') {
+            cell += '"';
+            index += 1;
+          } else if (ch === '"') {
+            quoted = false;
+          } else {
+            cell += ch;
+          }
+          continue;
+        }
+        if (ch === '"') {
+          quoted = true;
+        } else if (ch === delimiter) {
+          row.push(cell);
+          cell = "";
+        } else if (ch === "\n") {
+          row.push(cell);
+          rows.push(row);
+          row = [];
+          cell = "";
+        } else if (ch !== "\r") {
+          cell += ch;
+        }
+      }
+      if (cell || row.length) {
+        row.push(cell);
+        rows.push(row);
+      }
+      return rows.filter((items) => items.some((item) => String(item || "").trim()));
+    }
+
+    function detectDelimiter(text, fileName) {
+      const name = String(fileName || "").toLowerCase();
+      if (name.endsWith(".txt")) return "|";
+      if (name.endsWith(".csv")) return ",";
+      const sample = String(text || "").split(/\r?\n/).find((line) => line.trim()) || "";
+      return (sample.match(/\|/g) || []).length > (sample.match(/,/g) || []).length ? "|" : ",";
+    }
+
+    function processFile(text, fileName, isA) {
+      const delimiter = detectDelimiter(text, fileName);
+      const rows = parseDelimited(text, delimiter);
+      if (!rows.length) {
+        throw new Error("El archivo está vacío o es inválido.");
+      }
+      
+      const firstRow = rows[0] || [];
+      // Check if it has a header
+      const headerKeys = firstRow.map(header => {
+        const normalized = String(header || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        const found = fields.find(f => f.key.toLowerCase() === normalized || f.label.toLowerCase() === normalized);
+        return found ? found.key : "";
+      });
+      const hasHeader = headerKeys.filter(Boolean).length >= Math.min(6, fields.length);
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      const keys = hasHeader ? headerKeys : fields.map(f => f.key);
+      
+      const map = new Map();
+      dataRows.forEach((values, idx) => {
+        const item = {};
+        fields.forEach(f => { item[f.key] = ""; });
+        values.forEach((value, valIdx) => {
+          const key = keys[valIdx];
+          if (key && Object.prototype.hasOwnProperty.call(item, key)) {
+            item[key] = String(value || "").trim();
+          }
+        });
+        
+        // Use numero_cuenta (index 25) as primary key, fallback to client name/index
+        const accNum = item.numero_cuenta || `row-${idx}`;
+        map.set(accNum, item);
+      });
+      
+      return map;
+    }
+
+    function updateFileUI(box, icon, title, desc, file, isA) {
+      if (file) {
+        box.classList.add("has-file");
+        icon.innerHTML = "&#x2705;";
+        icon.className = "file-icon success";
+        title.textContent = file.name;
+        desc.textContent = `(${formatSize(file.size)}) - Cargado correctamente.`;
+      } else {
+        box.classList.remove("has-file");
+        icon.innerHTML = "&#x1F4C4;";
+        icon.className = "file-icon";
+        title.textContent = isA ? "Archivo A (Anterior / Base)" : "Archivo B (Nuevo / Reciente)";
+        desc.textContent = "Arrastra o haz clic para subir";
+      }
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1048576).toFixed(1)} MB`;
+    }
+
+    function handleFile(file, isA) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const text = e.target.result;
+          if (isA) {
+            parsedA = processFile(text, file.name, true);
+            updateFileUI(boxA, document.getElementById("icon_a"), document.getElementById("title_a"), document.getElementById("desc_a"), file, true);
+          } else {
+            parsedB = processFile(text, file.name, false);
+            updateFileUI(boxB, document.getElementById("icon_b"), document.getElementById("title_b"), document.getElementById("desc_b"), file, false);
+          }
+          checkAndCompare();
+        } catch (error) {
+          alert(`Error al procesar archivo: ${error.message}`);
+          if (isA) {
+            parsedA = new Map();
+            updateFileUI(boxA, document.getElementById("icon_a"), document.getElementById("title_a"), document.getElementById("desc_a"), null, true);
+          } else {
+            parsedB = new Map();
+            updateFileUI(boxB, document.getElementById("icon_b"), document.getElementById("title_b"), document.getElementById("desc_b"), null, false);
+          }
+          checkAndCompare();
+        }
+      };
+      reader.readAsText(file, "utf-8");
+    }
+
+    fileAInput.addEventListener("change", (e) => handleFile(e.target.files[0], true));
+    fileBInput.addEventListener("change", (e) => handleFile(e.target.files[0], false));
+
+    // Drag and drop events
+    [boxA, boxB].forEach((box, idx) => {
+      const isA = idx === 0;
+      box.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        box.style.borderColor = "#1f5fbf";
+        box.style.background = "#f0f7ff";
+      });
+      box.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        box.style.borderColor = "";
+        box.style.background = "";
+      });
+      box.addEventListener("drop", (e) => {
+        e.preventDefault();
+        box.style.borderColor = "";
+        box.style.background = "";
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          if (isA) {
+            fileAInput.files = e.dataTransfer.files;
+            handleFile(file, true);
+          } else {
+            fileBInput.files = e.dataTransfer.files;
+            handleFile(file, false);
+          }
+        }
+      });
+    });
+
+    function checkAndCompare() {
+      if (parsedA.size > 0 && parsedB.size > 0) {
+        compareReports();
+      } else {
+        comparisonPanel.style.display = "none";
+      }
+    }
+
+    function compareReports() {
+      comparisonResults = [];
+      const allKeys = new Set([...parsedA.keys(), ...parsedB.keys()]);
+      
+      allKeys.forEach(key => {
+        const itemA = parsedA.get(key);
+        const itemB = parsedB.get(key);
+        
+        let inA = !!itemA;
+        let inB = !!itemB;
+        let type = "";
+        let diffs = [];
+        
+        if (inA && inB) {
+          // Both files contain the account, check for field differences
+          fields.forEach(f => {
+            const valA = String(itemA[f.key] || "").trim();
+            const valB = String(itemB[f.key] || "").trim();
+            if (valA !== valB) {
+              diffs.push({ key: f.key, label: f.label, valA, valB });
+            }
+          });
+          type = diffs.length > 0 ? "common_diff" : "common";
+        } else if (inA) {
+          type = "only_a";
+        } else {
+          type = "only_b";
+        }
+        
+        comparisonResults.push({
+          key,
+          itemA,
+          itemB,
+          type,
+          diffs,
+          selectedForAction: type === "only_a" // default check accounts only in A
+        });
+      });
+      
+      comparisonPanel.style.display = "";
+      filterAndRender();
+    }
+
+    function filterAndRender() {
+      const typeFilter = compareTypeSelect.value;
+      const searchVal = compareSearchInput.value.toLowerCase().trim();
+      
+      const filtered = comparisonResults.filter(r => {
+        // Filter by comparison type
+        if (typeFilter !== "all" && r.type !== typeFilter) {
+          if (typeFilter === "common" && r.type !== "common" && r.type !== "common_diff") {
+            return false;
+          }
+          if (typeFilter !== "common") {
+            return false;
+          }
+        }
+        
+        // Filter by search string
+        if (searchVal) {
+          const clientName = (r.itemA ? r.itemA.nombre_completo || r.itemA.razon_social : "") || 
+                             (r.itemB ? r.itemB.nombre_completo || r.itemB.razon_social : "");
+          const isMatch = r.key.toLowerCase().includes(searchVal) || 
+                          clientName.toLowerCase().includes(searchVal);
+          if (!isMatch) return false;
+        }
+        
+        return true;
+      });
+
+      // Update summary text
+      const totalA = parsedA.size;
+      const totalB = parsedB.size;
+      const onlyA = comparisonResults.filter(r => r.type === "only_a").length;
+      const onlyB = comparisonResults.filter(r => r.type === "only_b").length;
+      const commonDiff = comparisonResults.filter(r => r.type === "common_diff").length;
+      
+      summaryText.innerHTML = `Archivo A: <strong>${totalA}</strong> cuentas | Archivo B: <strong>${totalB}</strong> cuentas. <br />` +
+                           `Solo en A (omitidas): <span class="diff-badge danger">${onlyA}</span> | Solo en B (nuevas): <span class="diff-badge success">${onlyB}</span> | Comunes con diferencias: <span class="diff-badge warning">${commonDiff}</span>.`;
+
+      // Render table rows
+      if (filtered.length === 0) {
+        comparisonRows.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #667892; padding: 20px;">No se encontraron registros con los filtros seleccionados.</td></tr>`;
+        btnGenerateClosure.disabled = true;
+        return;
+      }
+      
+      comparisonRows.innerHTML = filtered.map((r, idx) => {
+        const item = r.itemA || r.itemB;
+        const clientName = item.nombre_completo || item.razon_social || "Cliente sin nombre";
+        const docId = r.key;
+        const rncCed = item.rnc || item.cedula_nueva || "-";
+        
+        let estatusHTML = "";
+        let estadoHTML = "";
+        let balanceHTML = "";
+        
+        if (r.type === "only_a") {
+          estatusHTML = `<span class="val-comparison"><span class="a-val">A: ${escapeHtml(r.itemA.estatus_cuenta)}</span><span class="b-val">B: (No existe)</span></span>`;
+          estadoHTML = `<span class="val-comparison"><span class="a-val">A: ${escapeHtml(r.itemA.estado_cuenta)}</span><span class="b-val">B: (No existe)</span></span>`;
+          balanceHTML = `<span class="val-comparison"><span class="a-val">A: $${escapeHtml(r.itemA.balance_actual)}</span><span class="b-val">B: (No existe)</span></span>`;
+        } else if (r.type === "only_b") {
+          estatusHTML = `<span class="val-comparison"><span class="a-val">A: (No existe)</span><span class="b-val">B: ${escapeHtml(r.itemB.estatus_cuenta)}</span></span>`;
+          estadoHTML = `<span class="val-comparison"><span class="a-val">A: (No existe)</span><span class="b-val">B: ${escapeHtml(r.itemB.estado_cuenta)}</span></span>`;
+          balanceHTML = `<span class="val-comparison"><span class="a-val">A: (No existe)</span><span class="b-val">B: $${escapeHtml(r.itemB.balance_actual)}</span></span>`;
+        } else {
+          const isEstatusDiff = r.itemA.estatus_cuenta !== r.itemB.estatus_cuenta;
+          estatusHTML = isEstatusDiff
+            ? `<span class="val-comparison"><span class="a-val">A: ${escapeHtml(r.itemA.estatus_cuenta)}</span><span class="b-val">B: ${escapeHtml(r.itemB.estatus_cuenta)}</span></span>`
+            : `<span class="equal-val">${escapeHtml(r.itemA.estatus_cuenta)}</span>`;
+
+          const isEstadoDiff = r.itemA.estado_cuenta !== r.itemB.estado_cuenta;
+          estadoHTML = isEstadoDiff
+            ? `<span class="val-comparison"><span class="a-val">A: ${escapeHtml(r.itemA.estado_cuenta)}</span><span class="b-val">B: ${escapeHtml(r.itemB.estado_cuenta)}</span></span>`
+            : `<span class="equal-val">${escapeHtml(r.itemA.estado_cuenta)}</span>`;
+
+          const isBalanceDiff = r.itemA.balance_actual !== r.itemB.balance_actual;
+          balanceHTML = isBalanceDiff
+            ? `<span class="val-comparison"><span class="a-val">A: $${escapeHtml(r.itemA.balance_actual)}</span><span class="b-val">B: $${escapeHtml(r.itemB.balance_actual)}</span></span>`
+            : `<span class="equal-val">$${escapeHtml(r.itemA.balance_actual)}</span>`;
+        }
+        
+        return `
+          <tr data-idx="${idx}">
+            <td><input type="checkbox" class="row-select" data-key="${escapeHtml(r.key)}" ${r.selectedForAction ? "checked" : ""} /></td>
+            <td><strong>${escapeHtml(docId)}</strong></td>
+            <td>
+              <div>${escapeHtml(clientName)}</div>
+              <small style="color: #64748b; font-size: 0.78rem;">RNC/Céd: ${escapeHtml(rncCed)}</small>
+            </td>
+            <td>${estatusHTML}</td>
+            <td>${estadoHTML}</td>
+            <td>${balanceHTML}</td>
+            <td style="text-align: center;">
+              <button type="button" class="tu-btn secondary" style="min-height: 28px; padding: 4px 8px; font-size: 0.78rem;" onclick="window.showAccountDetail('${escapeHtml(r.key)}')">
+                Ver detalle
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+      
+      // Hook checkboxes event
+      comparisonRows.querySelectorAll(".row-select").forEach(cb => {
+        cb.addEventListener("change", () => {
+          const key = cb.dataset.key;
+          const matched = comparisonResults.find(r => r.key === key);
+          if (matched) {
+            matched.selectedForAction = cb.checked;
+          }
+          updateActionButtons();
+        });
+      });
+      
+      updateActionButtons();
+    }
+
+    const btnGenerateCombined = document.getElementById("btn_generate_combined");
+
+    function updateActionButtons() {
+      const selectedCount = comparisonResults.filter(r => r.selectedForAction).length;
+      btnGenerateClosure.disabled = selectedCount === 0;
+      btnGenerateClosure.textContent = `Generar Reporte de Cierre para Selección (${selectedCount})`;
+      
+      btnGenerateCombined.disabled = parsedA.size === 0 || parsedB.size === 0;
+      
+      // Update select all checkbox state
+      const visibleCheckboxes = Array.from(comparisonRows.querySelectorAll(".row-select"));
+      if (visibleCheckboxes.length > 0) {
+        selectAllCheckbox.checked = visibleCheckboxes.every(cb => cb.checked);
+      }
+    }
+
+    selectAllCheckbox.addEventListener("change", () => {
+      const isChecked = selectAllCheckbox.checked;
+      const visibleCheckboxes = comparisonRows.querySelectorAll(".row-select");
+      visibleCheckboxes.forEach(cb => {
+        cb.checked = isChecked;
+        const key = cb.dataset.key;
+        const matched = comparisonResults.find(r => r.key === key);
+        if (matched) {
+          matched.selectedForAction = isChecked;
+        }
+      });
+      updateActionButtons();
+    });
+
+    compareTypeSelect.addEventListener("change", filterAndRender);
+    compareSearchInput.addEventListener("input", filterAndRender);
+
+    // Side-by-side details view
+    window.showAccountDetail = function(key) {
+      const match = comparisonResults.find(r => r.key === key);
+      if (!match) return;
+      
+      modalAccountTitle.textContent = `Detalle de Cuenta: ${key}`;
+      
+      const itemA = match.itemA || {};
+      const itemB = match.itemB || {};
+      
+      modalDetailsRows.innerHTML = fields.map(f => {
+        const valA = itemA[f.key] !== undefined ? String(itemA[f.key]) : "(No existe)";
+        const valB = itemB[f.key] !== undefined ? String(itemB[f.key]) : "(No existe)";
+        const hasDiff = valA !== valB;
+        
+        return `
+          <tr class="${hasDiff ? "has-diff" : ""}">
+            <td><strong>${escapeHtml(f.label)}</strong> <br /> <small style="color:#64748b;">${escapeHtml(f.key)}</small></td>
+            <td>${escapeHtml(valA)}</td>
+            <td>${escapeHtml(valB)}</td>
+          </tr>
+        `;
+      }).join("");
+      
+      detailModal.classList.add("is-visible");
+    };
+
+    function hideModal() {
+      detailModal.classList.remove("is-visible");
+    }
+    
+    modalCloseX.addEventListener("click", hideModal);
+    modalCloseBtn.addEventListener("click", hideModal);
+    detailModal.addEventListener("click", (e) => {
+      if (e.target === detailModal) hideModal();
+    });
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      }[ch]));
+    }
+
+    // Generate Closure File
+    btnGenerateClosure.addEventListener("click", () => {
+      const selectedToClose = comparisonResults.filter(r => r.selectedForAction);
+      if (!selectedToClose.length) return;
+      
+      // Determine format of the first file if available
+      const format = "txt"; // Default to pipe delimited txt
+      const delimiter = "|";
+      const filename = `Cierre_Omitidas.${new Date().toISOString().slice(2,10).replace(/-/g,"")}.txt`;
+      
+      let csvContent = "";
+      
+      selectedToClose.forEach(r => {
+        // Base closure row on the original item A details
+        const baseItem = r.itemA || r.itemB;
+        const rowData = {};
+        
+        // Copy original values
+        fields.forEach(f => {
+          rowData[f.key] = baseItem[f.key] || "";
+        });
+        
+        // Force closed specifications
+        rowData.saldo = "0";
+        rowData.balance_actual = "0";
+        rowData.monto_atraso = "0";
+        rowData.cuotas_atrasadas = "0";
+        rowData.estatus_cuenta = "NORMAL";
+        rowData.estado_cuenta = "CERRADA";
+        
+        // Zero all aging buckets
+        const bucketKeys = [
+          "saldo_vencido_1_30", "saldo_vencido_31_60", "saldo_vencido_61_90",
+          "saldo_vencido_91_120", "saldo_vencido_121_150", "saldo_vencido_151_180", "saldo_vencido_181_mas"
+        ];
+        bucketKeys.forEach(k => { rowData[k] = "0"; });
+        
+        // Build clean delimited row line
+        const lineParts = fields.map(f => {
+          let val = String(rowData[f.key] || "").trim();
+          // Escape quotes if comma delimiter is used
+          if (delimiter === "," && (val.includes(",") || val.includes('"') || val.includes("\n"))) {
+            val = '"' + val.replace(/"/g, '""') + '"';
+          }
+          return val;
+        });
+        
+        csvContent += lineParts.join(delimiter) + "\r\n";
+      });
+      
+      const blob = new Blob([csvContent], { type: "text/plain; charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      alert(`Se generó correctamente el archivo de cierre de TransUnion: ${filename}\nContiene ${selectedToClose.length} cuentas saldadas. Puedes subir este archivo directo a TransUnion para cerrar las cuentas omitidas.`);
+    });
+
+    // Generate Combined B + Omitted A Report
+    btnGenerateCombined.addEventListener("click", () => {
+      if (parsedA.size === 0 || parsedB.size === 0) return;
+      
+      // We will use File B's formatting as reference
+      const fileBName = fileBInput.files[0] ? fileBInput.files[0].name : "Reporte_Combinado.txt";
+      const isCsv = fileBName.toLowerCase().endsWith(".csv");
+      const delimiter = isCsv ? "," : "|";
+      const filename = `Reporte_Combinado.${new Date().toISOString().slice(2,10).replace(/-/g,"")}.${isCsv ? "csv" : "txt"}`;
+      
+      let csvContent = "";
+      
+      // 1. Add all accounts from File B exactly as they are in B
+      parsedB.forEach(item => {
+        const lineParts = fields.map(f => {
+          let val = String(item[f.key] || "").trim();
+          if (delimiter === "," && (val.includes(",") || val.includes('"') || val.includes("\n"))) {
+            val = '"' + val.replace(/"/g, '""') + '"';
+          }
+          return val;
+        });
+        csvContent += lineParts.join(delimiter) + "\r\n";
+      });
+      
+      // 2. Identify omitted accounts (present in A but not in B)
+      const omitted = comparisonResults.filter(r => r.type === "only_a");
+      
+      omitted.forEach(r => {
+        const baseItem = r.itemA;
+        const rowData = {};
+        fields.forEach(f => {
+          rowData[f.key] = baseItem[f.key] || "";
+        });
+        
+        // Force closed specifications
+        rowData.saldo = "0";
+        rowData.balance_actual = "0";
+        rowData.monto_atraso = "0";
+        rowData.cuotas_atrasadas = "0";
+        rowData.estatus_cuenta = "NORMAL";
+        rowData.estado_cuenta = "CERRADA";
+        
+        // Zero all aging buckets
+        const bucketKeys = [
+          "saldo_vencido_1_30", "saldo_vencido_31_60", "saldo_vencido_61_90",
+          "saldo_vencido_91_120", "saldo_vencido_121_150", "saldo_vencido_151_180", "saldo_vencido_181_mas"
+        ];
+        bucketKeys.forEach(k => { rowData[k] = "0"; });
+        
+        const lineParts = fields.map(f => {
+          let val = String(rowData[f.key] || "").trim();
+          if (delimiter === "," && (val.includes(",") || val.includes('"') || val.includes("\n"))) {
+            val = '"' + val.replace(/"/g, '""') + '"';
+          }
+          return val;
+        });
+        csvContent += lineParts.join(delimiter) + "\r\n";
+      });
+      
+      const blob = new Blob([csvContent], { type: "text/plain; charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      alert(`Se generó correctamente el reporte combinado: ${filename}\nContiene ${parsedB.size} cuentas del Archivo B y ${omitted.length} cuentas omitidas del Archivo A añadidas como CERRADAS al final.`);
+    });
+
+  })();
+</script>
+{% endblock %}

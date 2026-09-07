@@ -410,7 +410,7 @@
     grid-template-columns: 190px 1fr;
     gap: 14px;
     align-items: start;
-    margin-bottom: 7mm;
+    margin-bottom: 2mm;
   }
 
   .carta-logo {
@@ -430,23 +430,38 @@
   }
 
   .carta-head-right {
-    margin: 2.5mm 0 4mm;
+    margin: 1mm 0 2mm;
     text-align: right;
     font-size: 11pt;
   }
 
   .carta-title {
-    margin: calc(4mm - 60px) 0 6mm;
+    margin: 2mm 0 4mm;
     text-align: center;
     color: #d60000;
-    font-size: 26pt;
+    font-size: 22pt;
     font-weight: 700;
     letter-spacing: 0.2em;
   }
 
   .carta-intro {
-    margin-top: 60px;
-    margin-bottom: 5mm;
+    margin-top: 2mm;
+    margin-bottom: 3mm;
+  }
+
+  .cliente-info-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 0 !important;
+    margin-bottom: 3mm !important;
+    font-size: 11pt !important;
+    border: none !important;
+  }
+
+  .cliente-info-table td {
+    border: none !important;
+    padding: 2px 0 !important;
+    text-align: left !important;
   }
 
   .carta-intro p {
@@ -937,11 +952,13 @@
       cliente_ciudad: (avisoCiudad && avisoCiudad.value) || "",
       cliente_telefono: cliente.telefono || "",
       cliente_sector: cliente.sector || "",
+      cliente_apodo: cliente.contacto || "",
+      articulos_atraso: data?.articulos_atraso || "",
       fecha: data?.fecha || "",
       hora: data?.hora || "",
       empresa_nombre: empresa.nombre || empresaNombre,
       ciudad_impresion: (avisoCiudad && avisoCiudad.value) || "",
-      carta_titulo: "AVISO",
+      carta_titulo: "CARTA DE AVISO",
       balance_atraso: formatMoney(totales.saldo || 0),
       total_mora: formatMoney(totales.mora || 0),
       facturas_count: docs.length,
@@ -1136,18 +1153,32 @@
             <div>${escapeHtml(data.hora || "")}</div>
           </div>
 
-          <h1 class="carta-title">AVISO</h1>
+          <h1 class="carta-title">CARTA DE AVISO</h1>
 
           <div class="carta-intro">
-            <p>Señor(a):</p>
-            <p><strong>${escapeHtml(cliente.nombre || "")}</strong><br/>
-            Cédula/Pasaporte: <strong>${escapeHtml(cliente.rnc_ced || "")}</strong><br/>
-            Dirección: <strong>${escapeHtml(cliente.direccion || "")}</strong><br/>
-            Ciudad: <strong>${escapeHtml((avisoCiudad && avisoCiudad.value) || "")}</strong><br/>
-            Teléfono: <strong>${escapeHtml(cliente.telefono || "")}</strong></p>
+            <table class="cliente-info-table">
+              <tr>
+                <td style="width: 50%;">Cliente: <strong>${escapeHtml(cliente.nombre || "")}</strong></td>
+                <td style="width: 25%;">Apodo: <strong>${escapeHtml(cliente.contacto || "")}</strong></td>
+                <td style="width: 25%;">Cédula/Pasaporte: <strong>${escapeHtml(cliente.rnc_ced || "")}</strong></td>
+              </tr>
+              <tr>
+                <td colspan="3">Dirección: <strong>${escapeHtml(cliente.direccion || "")}</strong></td>
+              </tr>
+              <tr>
+                <td>Ciudad: <strong>${escapeHtml((avisoCiudad && avisoCiudad.value) || "")}</strong></td>
+                <td colspan="2">Teléfono: <strong>${escapeHtml(cliente.telefono || "")}</strong></td>
+              </tr>
+            </table>
 
             ${renderAvisoBody(data, facturas)}
           </div>
+
+          ${data.articulos_atraso ? `
+          <div style="margin-top: 3mm; margin-bottom: 3mm; font-size: 11pt;">
+            Artículos en Atraso: <strong>${escapeHtml(data.articulos_atraso)}</strong>
+          </div>
+          ` : ''}
 
           <table class="carta-table">
             <thead>
@@ -1168,10 +1199,6 @@
           <div class="carta-totals">
             <div>Balance en Atraso --> ${escapeHtml(formatMoney(totales.saldo || 0))}</div>
             <div>Total Mora --> ${escapeHtml(formatMoney(totales.mora || 0))}</div>
-          </div>
-
-          <div class="legal-clause">
-            El cliente reconoce y acepta que ${escapeHtml(empresaNombreFinal || "la empresa")} podrá consultar, compartir y reportar su información crediticia ante las sociedades de información crediticia, conforme a la normativa vigente. En caso de incumplimiento de sus obligaciones de pago reflejadas en el presente estado de cuenta, dicha información podrá ser reportada, en apego a las disposiciones legales aplicables.
           </div>
         </div>
 

@@ -1,0 +1,1187 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<style>
+  /* Premium CSS styles */
+  .tur-card {
+    background: #fff;
+    border: 1px solid #d9e3f3;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 10px 24px rgba(23,43,77,.06);
+    margin-bottom: 20px;
+    min-width: 0;
+  }
+  .tur-card h3 {
+    margin: 0 0 8px;
+    color: #173d7a;
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+  .tur-sub {
+    margin: 0 0 16px;
+    color: #5c6b84;
+    font-size: 0.9rem;
+  }
+  .tur-btn {
+    min-height: 40px;
+    box-sizing: border-box;
+    border: 1px solid #1a66ce;
+    border-radius: 10px;
+    padding: 8px 16px;
+    background: #1f5fbf;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.2s ease;
+  }
+  .tur-btn:hover {
+    background: #1850a3;
+  }
+  .tur-btn.secondary {
+    background: #e9f1ff;
+    color: #1f4f9d;
+    border-color: #c8d9f6;
+  }
+  .tur-btn.secondary:hover {
+    background: #dbe8ff;
+  }
+  
+  /* Upload / Dropzone styling */
+  .tur-dropzone {
+    border: 2px dashed #b3cbf2;
+    background: #fcfdfe;
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.22s ease;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .tur-dropzone.is-dragover {
+    border-color: #1f5fbf;
+    background: #f0f6ff;
+    transform: scale(0.995);
+  }
+  .tur-dropzone svg {
+    width: 48px;
+    height: 48px;
+    color: #1f5fbf;
+    margin-bottom: 8px;
+  }
+  .tur-dropzone p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #3b4e6b;
+  }
+  .tur-dropzone span {
+    font-size: 0.8rem;
+    color: #8c9ba5;
+  }
+  
+  /* Metadata panel */
+  .tur-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+    background: #f4f7fc;
+    border: 1px solid #e2ebf6;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .tur-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tur-meta-item span {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .tur-meta-item strong {
+    font-size: 1.05rem;
+    color: #1e293b;
+    font-weight: 700;
+  }
+  
+  /* Main Sidebar + Detail View Layout */
+  .tur-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  
+  /* Sidebar Filter / Search Controls */
+  .tur-controls {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .tur-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .tur-field label {
+    font-size: .8rem;
+    color: #51627c;
+    font-weight: 700;
+  }
+  .tur-field input, .tur-field select {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    box-sizing: border-box;
+    border: 1px solid #c9d7ef;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 0.9rem;
+    transition: border-color 0.15s ease;
+  }
+  .tur-field input:focus, .tur-field select:focus {
+    border-color: #1f5fbf;
+    outline: none;
+  }
+  
+  /* Sidebar List */
+  .tur-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .tur-list {
+    max-height: 600px;
+    overflow-y: auto;
+    display: grid;
+    gap: 8px;
+    padding-right: 4px;
+  }
+  .tur-account {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    border: 1px solid #e2eaf8;
+    background: #f8fbff;
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tur-account:hover {
+    border-color: #cbdcf7;
+    background: #eff5ff;
+  }
+  .tur-account.is-selected {
+    border-color: #1f5fbf;
+    background: #f0f6ff;
+    box-shadow: 0 0 0 2px rgba(31,95,191,.14);
+  }
+  .tur-account strong {
+    color: #173d7a;
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tur-account span {
+    color: #5c6b84;
+    font-size: 0.82rem;
+  }
+  .tur-badge {
+    align-self: flex-start;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  /* Details Panel View */
+  .tur-detail-view {
+    min-width: 0;
+  }
+  
+  /* Alert Rejection Reason Banner */
+  .tur-rejection-banner {
+    background: #fff5f5;
+    border: 1px solid #fee2e2;
+    border-left: 5px solid #ef4444;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .tur-rejection-banner svg {
+    width: 24px;
+    height: 24px;
+    color: #ef4444;
+    flex-shrink: 0;
+  }
+  .tur-rejection-banner div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .tur-rejection-banner h4 {
+    margin: 0;
+    color: #991b1b;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .tur-rejection-banner p {
+    margin: 0;
+    color: #dc2626;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  
+  /* Fields Layout Groups */
+  .tur-group-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 20px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tur-group-title:first-of-type {
+    margin-top: 0;
+  }
+  .tur-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .tur-info-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tur-info-block label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+  }
+  .tur-info-block span {
+    font-size: 0.92rem;
+    color: #0f172a;
+    font-weight: 500;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-height: 18px;
+    word-break: break-all;
+  }
+  .tur-info-block.highlight span {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #dcfce7;
+    font-weight: 600;
+  }
+  .tur-info-block.atraso span {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #ffedd5;
+    font-weight: 600;
+  }
+  .tur-info-block.atraso-monto span {
+    background: #fef2f2;
+    color: #991b1b;
+    border-color: #fee2e2;
+    font-weight: 700;
+  }
+  
+  /* Empty State */
+  .tur-empty {
+    padding: 40px 20px;
+    color: #64748b;
+    border: 1px dashed #c9d7ef;
+    border-radius: 12px;
+    background: #f8fbff;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .tur-empty svg {
+    width: 48px;
+    height: 48px;
+    color: #94a3b8;
+  }
+  .tur-empty p {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .tur-empty span {
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 992px) {
+    .tur-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="tur-card">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <h2 class="page-title" style="margin: 0;">Detalles de Cuentas Rechazadas</h2>
+      <p class="page-subtitle" style="margin: 4px 0 0;">Visualiza y analiza de forma legible los archivos de respuesta de cuentas rechazadas devueltos por TransUnion.</p>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a class="tur-btn secondary" href="{% url 'ajustes:reportes_transunion' %}">Reportes TransUnion</a>
+      <a class="tur-btn secondary" href="{% url 'ajustes:integraciones' %}">Volver</a>
+    </div>
+  </div>
+</div>
+
+<div class="tur-card">
+  <!-- Interactive dropzone -->
+  <div id="tur_dropzone" class="tur-dropzone">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+    </svg>
+    <p>Arrastra y suelta el archivo CSV aquí o <strong>haz clic para buscar</strong></p>
+    <span>Formatos permitidos: .csv (Reporte de rechazos de TransUnion)</span>
+    <input type="file" id="tur_file_input" accept=".csv" style="display: none;" />
+  </div>
+
+  <!-- Metadata Grid (hidden initially) -->
+  <div id="tur_metadata_wrap" class="tur-meta-grid" style="display: none;">
+    <div class="tur-meta-item">
+      <span>Archivo cargado</span>
+      <strong id="meta_filename">-</strong>
+    </div>
+    <div class="tur-meta-item">
+      <span>Código de Suscriptor</span>
+      <strong id="meta_subscriber">-</strong>
+    </div>
+    <div class="tur-meta-item">
+      <span>Fecha Creación Reporte</span>
+      <strong id="meta_report_date">-</strong>
+    </div>
+    <div class="tur-meta-item">
+      <span>Fecha Subida a TransUnion</span>
+      <strong id="meta_upload_date">-</strong>
+    </div>
+  </div>
+</div>
+
+<!-- Main view layout (hidden initially) -->
+<div id="tur_main_layout" class="tur-layout" style="display: none;">
+  <!-- Left Column: List & Filters -->
+  <aside class="tur-card" style="padding: 16px;">
+    <h3>Cuentas Rechazadas</h3>
+    <div class="tur-controls">
+      <div class="tur-field">
+        <label for="tur_search">Buscar</label>
+        <input id="tur_search" type="text" placeholder="Buscar por cliente, documento o cuenta..." />
+      </div>
+      <div class="tur-field">
+        <label for="tur_reason_filter">Motivo de Rechazo</label>
+        <select id="tur_reason_filter">
+          <option value="">Todos los motivos</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="tur-list-header">
+      <span>Listado</span>
+      <span id="tur_record_count">0 de 0</span>
+    </div>
+    
+    <div id="tur_accounts_list" class="tur-list">
+      <!-- Renders dynamically -->
+    </div>
+  </aside>
+
+  <!-- Right Column: Detail View -->
+  <section class="tur-card" style="padding: 20px;">
+    <div id="tur_detail_empty" class="tur-empty">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <p>Ninguna cuenta seleccionada</p>
+      <span>Selecciona una cuenta del listado de la izquierda para examinar sus datos detalladamente.</span>
+    </div>
+
+    <div id="tur_detail_content" class="tur-detail-view" style="display: none;">
+      <!-- Prominent Red Banner for Rejection Reason -->
+      <div class="tur-rejection-banner">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <div>
+          <h4>Política / Motivo de Rechazo</h4>
+          <p id="detail_politicas_incumplidas">-</p>
+        </div>
+      </div>
+
+      <!-- Information Groups -->
+      <div class="tur-group-title">Información del Cliente</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block">
+          <label>Nombre Completo</label>
+          <span id="detail_nombre_completo" style="font-weight: 700; color: #1e3a8a;">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Cédula Nueva</label>
+          <span id="detail_cedula_nueva">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>RNC</label>
+          <span id="detail_rnc">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Pasaporte</label>
+          <span id="detail_numero_pasaporte">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Código del Cliente</label>
+          <span id="detail_codigo_cliente">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Relación con la Cuenta</label>
+          <span id="detail_relacion_cuenta">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Detalles de la Cuenta</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block">
+          <label>Número de Cuenta Original</label>
+          <span id="detail_numero_cuenta_original" style="font-weight: 600; color: #0f172a;">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Número de Cuenta Interno</label>
+          <span id="detail_numero_cuenta_interno">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Número de Tarjeta</label>
+          <span id="detail_numero_tarjeta">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo de Moneda</label>
+          <span id="detail_tipo_moneda">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo de Cuenta</label>
+          <span id="detail_tipo_cuenta">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo de Préstamo</label>
+          <span id="detail_tipo_prestamo">-</span>
+        </div>
+        <div class="tur-info-block highlight">
+          <label>Estado de Cuenta</label>
+          <span id="detail_estado_cuenta">-</span>
+        </div>
+        <div class="tur-info-block highlight">
+          <label>Estatus</label>
+          <span id="detail_estatus">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Saldos y Límites</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block">
+          <label>Límite de Crédito</label>
+          <span id="detail_limite_credito">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Límite de Crédito Más Alto</label>
+          <span id="detail_limite_credito_mas_alto">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Balance Actual</label>
+          <span id="detail_balance_actual" style="font-weight: 700;">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Pago Mínimo</label>
+          <span id="detail_pago_minimo">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Cuotas y Atrasos</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block atraso-monto">
+          <label>Monto en Atraso</label>
+          <span id="detail_monto_atraso">-</span>
+        </div>
+        <div class="tur-info-block atraso">
+          <label>Cuotas Atrasadas</label>
+          <span id="detail_cuotas_atrasadas">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Cantidad de Cuotas</label>
+          <span id="detail_cantidad_cuotas">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Monto de Cuota</label>
+          <span id="detail_monto_cuotas">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Forma de Pago</label>
+          <span id="detail_forma_pago">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo de Cuota</label>
+          <span id="detail_tipo_cuota">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Fechas e Historial</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block">
+          <label>Fecha de Apertura</label>
+          <span id="detail_fecha_apertura">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Fecha de Vencimiento</label>
+          <span id="detail_fecha_vencimiento">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Fecha Último Pago</label>
+          <span id="detail_fecha_ultimo_pago">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Monto Último Pago</label>
+          <span id="detail_monto_ultimo_pago">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Fecha Último Corte Cuenta</label>
+          <span id="detail_fecha_ultimo_corte">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Fecha Corte TC</label>
+          <span id="detail_fecha_corte_tc">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Historial de Atrasos (Días)</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px; grid-template-columns: repeat(4, 1fr);">
+        <div class="tur-info-block">
+          <label>Atraso 1-30</label>
+          <span id="detail_atraso_30">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Atraso 31-60</label>
+          <span id="detail_atraso_60">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Atraso 61-90</label>
+          <span id="detail_atraso_90">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Atraso 91-120</label>
+          <span id="detail_atraso_120">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Atraso 121-150</label>
+          <span id="detail_atraso_150">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Atraso 151-180</label>
+          <span id="detail_atraso_180">-</span>
+        </div>
+        <div class="tur-info-block" style="grid-column: span 2;">
+          <label>Atraso 181+</label>
+          <span id="detail_atraso_181_mas">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Contactos del Cliente</div>
+      <div class="tur-fields-grid" style="margin-bottom: 20px;">
+        <div class="tur-info-block">
+          <label>Teléfono 1</label>
+          <span id="detail_telefono_1">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo Teléfono 1</label>
+          <span id="detail_tipo_telefono_1">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Teléfono 2</label>
+          <span id="detail_telefono_2">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo Teléfono 2</label>
+          <span id="detail_tipo_telefono_2">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Teléfono 3</label>
+          <span id="detail_telefono_3">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo Teléfono 3</label>
+          <span id="detail_tipo_telefono_3">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Teléfono 4</label>
+          <span id="detail_telefono_4">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Teléfono 5</label>
+          <span id="detail_telefono_5">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Fax</label>
+          <span id="detail_fax">-</span>
+        </div>
+      </div>
+
+      <div class="tur-group-title">Ubicación / Dirección</div>
+      <div class="tur-fields-grid">
+        <div class="tur-info-block" style="grid-column: span 2;">
+          <label>Dirección Actual</label>
+          <span id="detail_direccion_actual">-</span>
+        </div>
+        <div class="tur-info-block" style="grid-column: span 2;">
+          <label>Dirección Extendida</label>
+          <span id="detail_direccion_extendida">-</span>
+        </div>
+        <div class="tur-info-block" style="grid-column: span 2;">
+          <label>Dirección Alternativa</label>
+          <span id="detail_direccion_alternativa">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Ident. Dirección Alt.</label>
+          <span id="detail_identificacion_direccion_alternativa">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Prefijo Dirección Alt.</label>
+          <span id="detail_prefijo_direccion_alternativa">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Esquina</label>
+          <span id="detail_esquina">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Número Domicilio</label>
+          <span id="detail_numero_domicilio">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Edificio Residencial</label>
+          <span id="detail_edificio_residencial">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Prefijo Dirección</label>
+          <span id="detail_prefijo_direccion">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Número Apartamento</label>
+          <span id="detail_numero_apartamento">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Tipo Construcción</label>
+          <span id="detail_tipo_construccion">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Piso Domicilio</label>
+          <span id="detail_piso_domicilio">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Municipio</label>
+          <span id="detail_municipio">-</span>
+        </div>
+        <div class="tur-info-block">
+          <label>Ciudad</label>
+          <span id="detail_ciudad">-</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function() {
+  const dropzone = document.getElementById("tur_dropzone");
+  const fileInput = document.getElementById("tur_file_input");
+  
+  const metadataWrap = document.getElementById("tur_metadata_wrap");
+  const metaFilename = document.getElementById("meta_filename");
+  const metaSubscriber = document.getElementById("meta_subscriber");
+  const metaReportDate = document.getElementById("meta_report_date");
+  const metaUploadDate = document.getElementById("meta_upload_date");
+  
+  const mainLayout = document.getElementById("tur_main_layout");
+  const accountsList = document.getElementById("tur_accounts_list");
+  const searchInput = document.getElementById("tur_search");
+  const reasonFilter = document.getElementById("tur_reason_filter");
+  const recordCount = document.getElementById("tur_record_count");
+  
+  const detailEmpty = document.getElementById("tur_detail_empty");
+  const detailContent = document.getElementById("tur_detail_content");
+  
+  let rejectedRecords = [];
+  let filteredRecords = [];
+  let selectedIndex = -1;
+
+  // Header mapping dictionary (normalizes file column headers to internal keys)
+  const HEADER_MAPPING = {
+    "POLITICAS INCUMPLIDAS": "politicas_incumplidas",
+    "CODIGO DEL CLIENTE": "codigo_cliente",
+    "NOMBRE COMPLETO": "nombre_completo",
+    "CEDULA NUEVA": "cedula_nueva",
+    "NUMERO DE PASAPORTE": "numero_pasaporte",
+    "RNC": "rnc",
+    "RELACION CON LA CUENTA": "relacion_cuenta",
+    "NUMERO DE CUENTA ORIGINAL": "numero_cuenta_original",
+    "NUMERO DE CUENTA INTERNO": "numero_cuenta_interno",
+    "NUMERO DE TARJETA": "numero_tarjeta",
+    "TIPO DE MONEDA": "tipo_moneda",
+    "TIPO DE CUENTA": "tipo_cuenta",
+    "TIPO DE PRESTAMO": "tipo_prestamo",
+    "FECHA DE APERTURA": "fecha_apertura",
+    "FECHA DE VENCIMIENTO": "fecha_vencimiento",
+    "TIPO DE CUOTA": "tipo_cuota",
+    "CANTIDAD DE CUOTAS": "cantidad_cuotas",
+    "MONTO DE CUOTAS": "monto_cuotas",
+    "FORMA DE PAGO": "forma_pago",
+    "FECHA DE ULTIMO PAGO": "fecha_ultimo_pago",
+    "MONTO ULTIMO PAGO": "monto_ultimo_pago",
+    "FECHA ULTIMO CORTE DE LA CUENTA": "fecha_ultimo_corte",
+    "FECHA DE CORTE TC": "fecha_corte_tc",
+    "LIMITE DE CREDITO": "limite_credito",
+    "LIMITE DE CREDITO MAS ALTO": "limite_credito_mas_alto",
+    "BALANCE ACTUAL": "balance_actual",
+    "PAGO MINIMO": "pago_minimo",
+    "MONTO EN ATRASO": "monto_atraso",
+    "CUOTAS ATRASADAS": "cuotas_atrasadas",
+    "ESTATUS": "estatus",
+    "ESTADO DE LA CUENTA": "estado_cuenta",
+    "CONTADOR DE ATRASO A 30": "atraso_30",
+    "CONTADOR DE ATRASO A 60": "atraso_60",
+    "CONTADOR DE ATRASO A 90": "atraso_90",
+    "CONTADOR DE ATRASO A 120": "atraso_120",
+    "CONTADOR DE ATRASO A 150": "atraso_150",
+    "CONTADOR DE ATRASO A 180": "atraso_180",
+    "CONTADOR DE ATRASO A 181+": "atraso_181_mas",
+    "TELEFONO 1": "telefono_1",
+    "TIPO DE TELEFONO 1": "tipo_telefono_1",
+    "TELEFONO 2": "telefono_2",
+    "TIPO DE TELEFONO 2": "tipo_telefono_2",
+    "TELEFONO 3": "telefono_3",
+    "TIPO DE TELEFONO 3": "tipo_telefono_3",
+    "TELEFONO 4": "telefono_4",
+    "TELEFONO 5": "telefono_5",
+    "FAX": "fax",
+    "DIRECCION ACTUAL": "direccion_actual",
+    "DIRECCION EXTENDIDA": "direccion_extendida",
+    "DIRECCION ALTERNATIVA": "direccion_alternativa",
+    "IDENTIFICACION DIRECCION ALTERNATIVA": "identificacion_direccion_alternativa",
+    "PREFIJO DIRECCION ALTERNATIVA": "prefijo_direccion_alternativa",
+    "ESQUINA": "esquina",
+    "NUMERO DE DOMICILIO": "numero_domicilio",
+    "EDIFICIO RESIDENCIAL": "edificio_residencial",
+    "PREFIJO DE DIRECCION": "prefijo_direccion",
+    "NUMERO DE APARTAMENTO": "numero_apartamento",
+    "TIPO DE CONSTRUCCION": "tipo_construccion",
+    "PISO DEL DOMICILIO": "piso_domicilio",
+    "MUNICIPIO": "municipio",
+    "CIUDAD": "ciudad"
+  };
+
+  // Drag and drop event listeners
+  dropzone.addEventListener("click", () => fileInput.click());
+  
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("is-dragover");
+  });
+  
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("is-dragover");
+  });
+  
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("is-dragover");
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  // Handle uploaded file
+  function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      alert("Por favor, selecciona un archivo en formato CSV.");
+      return;
+    }
+    
+    // Parse metadata from filename
+    parseFilenameMetadata(file.name);
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      parseCSV(text);
+    };
+    reader.onerror = function() {
+      alert("Hubo un error al leer el archivo.");
+    };
+    
+    // We read using ISO-8859-1 (Latin-1) to preserve accents and special characters (e.g. ñ, ó)
+    reader.readAsText(file, "ISO-8859-1");
+  }
+
+  // Parse filename to extract subscriber, creation date, upload date
+  // e.g. DetalleCuentasRechazadas_C0542_260617_20260714.csv
+  function parseFilenameMetadata(filename) {
+    metaFilename.textContent = filename;
+    
+    // Pattern to catch the three blocks after "DetalleCuentasRechazadas_"
+    const regex = /DetalleCuentasRechazadas_([a-zA-Z0-9]+)_(\d{6})_(\d{8})/i;
+    const match = filename.match(regex);
+    
+    if (match) {
+      const subscriber = match[1];
+      const rawReportDate = match[2]; // YYMMDD
+      const rawUploadDate = match[3]; // YYYYMMDD
+      
+      metaSubscriber.textContent = subscriber;
+      
+      // Parse YYMMDD (260617 -> 2026-06-17)
+      if (rawReportDate.length === 6) {
+        const year = "20" + rawReportDate.substring(0, 2);
+        const month = rawReportDate.substring(2, 4);
+        const day = rawReportDate.substring(4, 6);
+        metaReportDate.textContent = formatDateSpanish(year, month, day);
+      } else {
+        metaReportDate.textContent = rawReportDate;
+      }
+      
+      // Parse YYYYMMDD (20260714 -> 2026-07-14)
+      if (rawUploadDate.length === 8) {
+        const year = rawUploadDate.substring(0, 4);
+        const month = rawUploadDate.substring(4, 6);
+        const day = rawUploadDate.substring(6, 8);
+        metaUploadDate.textContent = formatDateSpanish(year, month, day);
+      } else {
+        metaUploadDate.textContent = rawUploadDate;
+      }
+    } else {
+      // Fallback
+      metaSubscriber.textContent = "N/A";
+      metaReportDate.textContent = "Desconocida";
+      metaUploadDate.textContent = "Desconocida";
+    }
+    
+    metadataWrap.style.display = "grid";
+  }
+
+  function formatDateSpanish(year, month, day) {
+    const months = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    const mIdx = parseInt(month, 10) - 1;
+    if (mIdx >= 0 && mIdx < 12) {
+      return `${parseInt(day, 10)} de ${months[mIdx]} de ${year}`;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  // Parse CSV content using a standard CSV parser
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+    
+    // Normalize newlines
+    const cleanText = text.replace(/\r/g, "");
+    
+    for (let i = 0; i < cleanText.length; i++) {
+      const char = cleanText[i];
+      const nextChar = cleanText[i + 1];
+      
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          cell += '"';
+          i++; // skip next quote
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          cell += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          row.push(cell.trim());
+          cell = "";
+        } else if (char === '\n') {
+          row.push(cell.trim());
+          if (row.some(c => c !== "")) {
+            rows.push(row);
+          }
+          row = [];
+          cell = "";
+        } else {
+          cell += char;
+        }
+      }
+    }
+    // catch last cell
+    if (cell || row.length > 0) {
+      row.push(cell.trim());
+      if (row.some(c => c !== "")) {
+        rows.push(row);
+      }
+    }
+
+    if (rows.length < 2) {
+      alert("El archivo CSV no contiene registros válidos.");
+      return;
+    }
+
+    // Process headers and map columns
+    const fileHeaders = rows[0].map(h => h.toUpperCase().trim());
+    const colMapping = {}; // key -> colIndex
+    
+    Object.keys(HEADER_MAPPING).forEach(expectedHeader => {
+      const normalizedHeader = expectedHeader.toUpperCase();
+      const colIndex = fileHeaders.indexOf(normalizedHeader);
+      if (colIndex !== -1) {
+        colMapping[HEADER_MAPPING[expectedHeader]] = colIndex;
+      }
+    });
+
+    // Populate objects
+    rejectedRecords = [];
+    const uniqueReasons = new Set();
+
+    for (let i = 1; i < rows.length; i++) {
+      const rowData = rows[i];
+      const record = {};
+      
+      // Default all keys to empty string
+      Object.values(HEADER_MAPPING).forEach(key => {
+        record[key] = "";
+      });
+      
+      // Map columns
+      Object.entries(colMapping).forEach(([key, colIndex]) => {
+        if (colIndex < rowData.length) {
+          record[key] = rowData[colIndex] || "";
+        }
+      });
+      
+      // Format dates (YYYYMMDD to YYYY-MM-DD for visual display)
+      const dateKeys = ["fecha_apertura", "fecha_vencimiento", "fecha_ultimo_pago", "fecha_ultimo_corte", "fecha_corte_tc"];
+      dateKeys.forEach(dk => {
+        if (record[dk] && record[dk].length === 8 && /^\d+$/.test(record[dk])) {
+          record[dk] = `${record[dk].substring(0, 4)}-${record[dk].substring(4, 6)}-${record[dk].substring(6, 8)}`;
+        }
+      });
+      
+      // Format currencies (clean and prefix)
+      const moneyKeys = [
+        "limite_credito", "limite_credito_mas_alto", "balance_actual", "pago_minimo",
+        "monto_atraso", "monto_cuotas", "monto_ultimo_pago",
+        "atraso_30", "atraso_60", "atraso_90", "atraso_120", "atraso_150", "atraso_180", "atraso_181_mas"
+      ];
+      moneyKeys.forEach(mk => {
+        if (record[mk]) {
+          const val = parseFloat(record[mk]);
+          if (!isNaN(val)) {
+            record[mk] = new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(val);
+          }
+        }
+      });
+
+      // Collect unique reasons
+      if (record.politicas_incumplidas) {
+        uniqueReasons.add(record.politicas_incumplidas);
+      }
+      
+      rejectedRecords.push(record);
+    }
+
+    // Populate reasons select filter
+    reasonFilter.innerHTML = '<option value="">Todos los motivos</option>';
+    Array.from(uniqueReasons).sort().forEach(reason => {
+      const option = document.createElement("option");
+      option.value = reason;
+      option.textContent = reason;
+      reasonFilter.appendChild(option);
+    });
+
+    // Reset select index and view
+    selectedIndex = -1;
+    detailEmpty.style.display = "flex";
+    detailContent.style.display = "none";
+    
+    // Apply filters and show main layout
+    applyFilters();
+    mainLayout.style.display = "grid";
+    
+    // Smooth scroll down to main content
+    mainLayout.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Filter and search logic
+  function applyFilters() {
+    const searchVal = searchInput.value.toLowerCase().trim();
+    const filterReason = reasonFilter.value;
+    
+    filteredRecords = rejectedRecords.filter(rec => {
+      const matchesSearch = !searchVal || 
+        (rec.nombre_completo && rec.nombre_completo.toLowerCase().includes(searchVal)) ||
+        (rec.cedula_nueva && rec.cedula_nueva.includes(searchVal)) ||
+        (rec.rnc && rec.rnc.includes(searchVal)) ||
+        (rec.numero_cuenta_original && rec.numero_cuenta_original.toLowerCase().includes(searchVal)) ||
+        (rec.numero_cuenta_interno && rec.numero_cuenta_interno.toLowerCase().includes(searchVal));
+        
+      const matchesReason = !filterReason || rec.politicas_incumplidas === filterReason;
+      
+      return matchesSearch && matchesReason;
+    });
+    
+    // Render account list
+    renderAccountList();
+  }
+
+  // Event handlers for filters
+  searchInput.addEventListener("input", applyFilters);
+  reasonFilter.addEventListener("change", applyFilters);
+
+  // Render accounts left side list
+  function renderAccountList() {
+    accountsList.innerHTML = "";
+    recordCount.textContent = `${filteredRecords.length} de ${rejectedRecords.length}`;
+    
+    if (filteredRecords.length === 0) {
+      accountsList.innerHTML = '<div class="tur-empty" style="padding: 20px;"><p>No se encontraron cuentas</p></div>';
+      return;
+    }
+    
+    filteredRecords.forEach((rec, idx) => {
+      const accountBtn = document.createElement("button");
+      accountBtn.type = "button";
+      accountBtn.className = "tur-account" + (idx === selectedIndex ? " is-selected" : "");
+      
+      const title = document.createElement("strong");
+      title.textContent = rec.nombre_completo || "Cliente Sin Nombre";
+      accountBtn.appendChild(title);
+      
+      const docLabel = document.createElement("span");
+      const accountNum = rec.numero_cuenta_original || rec.numero_cuenta_interno || "-";
+      const docType = rec.cedula_nueva ? `Céd: ${rec.cedula_nueva}` : (rec.rnc ? `RNC: ${rec.rnc}` : "Sin ID");
+      docLabel.textContent = `Cuenta: ${accountNum} | ${docType}`;
+      accountBtn.appendChild(docLabel);
+      
+      if (rec.politicas_incumplidas) {
+        const badge = document.createElement("div");
+        badge.className = "tur-badge";
+        badge.textContent = rec.politicas_incumplidas;
+        accountBtn.appendChild(badge);
+      }
+      
+      accountBtn.addEventListener("click", () => {
+        selectAccount(idx);
+      });
+      
+      accountsList.appendChild(accountBtn);
+    });
+    
+    // Maintain selection visual state if valid
+    if (selectedIndex >= filteredRecords.length) {
+      selectedIndex = -1;
+      detailEmpty.style.display = "flex";
+      detailContent.style.display = "none";
+    }
+  }
+
+  // Select account and display details
+  function selectAccount(idx) {
+    selectedIndex = idx;
+    
+    // Highlight list item
+    const buttons = accountsList.querySelectorAll(".tur-account");
+    buttons.forEach((btn, bIdx) => {
+      if (bIdx === idx) {
+        btn.classList.add("is-selected");
+      } else {
+        btn.classList.remove("is-selected");
+      }
+    });
+
+    const record = filteredRecords[idx];
+    if (!record) return;
+
+    // Map fields to DOM labels
+    Object.keys(HEADER_MAPPING).forEach(expectedHeader => {
+      const key = HEADER_MAPPING[expectedHeader];
+      const element = document.getElementById(`detail_${key}`);
+      if (element) {
+        element.textContent = record[key] || "-";
+      }
+    });
+
+    // Special highlighting for fields if they are positive/overdue
+    const balanceSpan = document.getElementById("detail_balance_actual");
+    if (balanceSpan && record.balance_actual && record.balance_actual !== "$0.00" && record.balance_actual !== "0") {
+      balanceSpan.style.color = "#b91c1c";
+    } else if (balanceSpan) {
+      balanceSpan.style.color = "";
+    }
+
+    // Toggle views
+    detailEmpty.style.display = "none";
+    detailContent.style.display = "block";
+  }
+
+})();
+</script>
+{% endblock %}

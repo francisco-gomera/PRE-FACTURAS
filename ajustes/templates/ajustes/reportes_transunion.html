@@ -105,6 +105,8 @@
       <input id="tu_import_file" type="file" accept=".csv,.txt,text/csv,text/plain" />
     </div>
     <button id="tu_import" type="button" class="tu-btn secondary">Cargar archivo</button>
+    <a class="tu-btn secondary" href="{% url 'ajustes:reportes_transunion_rechazados' %}" style="background:#fff1f1; color:#9a2525; border-color:#efc0c0;">Cuentas Rechazadas</a>
+    <a class="tu-btn secondary" href="{% url 'ajustes:reportes_transunion_comparar' %}" style="background:#f0f7ff; color:#1a66ce; border-color:#c8d9f6;">Comparar Reportes</a>
     <a class="tu-btn secondary" href="{% url 'ajustes:integraciones' %}">Volver</a>
   </div>
   <div id="tu_status" class="tu-status">Nombre sugerido: {{ transunion_default_filename }}</div>
@@ -536,6 +538,7 @@
           detail = data.detail || detail;
         } catch (error) {}
         setStatus(detail);
+        alert(detail);
         return;
       }
       const blob = await response.blob();

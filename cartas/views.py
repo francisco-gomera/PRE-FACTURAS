@@ -302,6 +302,25 @@ def _build_aviso_payload(ctx, id_sn):
             total_saldo += saldo_val
             total_mora += mora
 
+    overdue_doc_ids = list(set(f["id_doc"] for f in facturas))
+    articulos_atraso = []
+    if overdue_doc_ids:
+        placeholders = ", ".join(["%s"] * len(overdue_doc_ids))
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT DISTINCT DESCRIP_ART
+                    FROM DET_FACTURA
+                    WHERE ID_DOC IN ({placeholders})
+                    """,
+                    overdue_doc_ids
+                )
+                art_rows = cursor.fetchall()
+            articulos_atraso = [r[0].strip() for r in art_rows if r[0]]
+        except Exception:
+            pass
+
     return {
         "cliente": cliente,
         "facturas": facturas,
@@ -313,6 +332,7 @@ def _build_aviso_payload(ctx, id_sn):
             "saldo": total_saldo,
             "mora": total_mora,
         },
+        "articulos_atraso": ", ".join(articulos_atraso),
     }
 
 
@@ -329,11 +349,13 @@ def _build_aviso_template_vars(aviso_payload, ciudad_impresion):
         "cliente_ciudad": ciudad,
         "cliente_telefono": cliente.get("telefono", ""),
         "cliente_sector": cliente.get("sector", ""),
+        "cliente_apodo": cliente.get("contacto", ""),
+        "articulos_atraso": aviso_payload.get("articulos_atraso", ""),
         "fecha": aviso_payload.get("fecha", ""),
         "hora": aviso_payload.get("hora", ""),
         "empresa_nombre": empresa.get("nombre", ""),
         "ciudad_impresion": ciudad,
-        "carta_titulo": "AVISO",
+        "carta_titulo": "CARTA DE AVISO",
         "balance_atraso": _format_money_str(totales.get("saldo")),
         "total_mora": _format_money_str(totales.get("mora")),
         "facturas_count": len(facturas),
@@ -382,7 +404,9 @@ def _build_aviso_document_context(aviso_payload, ciudad_impresion="", plantilla_
         "cliente_rnc": cliente.get("rnc_ced", ""),
         "cliente_direccion": cliente.get("direccion", ""),
         "cliente_telefono": cliente.get("telefono", ""),
+        "cliente_apodo": cliente.get("contacto", ""),
         "ciudad_impresion": ciudad,
+        "articulos_atraso": aviso_payload.get("articulos_atraso", ""),
         "fecha": aviso_payload.get("fecha", ""),
         "hora": aviso_payload.get("hora", ""),
         "aviso_asunto": aviso_asunto,
@@ -612,7 +636,7 @@ def saldo_detalle_view(request):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT TOP 200 ID_DOC, FECHA_DOC, TOTAL_DOC, SALDO
+                SELECT TOP 200 ID_DOC, FECHA_DOC, TOTAL_DOC, SALDO, MONICA
                 FROM CAB_FACTURA
                 WHERE ID_SN = %s
                   AND ABS(ISNULL(SALDO, 0)) <= 0.0001
@@ -658,17 +682,26 @@ def saldo_detalle_view(request):
 
         total_doc = _to_float(r[2])
         saldo_doc = _to_float(r[3])
-        pagado = total_doc - saldo_doc
+        monica_raw = r[4]
+
+        if monica_raw is not None:
+            monica_val = _to_float(monica_raw)
+            total_doc = monica_val
+            pagado = monica_val
+        else:
+            pagado = total_doc - saldo_doc
 
         fecha_pago_str = ""
         try:
             with connection.cursor() as cursor2:
                 cursor2.execute(
                     """
-                    SELECT MAX(d.FECHA_CONT)
+                    SELECT MAX(COALESCE(c.FECHA_DOC, c.FECHA_CONT, d.FECHA_CONT, c.FECHA_CREACION))
                     FROM CAB_RECIBO_INGRESO c
                     INNER JOIN DET_RECIBO_INGRESO d ON c.ID_RECIBO = d.ID_RECIBO
                     WHERE c.ID_SN = %s AND d.NO_DOC = %s
+                      AND ISNULL(c.CANCELADO, 'N') <> 'Y'
+                      AND UPPER(ISNULL(c.EST_DOC, '')) <> 'CANCELADO'
                     """,
                     [id_sn, id_doc],
                 )

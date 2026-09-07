@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Pagos Recuperados - Cobros</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 10mm 14mm 10mm;
+        }
+
+        :root {
+            --ink: #111827;
+            --muted: #4b5563;
+            --border: #9ca3af;
+            --primary: #123d7a;
+            --success: #0b6b35;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f4f6f9;
+            color: var(--ink);
+            font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .no-print-bar {
+            background: #ffffff;
+            border-bottom: 1px solid #d1d5db;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .no-print-bar .title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .no-print-bar .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-print {
+            background: #0f8b44;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-print:hover {
+            background: #0b7036;
+        }
+
+        .btn-close {
+            background: #e5e7eb;
+            color: #374151;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-close:hover {
+            background: #d1d5db;
+        }
+
+        .page-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 16px auto;
+            background: #ffffff;
+            padding: 12mm 12mm 14mm 12mm;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            position: relative;
+        }
+
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        }
+
+        .company-info h2 {
+            margin: 0 0 3px 0;
+            font-size: 18px;
+            color: var(--primary);
+            letter-spacing: 0.5px;
+        }
+
+        .company-info .company-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .report-title-box {
+            text-align: right;
+        }
+
+        .report-title-box h1 {
+            margin: 0 0 2px 0;
+            font-size: 18px;
+            color: #1f2937;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .report-title-box .badge-period {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .meta-strip {
+            display: flex;
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 12px;
+            margin-bottom: 12px;
+            font-size: 11px;
+        }
+
+        .meta-strip div {
+            display: flex;
+            gap: 4px;
+        }
+
+        .meta-strip strong {
+            color: #111827;
+        }
+
+        table.report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+        }
+
+        table.report-table th,
+        table.report-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5px 6px;
+        }
+
+        table.report-table th {
+            background: #f1f5f9;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 10.5px;
+            text-align: left;
+        }
+
+        table.report-table tbody tr:nth-child(even) {
+            background: #fbfcfd;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-mono { font-family: "Courier New", Courier, monospace; font-size: 11px; }
+        .font-bold { font-weight: 700; }
+
+        .monto-col {
+            font-weight: 700;
+            color: var(--success);
+            white-space: nowrap;
+        }
+
+        .summary-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 14px;
+            page-break-inside: avoid;
+        }
+
+        .summary-notes {
+            flex: 1;
+            padding-right: 20px;
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        .summary-total-box {
+            min-width: 240px;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+
+        .summary-total-header {
+            background: var(--primary);
+            color: #ffffff;
+            padding: 6px 10px;
+            font-weight: 700;
+            font-size: 12px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .summary-total-body {
+            padding: 8px 12px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+
+        .summary-final-total {
+            display: flex;
+            justify-content: space-between;
+            border-top: 2px solid #cbd5e1;
+            padding-top: 6px;
+            margin-top: 6px;
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--success);
+        }
+
+        .doc-footer {
+            margin-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9.5px;
+            color: #6b7280;
+            page-break-inside: avoid;
+        }
+
+        @media print {
+            .no-print-bar {
+                display: none !important;
+            }
+            body {
+                background: #ffffff !important;
+            }
+            .page-sheet {
+                width: 100% !important;
+                min-height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print-bar">
+        <div class="title">Vista previa de impresión - Registro de Pagos Recuperados</div>
+        <div class="actions">
+            <button class="btn-print" onclick="window.print()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                Imprimir reporte
+            </button>
+            <button class="btn-close" onclick="window.close()">Cerrar</button>
+        </div>
+    </div>
+
+    <div class="page-sheet">
+        <!-- Encabezado institucional -->
+        <div class="doc-header">
+            <div class="company-info">
+                <h2>{{ empresa.nombre|default:"EMPRESA" }}</h2>
+                {% if empresa.rnc %}<p class="company-sub">RNC: {{ empresa.rnc }}</p>{% endif %}
+                {% if empresa.telefono %}<p class="company-sub">Teléfono: {{ empresa.telefono }}</p>{% elif empresa.tel1 %}<p class="company-sub">Teléfono: {{ empresa.tel1 }}</p>{% endif %}
+                {% if empresa.direccion %}<p class="company-sub">{{ empresa.direccion }}</p>{% endif %}
+            </div>
+            <div class="report-title-box">
+                <h1>Registro de Pagos Recuperados</h1>
+                <div class="badge-period">CLIENTES CON ACUERDOS DE PAGO</div>
+            </div>
+        </div>
+
+        <!-- Metadatos del informe -->
+        <div class="meta-strip">
+            <div>
+                <span>Período:</span>
+                <strong>
+                    {% if fecha_desde %}{{ fecha_desde }}{% else %}Inicio{% endif %}
+                    hasta
+                    {% if fecha_hasta %}{{ fecha_hasta }}{% else %}Hoy{% endif %}
+                </strong>
+            </div>
+            <div>
+                <span>Fecha de emisión:</span>
+                <strong>{{ fecha_impresion|date:"d/m/Y h:i A" }}</strong>
+            </div>
+            <div>
+                <span>Generado por:</span>
+                <strong>{{ usuario_nombre|default:"Usuario" }}</strong>
+            </div>
+            <div>
+                <span>Total pagos incluidos:</span>
+                <strong>{{ total_records }}</strong>
+            </div>
+        </div>
+
+        <!-- Tabla detallada de pagos recuperados -->
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th style="width: 24px;" class="text-center">#</th>
+                    <th style="width: 85px;">Fecha / Hora</th>
+                    <th style="width: 70px;" class="text-center">Recibo</th>
+                    <th style="width: 65px;">Cód. SN</th>
+                    <th>Nombre del Cliente</th>
+                    <th style="width: 100px;">Teléfono / Sector</th>
+                    <th style="width: 95px;">Tipo de Acuerdo</th>
+                    <th style="width: 75px;" class="text-center">Compromiso</th>
+                    <th style="width: 100px;" class="text-right">Monto Pago</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in records %}
+                <tr>
+                    <td class="text-center font-mono">{{ forloop.counter }}</td>
+                    <td>
+                        {{ item.fecha_evento|date:"d/m/Y" }}<br />
+                        <span style="color:#6b7280; font-size:9.5px;">{{ item.fecha_evento|date:"h:i A" }}</span>
+                    </td>
+                    <td class="text-center font-mono font-bold">{{ item.no_recibo }}</td>
+                    <td class="font-mono">{{ item.id_sn }}</td>
+                    <td class="font-bold">{{ item.cliente_nombre }}</td>
+                    <td>
+                        {% if item.telefono %}{{ item.telefono }}<br />{% endif %}
+                        <span style="color:#6b7280; font-size:9.5px;">{{ item.sector|default:"-" }}</span>
+                    </td>
+                    <td>{{ item.tipo_label }}</td>
+                    <td class="text-center">{{ item.fecha_compromiso|default:"-" }}</td>
+                    <td class="text-right monto-col">RD$ {{ item.monto_pago|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center" style="padding: 16px; color: #6b7280;">
+                        No se seleccionaron registros para este reporte.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Resumen final con total recuperado destacado -->
+        <div class="summary-container">
+            <div class="summary-notes">
+                <p><strong>Nota:</strong> Este reporte certifica los pagos ingresados a caja por clientes con acuerdos o promesas de cobro registradas en el sistema para el período indicado.</p>
+            </div>
+            <div class="summary-total-box">
+                <div class="summary-total-header">Resumen de Recuperación</div>
+                <div class="summary-total-body">
+                    <div class="summary-row">
+                        <span>Cantidad de recibos:</span>
+                        <strong>{{ total_records }}</strong>
+                    </div>
+                    <div class="summary-final-total">
+                        <span>TOTAL RECUPERADO:</span>
+                        <span>RD$ {{ total_monto|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie de página -->
+        <div class="doc-footer">
+            <span>Sistema de Cobros y Pre-Facturación</span>
+            <span>Impreso el {{ fecha_impresion|date:"d/m/Y h:i:s A" }}</span>
+        </div>
+    </div>
+</body>
+</html>

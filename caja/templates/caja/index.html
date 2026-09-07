@@ -26,6 +26,13 @@
     <a href="{% url 'caja:financiamiento' %}">Abrir submodulo</a>
   </div>
   {% endif %}
+  {% if submodules.pos %}
+  <div class="info-card">
+    <h3>Venta POS</h3>
+    <p>Sistema de punto de venta para transacciones en tienda.</p>
+    <a href="{% url 'caja:pos' %}">Abrir submodulo</a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 

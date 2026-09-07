@@ -817,7 +817,7 @@ def buscar_stock_articulos_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT TOP 800 A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA
+        SELECT TOP 800 A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(A.PRECIO_DET, 0) AS PRECIO_DET
         FROM MAESTRO_ARTICULO A
         LEFT JOIN (
             SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
@@ -849,6 +849,10 @@ def buscar_stock_articulos_view(request):
             stock = float(r[2] or 0)
         except Exception:
             stock = 0.0
+        try:
+            precio_det = float(r[5] or 0)
+        except Exception:
+            precio_det = 0.0
         results.append(
             {
                 "id_articulo": r[0] or "",
@@ -856,6 +860,8 @@ def buscar_stock_articulos_view(request):
                 "stock": stock,
                 "uom": r[3] or "",
                 "referencia": r[4] or "",
+                "precio_det": precio_det,
+                "precio": precio_det,
             }
         )
     return JsonResponse({"results": results})
@@ -883,7 +889,7 @@ def stock_articulos_print_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA
+        SELECT A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(A.PRECIO_DET, 0) AS PRECIO_DET
         FROM MAESTRO_ARTICULO A
         LEFT JOIN (
             SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
@@ -916,6 +922,10 @@ def stock_articulos_print_view(request):
             stock = float(r[2] or 0)
         except Exception:
             stock = 0.0
+        try:
+            precio_det = float(r[5] or 0)
+        except Exception:
+            precio_det = 0.0
         total_stock += stock
         articulos.append(
             {
@@ -924,6 +934,8 @@ def stock_articulos_print_view(request):
                 "stock": stock,
                 "uom": r[3] or "",
                 "referencia": r[4] or "",
+                "precio_det": precio_det,
+                "precio": precio_det,
             }
         )
 

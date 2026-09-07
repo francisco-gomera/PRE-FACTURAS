@@ -7,7 +7,10 @@
       <h2 class="page-title">Acuerdos y Recordatorios</h2>
       <p class="page-subtitle">Registra promesas de pago, recordatorios y notas de seguimiento por cliente.</p>
     </div>
-    <a href="{% url 'cobros:acuerdos' %}" class="btn-primary-link">Nuevo registro</a>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <a href="{% url 'cobros:pagos_recuperados' %}" class="btn-secondary-link" style="display:inline-flex; align-items:center; text-decoration:none; padding:10px 14px; border:1px solid #c9d7ec; border-radius:10px; font-weight:700; background:#fff; color:var(--text-color);">Ver pagos recuperados</a>
+      <a href="{% url 'cobros:acuerdos' %}" class="btn-primary-link">Nuevo registro</a>
+    </div>
   </div>
 
   {% if acuerdo_error %}

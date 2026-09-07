@@ -15,6 +15,8 @@ from .views import (
     reportes_transunion_cuentas_view,
     reportes_transunion_generar_view,
     reportes_transunion_actualizar_cuentas_view,
+    reportes_transunion_rechazados_view,
+    reportes_transunion_comparar_view,
     guardar_parametros_view,
     guardar_formatos_impresion_view,
     guardar_feriado_view,
@@ -76,4 +78,6 @@ urlpatterns = [
     path("integraciones/reportes-transunion/cuentas/", reportes_transunion_cuentas_view, name="reportes_transunion_cuentas"),
     path("integraciones/reportes-transunion/generar/", reportes_transunion_generar_view, name="reportes_transunion_generar"),
     path("integraciones/reportes-transunion/actualizar-cuentas/", reportes_transunion_actualizar_cuentas_view, name="reportes_transunion_actualizar_cuentas"),
+    path("integraciones/reportes-transunion/rechazados/", reportes_transunion_rechazados_view, name="reportes_transunion_rechazados"),
+    path("integraciones/reportes-transunion/comparar/", reportes_transunion_comparar_view, name="reportes_transunion_comparar"),
 ]

@@ -40,6 +40,13 @@
     <a href="{% url 'cobros:acuerdos' %}">Abrir acuerdos</a>
   </div>
   {% endif %}
+  {% if submodules.pagos_recuperados %}
+  <div class="info-card">
+    <h3>Pagos recuperados</h3>
+    <p>Registro histórico de pagos de clientes con acuerdos y reportes de recuperación.</p>
+    <a href="{% url 'cobros:pagos_recuperados' %}">Abrir pagos recuperados</a>
+  </div>
+  {% endif %}
   {% if submodules.cartas_enviadas %}
   <div class="info-card">
     <h3>Cartas enviadas</h3>

@@ -67,6 +67,7 @@ def ensure_base_perms():
             ("ver_alertas", "Ver Alertas"),
             ("ver_financiamientos_atraso", "Ver Financiamientos en Atraso"),
             ("ver_acuerdos", "Ver Acuerdos"),
+            ("ver_pagos_recuperados", "Ver Pagos Recuperados"),
             ("ver_cartas_enviadas", "Ver Cartas Enviadas"),
         ],
         "cartas": [

@@ -92,7 +92,7 @@ button {
 
 .nav {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .nav a {
@@ -100,11 +100,12 @@ button {
   color: #eaf2ff;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 7px 10px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  min-height: 30px;
   transition: 0.2s ease;
 }
 
@@ -117,14 +118,14 @@ button {
 .nav-item-main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
 }
 
 .nav-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -133,8 +134,8 @@ button {
 }
 
 .nav-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.8;

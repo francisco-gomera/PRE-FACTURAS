@@ -962,6 +962,7 @@ def _normalize_terminal_name(value):
 
 
 def _get_preferencia_impresora_row(nombre_terminal, tipo_documento):
+    nombre_terminal = _normalize_terminal_name(nombre_terminal)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -969,9 +970,9 @@ def _get_preferencia_impresora_row(nombre_terminal, tipo_documento):
                 NOMBRE_IMPRESORA,
                 PREDETERMINADA
             FROM AJUSTE_IMPRESORA_CONFIG
-            WHERE TIPO_DOCUMENTO = %s
+            WHERE NOMBRE_TERMINAL = %s AND TIPO_DOCUMENTO = %s
             """,
-            [tipo_documento],
+            [nombre_terminal, tipo_documento],
         )
         row = cursor.fetchone()
     if not row:
@@ -983,6 +984,7 @@ def _get_preferencia_impresora_row(nombre_terminal, tipo_documento):
 
 
 def _save_preferencia_impresora_row(nombre_terminal, tipo_documento, nombre_impresora):
+    nombre_terminal = _normalize_terminal_name(nombre_terminal)
     predeterminada = 1 if nombre_impresora else 0
     with connection.cursor() as cursor:
         cursor.execute(
@@ -991,20 +993,20 @@ def _save_preferencia_impresora_row(nombre_terminal, tipo_documento, nombre_impr
             SET NOMBRE_IMPRESORA = %s,
                 PREDETERMINADA = %s,
                 ACTUALIZADO_EN = GETDATE()
-            WHERE TIPO_DOCUMENTO = %s
+            WHERE NOMBRE_TERMINAL = %s AND TIPO_DOCUMENTO = %s
             """,
-            [nombre_impresora, predeterminada, tipo_documento],
+            [nombre_impresora, predeterminada, nombre_terminal, tipo_documento],
         )
         if cursor.rowcount:
             return
         cursor.execute(
             """
             INSERT INTO AJUSTE_IMPRESORA_CONFIG
-                (TIPO_DOCUMENTO, NOMBRE_IMPRESORA, PREDETERMINADA, CREADO_EN, ACTUALIZADO_EN)
+                (NOMBRE_TERMINAL, TIPO_DOCUMENTO, NOMBRE_IMPRESORA, PREDETERMINADA, CREADO_EN, ACTUALIZADO_EN)
             VALUES
-                (%s, %s, %s, GETDATE(), GETDATE())
+                (%s, %s, %s, %s, GETDATE(), GETDATE())
             """,
-            [tipo_documento, nombre_impresora, predeterminada],
+            [nombre_terminal, tipo_documento, nombre_impresora, predeterminada],
         )
 
 
@@ -2094,19 +2096,29 @@ def _tu_build_row(raw, corte=None):
     corte = corte or timezone.localdate()
     id_sn = _tu_clean(raw.get("id_sn"))
     rnc_ced = _tu_digits(raw.get("rnc_ced"))
-    saldo = Decimal(str(raw.get("saldo") or "0"))
+    est_doc = str(raw.get("est_doc") or "ABIERTO").strip().upper()
+    estado_cuenta = "ABIERTA" if est_doc == "ABIERTO" else "CERRADA"
+
+    if estado_cuenta == "CERRADA":
+        saldo = Decimal("0")
+        monto_atraso = Decimal("0")
+        cuotas_atrasadas = 0
+        buckets = _tu_bucket(0, 0)
+        estatus_cuenta = "NORMAL"
+    else:
+        saldo = Decimal(str(raw.get("saldo") or "0"))
+        dias = _tu_days_overdue(raw.get("fecha_venc"), corte)
+        buckets = raw.get("buckets") or _tu_bucket(dias, saldo)
+        monto_atraso = _tu_decimal(raw.get("monto_atraso")) if raw.get("monto_atraso") is not None else (saldo if dias > 0 else Decimal("0"))
+        cuotas_atrasadas = raw.get("cuotas_atrasadas")
+        if cuotas_atrasadas is None:
+            cuotas_atrasadas = 1 if dias > 0 and saldo > 0 else 0
+        estatus_cuenta = _tu_estatus_cuenta(dias, cuotas_atrasadas)
     total_doc = Decimal(str(raw.get("total_doc") or saldo or "0"))
-    dias = _tu_days_overdue(raw.get("fecha_venc"), corte)
-    buckets = raw.get("buckets") or _tu_bucket(dias, saldo)
     address = _tu_split_address(raw.get("dir_factura") or raw.get("ent_factura"))
     is_company = len(rnc_ced) == 9
     last_payment_amount = Decimal(str(raw.get("monto_ultimo_pago") or "0"))
-    monto_atraso = _tu_decimal(raw.get("monto_atraso")) if raw.get("monto_atraso") is not None else (saldo if dias > 0 else Decimal("0"))
-    cuotas_atrasadas = raw.get("cuotas_atrasadas")
-    if cuotas_atrasadas is None:
-        cuotas_atrasadas = 1 if dias > 0 and saldo > 0 else 0
-    est_doc = str(raw.get("est_doc") or "ABIERTO").strip().upper()
-    estado_cuenta = "ABIERTA" if est_doc == "ABIERTO" else "CERRADA"
+
     row = {
         "tipo_entidad": "E" if is_company else "I",
         "codigo_cliente": id_sn,
@@ -2146,7 +2158,7 @@ def _tu_build_row(raw, corte=None):
         "balance_actual": _tu_money(saldo),
         "monto_atraso": _tu_money(monto_atraso),
         "cuotas_atrasadas": str(cuotas_atrasadas),
-        "estatus_cuenta": _tu_estatus_cuenta(dias, cuotas_atrasadas),
+        "estatus_cuenta": estatus_cuenta,
         "estado_cuenta": estado_cuenta,
     }
     for key, value in buckets.items():
@@ -2303,6 +2315,26 @@ def reportes_transunion_view(request):
     return render(request, "ajustes/reportes_transunion.html", ctx)
 
 
+def reportes_transunion_rechazados_view(request):
+    ctx = _base_context(request, page_title="Detalles de Cuentas Rechazadas", active_nav="ajustes")
+    if not ctx:
+        return redirect("login")
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "ajustes", "ver_reportes_transunion"):
+        return render_denied(request, active_nav="ajustes")
+    return render(request, "ajustes/reportes_transunion_rechazados.html", ctx)
+
+
+def reportes_transunion_comparar_view(request):
+    ctx = _base_context(request, page_title="Integraciones - Comparar Reportes TransUnion", active_nav="ajustes")
+    if not ctx:
+        return redirect("login")
+    if not has_perm(ctx["auth_payload"]["usuario_id"], "ajustes", "ver_reportes_transunion"):
+        return render_denied(request, active_nav="ajustes")
+    ctx["transunion_fields"] = [{"key": key, "label": label} for key, label in TRANSUNION_FIELDS]
+    ctx["fecha_hoy"] = timezone.localdate()
+    return render(request, "ajustes/reportes_transunion_comparar.html", ctx)
+
+
 @require_http_methods(["GET"])
 def reportes_transunion_cuentas_view(request):
     ctx = _base_context(request, page_title="Integraciones - Reportes TransUnion", active_nav="ajustes")
@@ -2418,7 +2450,7 @@ def reportes_transunion_actualizar_cuentas_view(request):
 
     prestamo_doc_ids = [doc for doc, info in found_docs.items() if not info["is_closed"]]
     prestamo_summary = _tu_load_prestamo_summary(prestamo_doc_ids, corte) if prestamo_doc_ids else {}
-    last_payments = _tu_load_last_payments(prestamo_doc_ids) if prestamo_doc_ids else {}
+    last_payments = _tu_load_last_payments(list(found_docs.keys())) if found_docs else {}
 
     updated = []
     removed = []
@@ -2431,51 +2463,89 @@ def reportes_transunion_actualizar_cuentas_view(request):
             removed.append({"id_doc": doc_id, "reason": "No encontrada en la base de datos"})
             continue
 
-        if info["is_closed"]:
-            reason = "Cuenta saldada (saldo 0)" if info["saldo"] <= Decimal("0") else f"Cuenta cerrada (estado: {info['est_doc']})"
-            removed.append({"id_doc": doc_id, "reason": reason})
-            continue
-
         row = info["row"]
-        loan = prestamo_summary.get(doc_id) or {}
-        loan_balance = loan.get("balance_actual")
-        loan_has_balance = loan_balance is not None and loan_balance > Decimal("0.01")
         last_pmt = last_payments.get(doc_id) or {}
-        raw = {
-            "id_doc": row[0],
-            "id_sn": row[1],
-            "nom_socio": row[2],
-            "rnc_ced": row[3],
-            "fecha_doc": row[4],
-            "fecha_venc": loan.get("fecha_vencimiento") or row[5],
-            "total_doc": row[6],
-            "saldo": loan_balance if loan_has_balance else row[7],
-            "fecha_ultimo_pago": last_pmt.get("fecha"),
-            "monto_ultimo_pago": last_pmt.get("monto", Decimal("0")),
-            "est_doc": info["est_doc"],
-            "moneda": row[9] or row[19],
-            "ent_factura": row[10],
-            "dir_factura": row[11],
-            "tel1": row[12],
-            "tel2": row[13],
-            "celular": row[14],
-            "fax": row[15],
-            "email": row[16],
-            "sector": row[21] if (len(row) > 21 and row[21] is not None) else row[17],
-            "provincia_municipio": row[22] if (len(row) > 22 and row[22] is not None) else "",
-            "lim_credito": row[18],
-            "numero_cuenta": row[0],
-        }
-        if loan:
-            raw.update(
-                {
-                    "monto_cuota": loan.get("monto_cuota") or raw.get("saldo"),
-                    "cantidad_cuotas": loan.get("cantidad_cuotas"),
-                    "monto_atraso": loan.get("monto_atraso"),
-                    "cuotas_atrasadas": loan.get("cuotas_atrasadas"),
-                    "buckets": loan.get("buckets"),
+
+        if info["is_closed"]:
+            # For closed accounts, force zero balance/arrears, NORMAL status, and CERRADA state
+            raw = {
+                "id_doc": row[0],
+                "id_sn": row[1],
+                "nom_socio": row[2],
+                "rnc_ced": row[3],
+                "fecha_doc": row[4],
+                "fecha_venc": row[5],
+                "total_doc": row[6],
+                "saldo": Decimal("0"),
+                "fecha_ultimo_pago": last_pmt.get("fecha"),
+                "monto_ultimo_pago": last_pmt.get("monto", Decimal("0")),
+                "est_doc": "CERRADO",  # Forces CERRADA state in _tu_build_row
+                "moneda": row[9] or row[19],
+                "ent_factura": row[10],
+                "dir_factura": row[11],
+                "tel1": row[12],
+                "tel2": row[13],
+                "celular": row[14],
+                "fax": row[15],
+                "email": row[16],
+                "sector": row[21] if (len(row) > 21 and row[21] is not None) else row[17],
+                "provincia_municipio": row[22] if (len(row) > 22 and row[22] is not None) else "",
+                "lim_credito": row[18],
+                "numero_cuenta": row[0],
+                "monto_cuota": Decimal("0"),
+                "cantidad_cuotas": "1",
+                "monto_atraso": Decimal("0"),
+                "cuotas_atrasadas": 0,
+                "buckets": {
+                    "saldo_vencido_1_30": Decimal("0"),
+                    "saldo_vencido_31_60": Decimal("0"),
+                    "saldo_vencido_61_90": Decimal("0"),
+                    "saldo_vencido_91_120": Decimal("0"),
+                    "saldo_vencido_121_150": Decimal("0"),
+                    "saldo_vencido_151_180": Decimal("0"),
+                    "saldo_vencido_181_mas": Decimal("0"),
                 }
-            )
+            }
+        else:
+            loan = prestamo_summary.get(doc_id) or {}
+            loan_balance = loan.get("balance_actual")
+            loan_has_balance = loan_balance is not None and loan_balance > Decimal("0.01")
+            raw = {
+                "id_doc": row[0],
+                "id_sn": row[1],
+                "nom_socio": row[2],
+                "rnc_ced": row[3],
+                "fecha_doc": row[4],
+                "fecha_venc": loan.get("fecha_vencimiento") or row[5],
+                "total_doc": row[6],
+                "saldo": loan_balance if loan_has_balance else row[7],
+                "fecha_ultimo_pago": last_pmt.get("fecha"),
+                "monto_ultimo_pago": last_pmt.get("monto", Decimal("0")),
+                "est_doc": info["est_doc"],
+                "moneda": row[9] or row[19],
+                "ent_factura": row[10],
+                "dir_factura": row[11],
+                "tel1": row[12],
+                "tel2": row[13],
+                "celular": row[14],
+                "fax": row[15],
+                "email": row[16],
+                "sector": row[21] if (len(row) > 21 and row[21] is not None) else row[17],
+                "provincia_municipio": row[22] if (len(row) > 22 and row[22] is not None) else "",
+                "lim_credito": row[18],
+                "numero_cuenta": row[0],
+            }
+            if loan:
+                raw.update(
+                    {
+                        "monto_cuota": loan.get("monto_cuota") or raw.get("saldo"),
+                        "cantidad_cuotas": loan.get("cantidad_cuotas"),
+                        "monto_atraso": loan.get("monto_atraso"),
+                        "cuotas_atrasadas": loan.get("cuotas_atrasadas"),
+                        "buckets": loan.get("buckets"),
+                    }
+                )
+
         updated.append(
             {
                 "source": {
@@ -2485,9 +2555,9 @@ def reportes_transunion_actualizar_cuentas_view(request):
                     "rnc_ced": _tu_clean(row[3]),
                     "fecha_venc": _tu_date(raw.get("fecha_venc")),
                     "saldo": _tu_money(raw.get("saldo")),
-                    "dias_atraso": _tu_days_overdue(raw.get("fecha_venc"), corte),
-                    "cuotas": str(loan.get("cantidad_cuotas") or ""),
-                    "cuotas_atrasadas": str(loan.get("cuotas_atrasadas") or ""),
+                    "dias_atraso": 0 if info["is_closed"] else _tu_days_overdue(raw.get("fecha_venc"), corte),
+                    "cuotas": str(raw.get("cantidad_cuotas") or ""),
+                    "cuotas_atrasadas": str(raw.get("cuotas_atrasadas") if raw.get("cuotas_atrasadas") is not None else ""),
                     "monto_atraso": _tu_money(raw.get("monto_atraso")),
                 },
                 "fields": _tu_build_row(raw, corte),
@@ -2527,6 +2597,21 @@ def reportes_transunion_generar_view(request):
     codigo_suscriptor = _tu_clean(payload.get("codigo_suscriptor")) or "C0542"
     corte = _to_date_or_none(payload.get("corte")) or timezone.localdate()
     filename = f"{codigo_suscriptor}.{corte.strftime('%y%m%d')}.{extension}"
+
+    # Validar que Cédula Nueva no esté vacía y contenga exactamente 11 dígitos numéricos
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cedula = str(row.get("cedula_nueva") or "").strip()
+        rnc = str(row.get("rnc") or "").strip()
+        if not rnc:
+            clean_ced = "".join(c for c in cedula if c.isdigit())
+            if len(clean_ced) != 11 or len(cedula) != 11 or not cedula.isdigit():
+                nombre = row.get("nombre_completo") or row.get("razon_social") or "Cliente"
+                num_cuenta = row.get("numero_cuenta") or "sin número"
+                return JsonResponse({
+                    "detail": f"La cuenta {num_cuenta} de {nombre} tiene una Cédula Nueva inválida ('{cedula}'). Debe tener exactamente 11 dígitos numéricos."
+                }, status=400)
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=delimiter, lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)

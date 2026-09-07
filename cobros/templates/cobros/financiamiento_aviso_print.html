@@ -60,7 +60,7 @@
       grid-template-columns: 190px 1fr;
       gap: 16px;
       align-items: start;
-      margin-bottom: 7mm;
+      margin-bottom: 2mm;
     }
 
     .carta-logo {
@@ -80,23 +80,38 @@
     }
 
     .carta-head-right {
-      margin: 2.5mm 0 4mm;
+      margin: 1mm 0 2mm;
       text-align: right;
       font-size: 11pt;
     }
 
     .carta-title {
-      margin: 0 0 6mm;
+      margin: 2mm 0 4mm;
       text-align: center;
       color: #d60000;
-      font-size: 26pt;
+      font-size: 22pt;
       font-weight: 700;
       letter-spacing: 0.2em;
     }
 
     .carta-intro {
-      margin-top: 10mm;
-      margin-bottom: 5mm;
+      margin-top: 2mm;
+      margin-bottom: 3mm;
+    }
+
+    .cliente-info-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin-top: 0 !important;
+      margin-bottom: 3mm !important;
+      font-size: 11pt !important;
+      border: none !important;
+    }
+
+    .cliente-info-table td {
+      border: none !important;
+      padding: 2px 0 !important;
+      text-align: left !important;
     }
 
     .body-copy {
@@ -228,17 +243,23 @@
         <div>{{ hora }}</div>
       </div>
 
-      <h1 class="carta-title">AVISO</h1>
+      <h1 class="carta-title">CARTA DE AVISO</h1>
 
       <section class="carta-intro">
-        <p>Senor(a):</p>
-        <p>
-          <strong>{{ cliente_nombre }}</strong><br />
-          Cedula/Pasaporte: <strong>{{ cliente_rnc }}</strong><br />
-          Direccion: <strong>{{ cliente_direccion }}</strong><br />
-          Ciudad: <strong>{{ ciudad_impresion }}</strong><br />
-          Telefono: <strong>{{ cliente_telefono }}</strong>
-        </p>
+        <table class="cliente-info-table">
+          <tr>
+            <td style="width: 50%;">Cliente: <strong>{{ cliente_nombre }}</strong></td>
+            <td style="width: 25%;">Apodo: <strong>{{ cliente_apodo }}</strong></td>
+            <td style="width: 25%;">Cédula/Pasaporte: <strong>{{ cliente_rnc }}</strong></td>
+          </tr>
+          <tr>
+            <td colspan="3">Dirección: <strong>{{ cliente_direccion }}</strong></td>
+          </tr>
+          <tr>
+            <td>Ciudad: <strong>{{ ciudad_impresion }}</strong></td>
+            <td colspan="2">Teléfono: <strong>{{ cliente_telefono }}</strong></td>
+          </tr>
+        </table>
 
         {% if aviso_asunto %}
         <p><strong>Asunto:</strong> {{ aviso_asunto }}</p>
@@ -246,6 +267,12 @@
 
         <div class="body-copy">{{ aviso_body_text|linebreaksbr }}</div>
       </section>
+
+      {% if articulos_atraso %}
+      <div style="margin-top: 3mm; margin-bottom: 3mm; font-size: 11pt;">
+        Artículos en Atraso: <strong>{{ articulos_atraso }}</strong>
+      </div>
+      {% endif %}
 
       <table>
         <thead>
@@ -283,10 +310,6 @@
       <div class="carta-totals">
         <div>Balance en Atraso --> {{ total_saldo_fmt }}</div>
         <div>Total Mora --> {{ total_mora_fmt }}</div>
-      </div>
-
-      <div class="legal-clause">
-        El cliente reconoce y acepta que {{ empresa_nombre }} podra consultar, compartir y reportar su informacion crediticia ante las sociedades de informacion crediticia, conforme a la normativa vigente. En caso de incumplimiento de sus obligaciones de pago reflejadas en el presente estado de cuenta, dicha informacion podra ser reportada en apego a las disposiciones legales aplicables.
       </div>
     </div>
 

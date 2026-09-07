@@ -2193,6 +2193,10 @@
     </div>
     <div class="win-body cxc-message-body">
       <p id="cxc_confirm_modal_message" class="cxc-message-copy"></p>
+      <div id="cxc_confirm_modal_comment_container" class="cxc-comment-box" style="display: none; margin-top: 4px;">
+        <label for="cxc_confirm_modal_comment">Motivo de Cancelación / Comentario</label>
+        <textarea id="cxc_confirm_modal_comment" placeholder="Motivo por el cual se cancela el recibo..."></textarea>
+      </div>
       <div class="cxc-message-actions">
         <button id="btn_cxc_confirm_modal_cancel" type="button" class="cxc-action is-muted">Cancelar</button>
         <button id="btn_cxc_confirm_modal_ok" type="button" class="cxc-action is-danger">Continuar</button>
@@ -3226,13 +3230,26 @@
       }
     }
 
-    function showCxcConfirm(message) {
+    function showCxcConfirm(message, options = {}) {
       if (!confirmModalBackdrop || !confirmModalMessage) {
         return Promise.resolve(__nativeConfirm ? __nativeConfirm(message) : false);
       }
       if (cxcConfirmOpen) {
         closeCxcConfirmModal(false);
       }
+
+      const commentContainer = document.getElementById("cxc_confirm_modal_comment_container");
+      const commentTextarea = document.getElementById("cxc_confirm_modal_comment");
+      if (commentContainer && commentTextarea) {
+        if (options.showComment) {
+          commentContainer.style.display = "block";
+          commentTextarea.value = options.commentValue || "";
+        } else {
+          commentContainer.style.display = "none";
+          commentTextarea.value = "";
+        }
+      }
+
       return new Promise((resolve) => {
         confirmModalMessage.textContent = String(message ?? "");
         cxcConfirmResolver = resolve;
@@ -3240,7 +3257,11 @@
         confirmModalBackdrop.setAttribute("aria-hidden", "false");
         cxcConfirmOpen = true;
         lockPageScroll();
-        btnCxcConfirmModalOk?.focus();
+        if (options.showComment && commentTextarea) {
+          commentTextarea.focus();
+        } else {
+          btnCxcConfirmModalOk?.focus();
+        }
       });
     }
 
@@ -6594,10 +6615,19 @@
         return false;
       }
       const safeLabel = String(reciboLabel || reciboId).trim() || String(reciboId);
-      const confirmed = await showCxcConfirm(`Se cancelara el recibo ${safeLabel}. Esta accion revertira los movimientos relacionados. Deseas continuar?`);
+      const fieldComentario = document.getElementById("cxc_comentario");
+      const currentComment = fieldComentario ? fieldComentario.value : "";
+
+      const confirmed = await showCxcConfirm(
+        `Se cancelara el recibo ${safeLabel}. Esta accion revertira los movimientos relacionados. Deseas continuar?`,
+        { showComment: true, commentValue: currentComment }
+      );
       if (!confirmed) {
         return false;
       }
+
+      const commentTextarea = document.getElementById("cxc_confirm_modal_comment");
+      const editedComment = commentTextarea ? commentTextarea.value : currentComment;
 
       try {
         const clientEventId = createCxcClientEventId();
@@ -6615,6 +6645,7 @@
             recibo_id: reciboId,
             terminal_cliente: getCurrentCxcTerminalName(true),
             event_id: clientEventId,
+            comentario: editedComment,
           }),
         });
         const data = await res.json().catch(() => ({}));

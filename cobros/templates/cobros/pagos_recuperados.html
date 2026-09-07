@@ -1,0 +1,615 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="page-container pagos-recuperados-page">
+  <!-- Header con navegación entre pestañas -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Pagos Recuperados de Acuerdos</h2>
+      <p class="page-subtitle">Historial de pagos recibidos de clientes con acuerdos de cobro y generación de reportes.</p>
+    </div>
+    <div class="header-nav-tabs">
+      <a href="{% url 'cobros:acuerdos' %}" class="tab-link">Acuerdos y Recordatorios</a>
+      <a href="{% url 'cobros:pagos_recuperados' %}" class="tab-link active">Pagos Recuperados</a>
+      <a href="{% url 'cobros:cartas_enviadas' %}" class="tab-link">Cartas Enviadas</a>
+    </div>
+  </div>
+
+  <!-- Métricas resumidas -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <span class="metric-label">Total pagos en período</span>
+      <strong class="metric-value">{{ total_records }}</strong>
+      <span class="metric-sub">Registros coincidentes</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Monto total en período</span>
+      <strong class="metric-value text-success">RD$ {{ total_monto|floatformat:2 }}</strong>
+      <span class="metric-sub">Recuperado según filtros</span>
+    </div>
+    <div class="metric-card highlight">
+      <span class="metric-label">Pagos seleccionados</span>
+      <strong class="metric-value" id="summary_selected_count">{{ total_records }}</strong>
+      <span class="metric-sub">Marcados para el reporte</span>
+    </div>
+    <div class="metric-card highlight">
+      <span class="metric-label">Total recuperado seleccionado</span>
+      <strong class="metric-value text-success" id="summary_selected_monto">RD$ {{ total_monto|floatformat:2 }}</strong>
+      <span class="metric-sub">Suma a incluir en reporte</span>
+    </div>
+  </div>
+
+  <!-- Card principal -->
+  <section class="info-card">
+    <!-- Barra de filtros -->
+    <div class="filters-container">
+      <form method="get" class="filters-form" id="filters_form">
+        <div class="filter-group">
+          <label for="fecha_desde">Fecha Desde</label>
+          <input type="date" id="fecha_desde" name="fecha_desde" value="{{ fecha_desde }}" />
+        </div>
+        <div class="filter-group">
+          <label for="fecha_hasta">Fecha Hasta</label>
+          <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ fecha_hasta }}" />
+        </div>
+        <div class="filter-group flex-grow">
+          <label for="q">Buscar</label>
+          <input type="text" id="q" name="q" value="{{ q }}" placeholder="Nombre de cliente, código SN, no. recibo, teléfono o sector" />
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="btn-primary">Filtrar</button>
+          <a href="{% url 'cobros:pagos_recuperados' %}" class="btn-secondary">Limpiar</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Barra de acciones y reporte -->
+    <div class="table-toolbar">
+      <div class="toolbar-left">
+        <button type="button" id="btn_select_all" class="btn-action">Marcar todos</button>
+        <button type="button" id="btn_deselect_all" class="btn-action">Desmarcar todos</button>
+        <span class="selection-status">
+          Seleccionados: <strong id="lbl_status_count">{{ total_records }}</strong> de {{ total_records }} |
+          Total: <strong id="lbl_status_total" class="text-success">RD$ {{ total_monto|floatformat:2 }}</strong>
+        </span>
+      </div>
+      <div class="toolbar-right">
+        <button type="submit" form="form_reporte" class="btn-generate-report">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Generar reporte de pagos recuperados
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabla con formulario para imprimir selección -->
+    <form id="form_reporte" method="post" action="{% url 'cobros:pagos_recuperados_impresion' %}" target="_blank">
+      {% csrf_token %}
+      <input type="hidden" name="fecha_desde" value="{{ fecha_desde }}" />
+      <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}" />
+      <input type="hidden" name="q" value="{{ q }}" />
+
+      <div class="table-wrap">
+        <table class="data-table" id="pagos_table">
+          <thead>
+            <tr>
+              <th style="width: 44px; text-align: center;">
+                <input type="checkbox" id="master_checkbox" checked title="Marcar / Desmarcar todos los registros" />
+              </th>
+              <th style="width: 130px;">Fecha y Hora</th>
+              <th style="width: 100px;">No. Recibo</th>
+              <th>Cliente</th>
+              <th>Teléfono / Sector</th>
+              <th>Tipo Acuerdo</th>
+              <th style="width: 100px;">Estado Acuerdo</th>
+              <th style="width: 140px; text-align: right;">Monto Recuperado</th>
+              <th style="width: 90px; text-align: center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in records %}
+            <tr class="pago-row" data-id="{{ item.id_evento }}" data-monto="{{ item.monto_pago }}">
+              <td style="text-align: center;">
+                <input
+                  type="checkbox"
+                  name="selected_ids"
+                  value="{{ item.id_evento }}"
+                  class="row-checkbox"
+                  data-monto="{{ item.monto_pago }}"
+                  checked
+                />
+              </td>
+              <td>
+                <strong>{{ item.fecha_evento|date:"d/m/Y" }}</strong><br />
+                <span class="muted">{{ item.fecha_evento|date:"h:i A" }}</span>
+              </td>
+              <td>
+                <span class="badge-recibo">#{{ item.no_recibo }}</span>
+              </td>
+              <td>
+                <strong class="cliente-name">{{ item.cliente_nombre }}</strong><br />
+                <span class="muted font-mono">{{ item.id_sn }}</span>
+              </td>
+              <td>
+                {% if item.telefono %}
+                  <span>{{ item.telefono }}</span><br />
+                {% endif %}
+                <span class="muted">{{ item.sector|default:"Sin sector" }}</span>
+              </td>
+              <td>
+                <span class="tipo-tag">{{ item.tipo_label }}</span>
+                {% if item.fecha_compromiso %}
+                  <br /><span class="muted">Vencía: {{ item.fecha_compromiso }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {% if item.estado == 'PENDIENTE' %}warn{% elif item.estado == 'CUMPLIDO' %}success{% else %}muted{% endif %}">
+                  {{ item.estado }}
+                </span>
+              </td>
+              <td style="text-align: right;" class="cell-monto">
+                RD$ {{ item.monto_pago|floatformat:2 }}
+              </td>
+              <td style="text-align: center;">
+                {% if item.acuerdo_id %}
+                  <a href="{% url 'cobros:acuerdos' %}?edit={{ item.acuerdo_id }}" class="table-link" target="_blank" title="Ver o editar acuerdo">
+                    Ver
+                  </a>
+                {% else %}
+                  <span class="muted">-</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="empty-row">No se encontraron pagos de acuerdos en el período seleccionado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% if records %}
+          <tfoot>
+            <tr class="tfoot-summary">
+              <td colspan="7" style="text-align: right; font-weight: 700; padding-right: 14px;">
+                TOTAL RECUPERADO (SELECCIONADO):
+              </td>
+              <td style="text-align: right; font-weight: 800; font-size: 15px;" class="cell-monto" id="footer_monto_total">
+                RD$ {{ total_monto|floatformat:2 }}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </form>
+  </section>
+</div>
+
+<style>
+  .pagos-recuperados-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-nav-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tab-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    background: #eef3f9;
+    color: var(--text-color, #1f2d3d);
+    border: 1px solid #d0ddeb;
+    transition: all 0.2s ease;
+  }
+
+  .tab-link:hover {
+    background: #e2ecf7;
+    border-color: #b5cced;
+  }
+
+  .tab-link.active {
+    background: var(--primary-color, #0d5bb5);
+    color: #ffffff;
+    border-color: var(--primary-color, #0d5bb5);
+    box-shadow: 0 4px 10px rgba(13, 91, 181, 0.25);
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .metric-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color, #dbe4ef);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  }
+
+  .metric-card.highlight {
+    background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+    border-color: #bcd7ff;
+  }
+
+  .metric-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-light, #6b7c93);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .metric-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-color, #1a2530);
+    margin: 4px 0 2px;
+  }
+
+  .metric-sub {
+    font-size: 12px;
+    color: var(--text-light, #7c8c9e);
+  }
+
+  .text-success {
+    color: #177245 !important;
+  }
+
+  .filters-container {
+    padding: 14px 16px;
+    background: #fbfcfe;
+    border-bottom: 1px solid var(--border-color, #e5edf5);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .filters-form {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .filter-group.flex-grow {
+    flex: 1 1 260px;
+  }
+
+  .filter-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-color, #2c3e50);
+  }
+
+  .filter-group input {
+    height: 38px;
+    border: 1px solid #c9d7ec;
+    border-radius: 8px;
+    padding: 0 12px;
+    font: inherit;
+    background: #fff;
+    color: var(--text-color);
+  }
+
+  .filter-group input:focus {
+    outline: none;
+    border-color: var(--primary-color, #0d5bb5);
+    box-shadow: 0 0 0 3px rgba(13, 91, 181, 0.15);
+  }
+
+  .filter-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    height: 38px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary-color, #0d5bb5);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid #c9d7ec;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-color);
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 13px;
+  }
+
+  .table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f4f8fc;
+    border-bottom: 1px solid var(--border-color, #e5edf5);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-left {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-action {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #c9d7ec;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text-color);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .btn-action:hover {
+    background: #eef3f9;
+  }
+
+  .selection-status {
+    font-size: 13px;
+    color: var(--text-color);
+    margin-left: 6px;
+  }
+
+  .btn-generate-report {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 8px;
+    background: #0f8b44;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(15, 139, 68, 0.25);
+    transition: background 0.2s ease;
+  }
+
+  .btn-generate-report:hover {
+    background: #0b7036;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    background: #f7faff;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border-color, #dbe4ef);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-color);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color, #eef3f9);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  .data-table tbody tr:hover {
+    background: #f9fbfe;
+  }
+
+  .badge-recibo {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #e9f1fc;
+    color: #0b4e96;
+    border-radius: 6px;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .font-mono {
+    font-family: monospace;
+    font-size: 12px;
+  }
+
+  .cliente-name {
+    color: #17326a;
+  }
+
+  .tipo-tag {
+    display: inline-block;
+    font-weight: 600;
+    color: #2b4566;
+  }
+
+  .cell-monto {
+    font-weight: 700;
+    color: #177245;
+  }
+
+  .tfoot-summary {
+    background: #f3f9f4;
+    border-top: 2px solid #b7dfc8;
+  }
+
+  .table-link {
+    color: var(--primary-color, #0d5bb5);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .table-link:hover {
+    text-decoration: underline;
+  }
+
+  .empty-row {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-light, #8a9ba8);
+    font-style: italic;
+  }
+
+  @media (max-width: 900px) {
+    .filters-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .filter-actions {
+      margin-top: 4px;
+    }
+    .btn-primary, .btn-secondary {
+      flex: 1;
+      justify-content: center;
+      text-align: center;
+    }
+    .table-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .btn-generate-report {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    const masterCheckbox = document.getElementById("master_checkbox");
+    const rowCheckboxes = Array.from(document.querySelectorAll(".row-checkbox"));
+    const summarySelectedCount = document.getElementById("summary_selected_count");
+    const summarySelectedMonto = document.getElementById("summary_selected_monto");
+    const lblStatusCount = document.getElementById("lbl_status_count");
+    const lblStatusTotal = document.getElementById("lbl_status_total");
+    const footerMontoTotal = document.getElementById("footer_monto_total");
+    const btnSelectAll = document.getElementById("btn_select_all");
+    const btnDeselectAll = document.getElementById("btn_deselect_all");
+    const formReporte = document.getElementById("form_reporte");
+
+    function formatCurrency(amount) {
+      return "RD$ " + Number(amount || 0).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function recalculate() {
+      let count = 0;
+      let total = 0.0;
+
+      rowCheckboxes.forEach((cb) => {
+        if (cb.checked) {
+          count++;
+          const monto = parseFloat(cb.getAttribute("data-monto") || "0");
+          total += monto;
+        }
+      });
+
+      const formatted = formatCurrency(total);
+
+      if (summarySelectedCount) summarySelectedCount.textContent = count;
+      if (summarySelectedMonto) summarySelectedMonto.textContent = formatted;
+      if (lblStatusCount) lblStatusCount.textContent = count;
+      if (lblStatusTotal) lblStatusTotal.textContent = formatted;
+      if (footerMontoTotal) footerMontoTotal.textContent = formatted;
+
+      if (masterCheckbox) {
+        if (count === 0) {
+          masterCheckbox.checked = false;
+          masterCheckbox.indeterminate = false;
+        } else if (count === rowCheckboxes.length) {
+          masterCheckbox.checked = true;
+          masterCheckbox.indeterminate = false;
+        } else {
+          masterCheckbox.checked = false;
+          masterCheckbox.indeterminate = true;
+        }
+      }
+    }
+
+    if (masterCheckbox) {
+      masterCheckbox.addEventListener("change", function() {
+        const checkState = masterCheckbox.checked;
+        rowCheckboxes.forEach((cb) => {
+          cb.checked = checkState;
+        });
+        recalculate();
+      });
+    }
+
+    rowCheckboxes.forEach((cb) => {
+      cb.addEventListener("change", recalculate);
+    });
+
+    if (btnSelectAll) {
+      btnSelectAll.addEventListener("click", function() {
+        rowCheckboxes.forEach((cb) => { cb.checked = true; });
+        recalculate();
+      });
+    }
+
+    if (btnDeselectAll) {
+      btnDeselectAll.addEventListener("click", function() {
+        rowCheckboxes.forEach((cb) => { cb.checked = false; });
+        recalculate();
+      });
+    }
+
+    if (formReporte) {
+      formReporte.addEventListener("submit", function(e) {
+        const checkedCount = rowCheckboxes.filter((cb) => cb.checked).length;
+        if (checkedCount === 0) {
+          e.preventDefault();
+          alert("Debes marcar al menos un registro para generar el reporte de pagos recuperados.");
+        }
+      });
+    }
+
+    // Inicializar cálculo en carga
+    recalculate();
+  })();
+</script>
+{% endblock %}

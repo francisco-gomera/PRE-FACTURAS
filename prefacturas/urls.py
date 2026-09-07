@@ -50,6 +50,7 @@ urlpatterns = [
     path('app/caja/', include('caja.urls')),
     path('app/chat-interno/', include('chat_interno.urls')),
     path('app/empleados/', include('empleados.urls')),
+    path('api/chatbot/', include('chatbot_api.urls')),
 ]
 
 if settings.DEBUG:

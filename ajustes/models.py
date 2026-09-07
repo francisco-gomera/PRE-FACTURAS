@@ -137,7 +137,8 @@ class ImpresoraConfig(models.Model):
     ]
 
     id_config = models.AutoField(db_column="ID_CONFIG", primary_key=True)
-    tipo_documento = models.CharField(db_column="TIPO_DOCUMENTO", max_length=40, unique=True, choices=TIPO_CHOICES)
+    nombre_terminal = models.CharField(db_column="NOMBRE_TERMINAL", max_length=100, default="default")
+    tipo_documento = models.CharField(db_column="TIPO_DOCUMENTO", max_length=40, choices=TIPO_CHOICES)
     nombre_impresora = models.CharField(db_column="NOMBRE_IMPRESORA", max_length=255, blank=True, null=True)
     predeterminada = models.BooleanField(db_column="PREDETERMINADA", default=False)
     creado_en = models.DateTimeField(db_column="CREADO_EN", auto_now_add=True)
@@ -145,7 +146,13 @@ class ImpresoraConfig(models.Model):
 
     class Meta:
         db_table = "AJUSTE_IMPRESORA_CONFIG"
-        ordering = ["tipo_documento"]
+        ordering = ["nombre_terminal", "tipo_documento"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["nombre_terminal", "tipo_documento"],
+                name="uq_impresora_terminal_tipo",
+            )
+        ]
 
 
 class FormatoImpresionConfig(models.Model):

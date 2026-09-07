@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'caja',
     'chat_interno',
     'empleados',
+    'chatbot_api',
 ]
 
 MIDDLEWARE = [

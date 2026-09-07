@@ -32,6 +32,14 @@
           </select>
         </div>
 
+        <div class="form-row">
+          <label for="alertas_vista">Vista de impresión</label>
+          <select id="alertas_vista">
+            <option value="normal" selected>Normal (Detalle de cuotas)</option>
+            <option value="compacta">Compacta (Para terreno / cobrador)</option>
+          </select>
+        </div>
+
         <div class="actions-row">
           <button id="btn_alertas_ver" type="button">Ver listado</button>
           <button id="btn_alertas_abrir" type="button">Abrir en ventana</button>
@@ -181,6 +189,7 @@
   const alertasDiasDesde = document.getElementById("alertas_dias_desde");
   const alertasDiasHasta = document.getElementById("alertas_dias_hasta");
   const alertasSector = document.getElementById("alertas_sector");
+  const alertasVista = document.getElementById("alertas_vista");
   const btnAlertasVer = document.getElementById("btn_alertas_ver");
   const btnAlertasAbrir = document.getElementById("btn_alertas_abrir");
   const btnAlertasImprimir = document.getElementById("btn_alertas_imprimir");
@@ -201,8 +210,9 @@
     const diasHastaRaw = (alertasDiasHasta?.value || "").trim();
     const diasHasta = diasHastaRaw ? getDiasValue(alertasDiasHasta, 0) : "";
     const sector = (alertasSector?.value || "").trim();
+    const vista = (alertasVista?.value || "normal").trim();
     const suffix = embed ? "&embed=1" : "";
-    return `${alertasUrl}?dias_desde=${encodeURIComponent(diasDesde)}&dias_hasta=${encodeURIComponent(diasHasta)}&sector=${encodeURIComponent(sector)}${suffix}`;
+    return `${alertasUrl}?dias_desde=${encodeURIComponent(diasDesde)}&dias_hasta=${encodeURIComponent(diasHasta)}&sector=${encodeURIComponent(sector)}&vista=${encodeURIComponent(vista)}${suffix}`;
   }
 
   function showAlertasPreview() {
