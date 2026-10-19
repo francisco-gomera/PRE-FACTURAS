@@ -70,61 +70,205 @@
             margin-top: 6px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
             gap: 12px;
             font-size: 13px;
         }
 
         .sector-block {
-            margin-top: 14px;
+            margin-top: 10px;
+            page-break-inside: auto;
+            break-inside: auto;
         }
 
         .sector-title {
-            margin: 0 0 8px;
+            margin: 12px 0 6px;
             color: var(--sector);
-            font-size: 22px;
+            font-size: 17px;
             font-weight: 800;
             text-transform: uppercase;
-            border-bottom: 1px solid #d7d7d7;
-            padding-bottom: 4px;
+            border-bottom: 2px solid #d7d7d7;
+            padding-bottom: 3px;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
 
         .cliente-title {
-            margin: 10px 0 6px;
+            margin: 8px 0 4px;
             color: var(--cliente);
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 800;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
         }
 
-        table {
+        /* Vista compacta (Terreno / Cobrador) */
+        .compact-card {
+            background: #fafafa;
+            border: 1px solid #d1d5db;
+            padding: 5px 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            display: block;
+        }
+
+        .compact-header {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--cliente);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 3px;
+            margin-bottom: 4px;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .compact-name {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .compact-alias {
+            font-weight: 600;
+            color: #475569;
+            font-size: 11px;
+        }
+
+        .compact-tel {
+            color: #334155;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .compact-address {
+            font-size: 10.5px;
+            color: #111;
+            font-weight: normal;
+            margin-bottom: 4px;
+            padding-left: 2px;
+            white-space: normal;
+            line-height: 1.2;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .compact-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
-            margin-bottom: 6px;
+            font-size: 10px;
+            margin-bottom: 1px;
+            table-layout: fixed;
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+
+        .compact-table thead {
+            display: table-header-group !important;
             page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
         }
 
-        thead {
-            display: table-header-group;
-        }
-
-        tr {
+        .compact-table thead tr {
+            background: #eaeaea;
             page-break-inside: avoid;
+            break-inside: avoid;
         }
 
-        th, td {
+        .compact-table th {
+            padding: 3px 4px;
+            font-size: 9.5px;
+            border: 1px solid #999;
+            font-weight: 700;
+            color: #1a1a1a;
+            white-space: nowrap;
+        }
+
+        .compact-table tbody tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .compact-table td {
+            padding: 3px 4px;
+            border: 1px solid #aaa;
+            font-size: 10px;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
+
+        .compact-table .col-doc { font-weight: bold; white-space: nowrap; }
+        .compact-table .col-date { white-space: nowrap; }
+        .compact-table .col-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .compact-table .col-bal { text-align: right; font-weight: bold; color: #b21111; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .compact-table .col-pago { white-space: nowrap; }
+        .compact-table .col-dias { text-align: center; color: var(--alert); font-weight: bold; white-space: nowrap; }
+        .compact-table .col-art { white-space: normal; word-break: break-word; color: #444; font-size: 9.5px; line-height: 1.15; vertical-align: top; }
+
+        /* Vista normal */
+        .normal-card {
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            display: block;
+        }
+
+        .normal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 4px;
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+
+        .normal-table thead {
+            display: table-header-group !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+        }
+
+        .normal-table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .normal-table th,
+        .normal-table td {
             border: 1px solid #b8b8b8;
-            padding: 6px 7px;
+            padding: 5px 6px;
             text-align: left;
             white-space: nowrap;
         }
 
-        th {
+        .normal-table th {
             background: #efefef;
-            font-size: 11px;
+            font-size: 10.5px;
         }
 
         .text-right {
             text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
         }
 
         .alert-cell {
@@ -133,29 +277,134 @@
         }
 
         .empty {
-            min-height: 420px;
+            min-height: 380px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #7a7a7a;
             text-align: center;
             border: 1px dashed #c8c8c8;
+            font-size: 14px;
         }
 
         @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm 7mm;
         }
 
         @media print {
-            body { background: #fff; }
-            .toolbar { display: none; }
+            body {
+                background: #fff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .toolbar {
+                display: none !important;
+            }
+
             .page {
-                border: none;
-                margin: 0;
-                width: auto;
-                min-height: auto;
-                padding: 0;
+                border: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-height: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .header {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 8px !important;
+                padding-bottom: 6px !important;
+            }
+
+            .sector-block {
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            .sector-title {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+                margin-top: 10px !important;
+                margin-bottom: 5px !important;
+            }
+
+            .compact-card {
+                background: #ffffff !important;
+                border: 1px solid #999 !important;
+                border-radius: 0 !important; /* Critical to avoid Chromium page break clipping */
+                box-shadow: none !important;
+                margin-bottom: 7px !important;
+                padding: 4px 6px !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .compact-header {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            .compact-address {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            .compact-table {
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            .compact-table thead {
+                display: table-header-group !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            .compact-table thead tr {
+                background: #e8e8e8 !important;
+            }
+
+            .compact-table tbody tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            .compact-table td,
+            .compact-table th {
+                padding: 2.5px 3.5px !important;
+            }
+
+            .normal-card {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-bottom: 8px !important;
+            }
+
+            .normal-card .cliente-title {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            .normal-table {
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            .normal-table thead {
+                display: table-header-group !important;
+            }
+
+            .normal-table tbody tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
         }
     </style>
@@ -179,6 +428,26 @@
                         {% if has_max_days %} a {{ max_days }}{% else %} en adelante{% endif %}
                     </strong>
                 </div>
+                {% if balance_min is not None or balance_max is not None %}
+                <div>
+                    Balance actual:
+                    <strong>
+                        {% if balance_min is not None and balance_max is not None %}
+                            {{ balance_min|floatformat:2 }} a {{ balance_max|floatformat:2 }}
+                        {% elif balance_min is not None %}
+                            Desde {{ balance_min|floatformat:2 }}
+                        {% elif balance_max is not None %}
+                            Hasta {{ balance_max|floatformat:2 }}
+                        {% endif %}
+                    </strong>
+                </div>
+                {% endif %}
+                {% if fecha_ult_pago %}
+                <div>
+                    Último pago hasta:
+                    <strong>{{ fecha_ult_pago|date:"d/m/Y" }}</strong>
+                </div>
+                {% endif %}
                 <div>Fecha impresión: <strong>{{ fecha_impresion|date:"d/m/Y" }}</strong></div>
                 <div>Total registros: <strong>{{ total_items }}</strong></div>
             </div>
@@ -188,40 +457,40 @@
             {% if grupos %}
                 {% for grupo in grupos %}
                 <section class="sector-block">
-                    <h2 class="sector-title" style="font-size: 18px; margin-bottom: 6px;">{{ grupo.sector }}</h2>
+                    <h2 class="sector-title">{{ grupo.sector }}</h2>
                     {% for cliente in grupo.clientes %}
-                    <div style="background: #fafafa; border: 1px solid #ddd; padding: 6px 10px; margin-bottom: 10px; border-radius: 6px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page; display: block;">
-                        <div style="font-size: 13px; font-weight: bold; color: var(--cliente); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ccc; padding-bottom: 3px; margin-bottom: 5px;">
-                            <span>👤 {{ cliente.nombre }} {% if cliente.apodo %}(Alias: {{ cliente.apodo }}){% endif %}</span>
-                            <span style="color: #475569; font-size: 12px;">📞 {{ cliente.telefono|default:"Sin Teléfono" }}</span>
+                    <div class="compact-card">
+                        <div class="compact-header">
+                            <span class="compact-name">👤 {{ cliente.nombre }} {% if cliente.apodo %}<span class="compact-alias">(Alias: {{ cliente.apodo }})</span>{% endif %}</span>
+                            <span class="compact-tel">📞 {{ cliente.telefono|default:"Sin Teléfono" }}</span>
                         </div>
                         {% if cliente.direccion %}
-                        <div style="font-size: 11px; color: #000; font-weight: normal; margin-bottom: 6px; padding-left: 4px; white-space: normal; line-height: 1.2;">
+                        <div class="compact-address">
                             📍 <strong>Dirección:</strong> {{ cliente.direccion }}
                         </div>
                         {% endif %}
-                        <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 2px;">
+                        <table class="compact-table">
                             <thead>
-                                <tr style="background: #eaeaea;">
-                                    <th style="padding: 4px; font-size: 10px; border: 1px solid #aaa;">Factura</th>
-                                    <th style="padding: 4px; font-size: 10px; border: 1px solid #aaa;">F. Apertura</th>
-                                    <th style="padding: 4px; font-size: 10px; text-align: right; border: 1px solid #aaa;">Monto Apertura</th>
-                                    <th style="padding: 4px; font-size: 10px; text-align: right; border: 1px solid #aaa;">Balance Actual</th>
-                                    <th style="padding: 4px; font-size: 10px; border: 1px solid #aaa;">Últ. Pago</th>
-                                    <th style="padding: 4px; font-size: 10px; text-align: center; border: 1px solid #aaa;">Días Atraso</th>
-                                    <th style="padding: 4px; font-size: 10px; white-space: normal; border: 1px solid #aaa;">Artículos</th>
+                                <tr>
+                                    <th style="width: 13%;">Factura</th>
+                                    <th style="width: 12%;">F. Apertura</th>
+                                    <th style="width: 14%;" class="text-right">Monto Apertura</th>
+                                    <th style="width: 14%;" class="text-right">Balance Actual</th>
+                                    <th style="width: 12%;">Últ. Pago</th>
+                                    <th style="width: 10%;" class="text-center">Días Atraso</th>
+                                    <th style="width: 25%;">Artículos</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in cliente.items %}
                                 <tr>
-                                    <td style="padding: 4px; font-weight: bold; border: 1px solid #aaa;">{{ item.id_doc }}</td>
-                                    <td style="padding: 4px; border: 1px solid #aaa;">{{ item.fecha_factura }}</td>
-                                    <td style="padding: 4px; text-align: right; border: 1px solid #aaa;">{{ item.monto_total|floatformat:2 }}</td>
-                                    <td style="padding: 4px; text-align: right; font-weight: bold; color: #b21111; border: 1px solid #aaa;">{{ item.monto_pendiente|floatformat:2 }}</td>
-                                    <td style="padding: 4px; border: 1px solid #aaa;">{{ item.fecha_ultimo_pago|default:"-" }}</td>
-                                    <td style="padding: 4px; text-align: center; color: var(--alert); font-weight: bold; border: 1px solid #aaa;">{{ item.dias_atraso }}</td>
-                                    <td style="padding: 4px; white-space: normal; color: #555; max-width: 250px; border: 1px solid #aaa;">{{ item.articulos|default:"-" }}</td>
+                                    <td class="col-doc">{{ item.id_doc }}</td>
+                                    <td class="col-date">{{ item.fecha_factura }}</td>
+                                    <td class="col-num">{{ item.monto_total|floatformat:2 }}</td>
+                                    <td class="col-bal">{{ item.monto_pendiente|floatformat:2 }}</td>
+                                    <td class="col-pago">{{ item.fecha_ultimo_pago|default:"-" }}</td>
+                                    <td class="col-dias">{{ item.dias_atraso }}</td>
+                                    <td class="col-art">{{ item.articulos|default:"-" }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -239,9 +508,9 @@
                 <section class="sector-block">
                     <h2 class="sector-title">{{ grupo.sector }}</h2>
                     {% for cliente in grupo.clientes %}
-                    <div style="page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page; display: block; margin-bottom: 14px;">
+                    <div class="normal-card">
                         <div class="cliente-title">{{ cliente.nombre }}{% if cliente.telefono %} - {{ cliente.telefono }}{% endif %}</div>
-                        <table>
+                        <table class="normal-table">
                             <thead>
                                 <tr>
                                     <th>No. Factura</th>

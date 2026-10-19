@@ -17,8 +17,16 @@
     </div>
     <div id="etiqueta_format_fields_container"></div>
   </div>
-  <div class="etiqueta-format-preview-shell">
-    <div id="etiquetas_formato_preview"></div>
+  <div class="etiqueta-format-preview-shell" style="flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px;">
+    <div style="width: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 6px; flex-shrink: 0;">
+      <label for="ef_preview_mode" style="font-size: 11px; font-weight: 700; color: #163c73;">Vista previa:</label>
+      <select id="ef_preview_mode" style="height: 26px; border-radius: 8px; border: 1px solid #d6e1f3; background: #fff; font-size: 11px; font-weight: 600; padding: 0 6px;">
+        <option value="ambos" selected>Ambos Precios</option>
+        <option value="contado">Solo Contado (Precio Único)</option>
+        <option value="credito">Solo Crédito (Precio Único)</option>
+      </select>
+    </div>
+    <div id="etiquetas_formato_preview" style="display: flex; justify-content: center; align-items: center; flex: 1 1 auto; width: 100%;"></div>
   </div>
 </div>
 
@@ -182,6 +190,29 @@
     font-weight: 700;
     line-height: 1;
   }
+  .etq-precios-wrap {
+    margin-top: 1px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .etq-precio-tag { font-size: 1em; font-weight: inherit; margin-right: 3px; }
+  .etq-precio-contado,
+  .etq-precio-credito {
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .etq-precio-single {
+    margin-top: 1px;
+    margin-bottom: 2px;
+    line-height: 1.15;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .etiqueta-format-panel input,
   .etiqueta-format-panel select {
     height: 26px;
@@ -256,9 +287,12 @@
       empresa: { fontSizePt: 11, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0, align: "left" },
       articulo: { fontSizePt: 7.2, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.6, align: "left" },
       referencia: { fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 1.2, align: "left" },
-      precio: { fontSizePt: 12, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
-      barcode: { xMm: 0, yMm: 0, heightMm: 8.5, moduleWidth: 0.96, align: "center" },
-      code: { fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 0.3, align: "center" },
+      precio_contado: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.2, align: "left" },
+      precio: { fontSizePt: 9, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
+      precio_unico_contado: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.2, align: "left" },
+      precio_unico_credito: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
+      barcode: { visible: true, xMm: 0, yMm: 0, heightMm: 8.5, moduleWidth: 0.96, align: "center" },
+      code: { visible: true, fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 0.3, align: "center" },
     };
   }
 
@@ -283,15 +317,18 @@
       if (typeof v === "boolean") return v;
       return def;
     };
-    const field = (name) => ({
-      fontSizePt: clampNumber(src[name]?.fontSizePt, base[name].fontSizePt, 5, 48),
-      fontFamily: family(src[name]?.fontFamily, base[name].fontFamily),
-      bold: bool(src[name]?.bold, base[name].bold),
-      italic: bool(src[name]?.italic, base[name].italic),
-      xMm: clampNumber(src[name]?.xMm, base[name].xMm, -20, 20),
-      yMm: clampNumber(src[name]?.yMm, base[name].yMm, -20, 20),
-      align: align(src[name]?.align, base[name].align),
-    });
+    const field = (name, fallbackObj) => {
+      const fb = fallbackObj || base[name] || { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0, align: "left" };
+      return {
+        fontSizePt: clampNumber(src[name]?.fontSizePt, fb.fontSizePt, 5, 48),
+        fontFamily: family(src[name]?.fontFamily, fb.fontFamily),
+        bold: bool(src[name]?.bold, fb.bold),
+        italic: bool(src[name]?.italic, fb.italic),
+        xMm: clampNumber(src[name]?.xMm, fb.xMm, -20, 20),
+        yMm: clampNumber(src[name]?.yMm, fb.yMm, -20, 20),
+        align: align(src[name]?.align, fb.align),
+      };
+    };
     return {
       card: {
         widthMm: clampNumber(src.card?.widthMm, base.card.widthMm, 20, 120),
@@ -301,15 +338,22 @@
       empresa: field("empresa"),
       articulo: field("articulo"),
       referencia: field("referencia"),
+      precio_contado: field("precio_contado"),
       precio: field("precio"),
+      precio_unico_contado: field("precio_unico_contado", src.precio_contado || base.precio_unico_contado),
+      precio_unico_credito: field("precio_unico_credito", src.precio || base.precio_unico_credito),
       barcode: {
+        visible: bool(src.barcode?.visible, base.barcode.visible),
         xMm: clampNumber(src.barcode?.xMm, base.barcode.xMm, -20, 20),
         yMm: clampNumber(src.barcode?.yMm, base.barcode.yMm, -20, 20),
         heightMm: clampNumber(src.barcode?.heightMm, base.barcode.heightMm, 4, 20),
         moduleWidth: clampNumber(src.barcode?.moduleWidth, base.barcode.moduleWidth, 0.3, 2.5),
         align: align(src.barcode?.align, base.barcode.align),
       },
-      code: field("code"),
+      code: {
+        ...field("code"),
+        visible: bool(src.code?.visible, base.code.visible),
+      },
     };
   }
 
@@ -332,6 +376,11 @@
         <div class="etiqueta-format-group" data-ef-group="${key}">
           <h6>${title}</h6>
           <div class="etiqueta-format-grid">
+            <div style="grid-column: 1 / -1; margin-bottom: 2px;">
+              <label class="etiqueta-format-inline-checks" style="font-weight: 700; cursor: pointer;">
+                <input data-ef="${key}.visible" type="checkbox" /> Mostrar código de barras
+              </label>
+            </div>
             <label>Alto (mm)</label><input data-ef="${key}.heightMm" type="text" inputmode="decimal" />
             <label>Modulo</label><input data-ef="${key}.moduleWidth" type="text" inputmode="decimal" />
             <label>X (mm)</label><input data-ef="${key}.xMm" type="text" inputmode="decimal" />
@@ -365,6 +414,7 @@
           <select data-ef="${key}.align">${alignOptions}</select>
           <label>Estilo</label>
           <div class="etiqueta-format-inline-checks">
+            ${key === "code" ? `<label style="font-weight:700;"><input data-ef="${key}.visible" type="checkbox" /> Mostrar texto</label>` : ""}
             <label><input data-ef="${key}.bold" type="checkbox" /> Bold</label>
             <label><input data-ef="${key}.italic" type="checkbox" /> Italic</label>
           </div>
@@ -381,11 +431,14 @@
     efCardPadding.value = String(cfg.card.paddingMm);
     etiquetaFormatFieldsContainer.innerHTML = [
       buildFieldFormatGroupHtml("empresa", "Empresa"),
-      buildFieldFormatGroupHtml("articulo", "Articulo"),
+      buildFieldFormatGroupHtml("articulo", "Artículo"),
       buildFieldFormatGroupHtml("referencia", "Referencia"),
-      buildFieldFormatGroupHtml("precio", "Precio"),
-      buildFieldFormatGroupHtml("barcode", "Codigo de barras"),
-      buildFieldFormatGroupHtml("code", "Texto del codigo"),
+      buildFieldFormatGroupHtml("precio_contado", "Precio al Contado (ambos precios)"),
+      buildFieldFormatGroupHtml("precio", "Precio a Crédito (ambos precios)"),
+      buildFieldFormatGroupHtml("precio_unico_contado", "Precio Único al Contado (cuando Crédito está en 0 u oculto)"),
+      buildFieldFormatGroupHtml("precio_unico_credito", "Precio Único a Crédito (cuando Contado está en 0 u oculto)"),
+      buildFieldFormatGroupHtml("barcode", "Código de barras"),
+      buildFieldFormatGroupHtml("code", "Texto del código"),
     ].join("");
     Object.entries(cfg).forEach(([k, obj]) => {
       if (k === "card") return;
@@ -512,30 +565,98 @@
       normalHeight: 20,
     });
     const cardStyle = `width:${cfg.card.widthMm}mm;min-height:${cfg.card.heightMm}mm;padding:${cfg.card.paddingMm}mm;`;
+    const tipoPrecio = options.tipoPrecio || "ambos";
+
+    const valContado = parseNum(row.precio_ya);
+    const valCredito = parseNum(row.precio_det);
+    const hasContado = valContado > 0;
+    const hasCredito = valCredito > 0;
+
+    const singleContadoCfg = cfg.precio_unico_contado || {
+      ...cfg.precio_contado,
+      fontSizePt: Math.min(10, cfg.precio_contado?.fontSizePt || 10),
+      bold: true,
+    };
+    const singleCreditoCfg = cfg.precio_unico_credito || {
+      ...cfg.precio,
+      fontSizePt: Math.min(10, cfg.precio?.fontSizePt || 9.5),
+      bold: true,
+    };
+
+    let preciosHtml = "";
+    if (tipoPrecio === "contado") {
+      preciosHtml = `<div class="etq-precio-single" style="${styleFromTextCfg(singleContadoCfg)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>`;
+    } else if (tipoPrecio === "credito") {
+      preciosHtml = `<div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>`;
+    } else {
+      if (hasContado && hasCredito) {
+        preciosHtml = `
+          <div class="etq-precios-wrap">
+            <div class="etq-precio-contado" style="${styleFromTextCfg(cfg.precio_contado)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>
+            <div class="etq-precio-credito" style="${styleFromTextCfg(cfg.precio)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>
+          </div>
+        `;
+      } else if (hasContado && !hasCredito) {
+        preciosHtml = `
+          <div class="etq-precio-single" style="${styleFromTextCfg(singleContadoCfg)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>
+        `;
+      } else if (!hasContado && hasCredito) {
+        preciosHtml = `
+          <div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>
+        `;
+      } else {
+        preciosHtml = `
+          <div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}">${escapeHtml(formatEtiquetaPrecio(0))}</div>
+        `;
+      }
+    }
+
+    const showBarcode = cfg.barcode?.visible !== false;
+    const showCodeText = cfg.code?.visible !== false;
+    let barcodeHtml = "";
+    if (showBarcode || showCodeText) {
+      const barcodeSvgHtml = showBarcode ? `<div class="etq-barcode" style="${styleFromBarcodeCfg(cfg.barcode)}">${barcode.svg}</div>` : "";
+      const codeTextHtml = showCodeText ? `<div class="etq-code" style="${styleFromTextCfg(cfg.code)}">${escapeHtml(barcode.text)}</div>` : "";
+      barcodeHtml = `
+        <div class="etq-barcode-wrap">
+          <div class="etq-barcode-frame">
+            ${barcodeSvgHtml}
+            ${codeTextHtml}
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="etiqueta-card" style="${cardStyle}">
         <div class="etq-empresa" style="${styleFromTextCfg(cfg.empresa)}">${escapeHtml(empresaNombre)}</div>
         <div class="etq-articulo" style="${styleFromTextCfg(cfg.articulo)}">${escapeHtml(row.descrip_art)}</div>
         <div class="etq-ref" style="${styleFromTextCfg(cfg.referencia)}">Ref: ${escapeHtml(row.referencia || "")}</div>
-        <div class="etq-precio" style="${styleFromTextCfg(cfg.precio)}">${escapeHtml(formatEtiquetaPrecio(row.precio_det))}</div>
-        <div class="etq-barcode-wrap">
-          <div class="etq-barcode-frame">
-            <div class="etq-barcode" style="${styleFromBarcodeCfg(cfg.barcode)}">${barcode.svg}</div>
-            <div class="etq-code" style="${styleFromTextCfg(cfg.code)}">${escapeHtml(barcode.text)}</div>
-          </div>
-        </div>
+        ${preciosHtml}
+        ${barcodeHtml}
       </div>
     `;
   }
 
   function renderEtiquetaFormatoPreview() {
     const cfg = readEtiquetaFormatoEditor();
+    const mode = (document.getElementById("ef_preview_mode")?.value) || "ambos";
+    let pDet = 4000;
+    let pYa = 3500;
+    if (mode === "contado") {
+      pDet = 0;
+      pYa = 3500;
+    } else if (mode === "credito") {
+      pDet = 4000;
+      pYa = 0;
+    }
     etiquetasFormatoPreview.innerHTML = buildEtiquetaCardHtml({
       id_articulo: "IR-191",
       descrip_art: "LICUADORA REALES BASE NEGRA",
       referencia: "IR-191",
-      precio_det: 4000,
-    }, { isPrint: true, formato: cfg, sample: true });
+      precio_det: pDet,
+      precio_ya: pYa,
+    }, { isPrint: true, formato: cfg, sample: true, tipoPrecio: mode });
   }
 
   async function cargarFormatoEtiquetasUsuario() {
@@ -589,6 +710,7 @@
   efCardWidth?.addEventListener("input", renderEtiquetaFormatoPreview);
   efCardHeight?.addEventListener("input", renderEtiquetaFormatoPreview);
   efCardPadding?.addEventListener("input", renderEtiquetaFormatoPreview);
+  document.getElementById("ef_preview_mode")?.addEventListener("change", renderEtiquetaFormatoPreview);
   etiquetaFormatFieldsContainer?.addEventListener("input", renderEtiquetaFormatoPreview);
   etiquetaFormatFieldsContainer?.addEventListener("change", renderEtiquetaFormatoPreview);
 

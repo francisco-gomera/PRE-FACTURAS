@@ -54,5 +54,19 @@
     <a href="{% url 'cobros:cartas_enviadas' %}">Abrir cartas</a>
   </div>
   {% endif %}
+  {% if submodules.registros_pagos %}
+  <div class="info-card">
+    <h3>Registros de Pagos</h3>
+    <p>Gestión de cobradores, asignación de clientes por sector e impresión de planillas de cobro.</p>
+    <a href="{% url 'cobros:registros_pagos' %}">Abrir registros de pagos</a>
+  </div>
+  {% endif %}
+  {% if submodules.pagos_masivos %}
+  <div class="info-card" style="border-top: 3px solid #16a34a;">
+    <h3 style="color: #15803d;">⚡ Pagos Masivos</h3>
+    <p>Cobro masivo por cobrador con selección de cuentas, cálculo en vivo de efectivo/transferencia e impresión de recibos en lote.</p>
+    <a href="{% url 'cobros:pagos_masivos' %}" style="color: #16a34a; font-weight: 700;">Abrir pagos masivos &rarr;</a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

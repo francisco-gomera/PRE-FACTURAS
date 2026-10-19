@@ -381,3 +381,51 @@ class Usuario(models.Model):
     class Meta:
         managed = False
         db_table = 'USUARIO'
+
+
+class ListaPrecio(models.Model):
+    id_precio = models.DecimalField(db_column='ID_PRECIO', primary_key=True, max_digits=18, decimal_places=0)
+    descripcion = models.CharField(db_column='DESCRIPCION', max_length=50, blank=True, null=True)
+    listabase = models.IntegerField(db_column='LISTABASE', blank=True, null=True)
+    factor = models.DecimalField(db_column='FACTOR', max_digits=19, decimal_places=4, blank=True, null=True)
+    moneda = models.CharField(db_column='MONEDA', max_length=10, blank=True, null=True)
+    id_usuario = models.DecimalField(db_column='ID_USUARIO', max_digits=18, decimal_places=0, blank=True, null=True)
+    estatus = models.CharField(db_column='ESTATUS', max_length=12, blank=True, null=True)
+    edit = models.CharField(db_column='EDIT', max_length=1, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'LISTA_PRECIO'
+
+
+class DetPrecio(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)
+    id_precio = models.DecimalField(db_column='ID_PRECIO', max_digits=18, decimal_places=0)
+    id_articulo = models.CharField(db_column='ID_ARTICULO', max_length=20, blank=True, null=True)
+    precio = models.DecimalField(db_column='PRECIO', max_digits=19, decimal_places=4, blank=True, null=True)
+    porcdesc = models.DecimalField(db_column='PORCDESC', max_digits=19, decimal_places=4, blank=True, null=True)
+    moneda = models.CharField(db_column='MONEDA', max_length=10, blank=True, null=True)
+    desde = models.DateTimeField(db_column='DESDE', blank=True, null=True)
+    hasta = models.DateTimeField(db_column='HASTA', blank=True, null=True)
+    creacion = models.DateTimeField(db_column='CREACION', blank=True, null=True)
+    fechaedit = models.DateTimeField(db_column='FECHAEDIT', blank=True, null=True)
+    edit = models.CharField(db_column='EDIT', max_length=1, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'DET_PRECIO'
+
+
+
+class PrecioArt(models.Model):
+    id_detalle = models.DecimalField(db_column='ID_DETALLE', max_digits=18, decimal_places=0, primary_key=True)
+    id_articulo = models.CharField(db_column='ID_ARTICULO', max_length=20, blank=True, null=True)
+    id_precio = models.DecimalField(db_column='ID_PRECIO', max_digits=18, decimal_places=0, blank=True, null=True)
+    factor = models.DecimalField(db_column='FACTOR', max_digits=19, decimal_places=4, blank=True, null=True)
+    precio = models.DecimalField(db_column='PRECIO', max_digits=19, decimal_places=4, blank=True, null=True)
+    nivel = models.IntegerField(db_column='NIVEL', blank=True, null=True)
+    margen = models.DecimalField(db_column='MARGEN', max_digits=18, decimal_places=4, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'PRECIO_ART'

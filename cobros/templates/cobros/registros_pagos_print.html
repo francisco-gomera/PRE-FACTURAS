@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro Pago Clientes - {{ sector_display }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 10mm 10mm 12mm 10mm;
+        }
+
+        :root {
+            --ink: #000000;
+            --brand-blue: #3b82f6;
+            --table-border: #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #eef2f6;
+            color: var(--ink);
+            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+            font-size: 11.5px;
+            line-height: 1.25;
+        }
+
+        .no-print-bar {
+            background: #ffffff;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        .no-print-bar .title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e3a8a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .no-print-bar .badge {
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .no-print-bar .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-print {
+            background: #15803d;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .btn-print:hover {
+            background: #166534;
+        }
+
+        .btn-close {
+            background: #f1f5f9;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-close:hover {
+            background: #e2e8f0;
+        }
+
+        .page-sheet {
+            width: 215.9mm;
+            min-height: 279.4mm;
+            margin: 20px auto;
+            background: #ffffff;
+            padding: 12mm 12mm 15mm 12mm;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+            position: relative;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .company-name {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
+            color: #3b82f6;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+        }
+
+        .company-address {
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+            margin: 0 0 2px 0;
+            text-transform: uppercase;
+        }
+
+        .company-reference {
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+            margin: 0 0 14px 0;
+            text-transform: uppercase;
+        }
+
+        .document-title {
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            color: #000000;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+        }
+
+        .meta-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 8px;
+        }
+
+        .sector-box {
+            display: inline-block;
+            background-color: #d1d5db;
+            border: 1px solid #000000;
+            padding: 3px 12px;
+            font-weight: 900;
+            font-size: 13.5px;
+            letter-spacing: 0.5px;
+            text-decoration: underline;
+            text-transform: uppercase;
+            color: #000000;
+        }
+
+        .collector-meta {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: right;
+        }
+
+        .table-clients {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1.5px solid var(--table-border);
+            font-size: 11px;
+        }
+
+        .table-clients thead {
+            display: table-header-group;
+        }
+
+        .table-clients th {
+            border: 1.5px solid var(--table-border);
+            padding: 5px 6px;
+            font-weight: 900;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            text-align: left;
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .table-clients th.center,
+        .table-clients td.center {
+            text-align: center;
+        }
+
+        .table-clients tbody tr {
+            page-break-inside: avoid;
+        }
+
+        .table-clients td {
+            border: 1px solid var(--table-border);
+            padding: 4.5px 6px;
+            vertical-align: middle;
+            color: #000000;
+            height: 25px;
+        }
+
+        .table-clients td.col-cedula {
+            width: 17%;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        .table-clients td.col-apodo {
+            width: 18%;
+            font-weight: 900;
+            text-transform: capitalize;
+        }
+
+        .table-clients td.col-nombre {
+            width: 37%;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .table-clients td.col-abono {
+            width: 14%;
+            background-color: #ffffff;
+        }
+
+        .table-clients td.col-fecha {
+            width: 14%;
+            background-color: #ffffff;
+        }
+
+        .empty-row td {
+            text-align: center;
+            padding: 24px 10px;
+            font-style: italic;
+            color: #64748b;
+        }
+
+        .sheet-footer {
+            margin-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #6b7280;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 6px;
+        }
+
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+
+            .no-print-bar {
+                display: none !important;
+            }
+
+            .page-sheet {
+                width: 100% !important;
+                min-height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            .company-name {
+                color: #1d4ed8 !important;
+            }
+
+            .sector-box {
+                background-color: #d1d5db !important;
+                border: 1px solid #000000 !important;
+            }
+
+            .table-clients {
+                border: 1.5px solid #000000 !important;
+            }
+
+            .table-clients th,
+            .table-clients td {
+                border-color: #000000 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print-bar">
+        <div class="title">
+            <span>Registro Pago Clientes</span>
+            <span class="badge">{{ sector_display }}</span>
+            {% if cobrador %}
+            <span style="font-size: 13px; font-weight: normal; color: #475569;">Cobrador: <strong>{{ cobrador.nombre }}</strong></span>
+            {% endif %}
+            <span style="font-size: 12px; color: #64748b;">({{ total_clientes }} cliente{{ total_clientes|pluralize:"s" }})</span>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn-print" onclick="window.print()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Imprimir
+            </button>
+            <button type="button" class="btn-close" onclick="window.close()">Cerrar</button>
+        </div>
+    </div>
+
+    <div class="page-sheet">
+        <header class="header-section">
+            <h1 class="company-name">{{ empresa.nombre|default:"COMERCIAL ANITA" }}</h1>
+            <p class="company-address">C/ CNEL. ELIAS GONZALEZ No. 78 // TELS: 849-637-9943 // 809-527-2352</p>
+            <p class="company-reference">FRENTE A LA ESC. BARRIO GALINDO, VICENTE NOBLE</p>
+            <h2 class="document-title">REGISTRO PAGO CLIENTES</h2>
+        </header>
+
+        <div class="meta-strip">
+            <div>
+                <span class="sector-box">{{ sector_display }}</span>
+            </div>
+            {% if cobrador %}
+            <div class="collector-meta">
+                <span>Cobrador: <strong>{{ cobrador.nombre }}</strong></span>
+                {% if cobrador.telefono %}&nbsp;|&nbsp;<span>Tel: {{ cobrador.telefono }}</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <table class="table-clients">
+            <thead>
+                <tr>
+                    <th style="width: 17%;">CEDULA</th>
+                    <th style="width: 18%;">APODO</th>
+                    <th style="width: 37%;">NOMBRE</th>
+                    <th style="width: 14%;" class="center">ABONO</th>
+                    <th style="width: 14%;" class="center">FECHA</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clientes %}
+                <tr>
+                    <td class="col-cedula">{{ c.cedula }}</td>
+                    <td class="col-apodo">{{ c.apodo }}</td>
+                    <td class="col-nombre">{{ c.cliente_nombre }}</td>
+                    <td class="col-abono">&nbsp;</td>
+                    <td class="col-fecha">&nbsp;</td>
+                </tr>
+                {% empty %}
+                <tr class="empty-row">
+                    <td colspan="5">No hay clientes asignados a este cobrador.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="sheet-footer">
+            <span>Comercial Anita SRL &bull; Control y Cobranzas</span>
+            <span>Fecha de emisión: {{ fecha_impresion|date:"d/m/Y" }}</span>
+            <span>Página 1</span>
+        </div>
+    </div>
+</body>
+</html>

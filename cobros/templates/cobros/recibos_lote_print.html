@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lote de Recibos de Ingreso ({{ total_recibos }} recibo{{ total_recibos|pluralize:"s" }} - {{ copies }} copia{{ copies|pluralize:"s" }} c/u)</title>
+  <style>
+    @page {
+      {% if formato_impresion == "80mm" %}
+      size: 80mm 297mm;
+      {% elif formato_impresion == "58mm" %}
+      size: 58mm 297mm;
+      {% else %}
+      size: A4 portrait;
+      {% endif %}
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: {% if formato_impresion == "80mm" %}80mm{% elif formato_impresion == "58mm" %}58mm{% else %}210mm{% endif %};
+      min-height: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}auto{% else %}297mm{% endif %};
+      background: #ffffff;
+      color: #000000;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;
+    }
+
+    /* Barra Superior para pantalla (oculta al imprimir) */
+    .no-print-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      border-bottom: 2px solid #3b82f6;
+    }
+
+    .toolbar-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .toolbar-title span.badge {
+      background: #1e293b;
+      color: #93c5fd;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(147, 197, 253, 0.3);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-toolbar-print {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-toolbar-print:hover {
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      transform: translateY(-1px);
+    }
+
+    .btn-toolbar-pdf {
+      background: #047857;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-toolbar-pdf:hover {
+      background: #065f46;
+    }
+
+    .btn-toolbar-back {
+      background: #334155;
+      color: #f1f5f9;
+      text-decoration: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-toolbar-back:hover {
+      background: #475569;
+    }
+
+    /* Estructura idéntica a caja/templates/caja/cxc_recibo_pdf.html */
+    .print-sheet {
+      width: {% if formato_impresion == "80mm" %}80mm{% elif formato_impresion == "58mm" %}58mm{% else %}210mm{% endif %};
+      min-height: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}auto{% else %}297mm{% endif %};
+      padding: {% if formato_impresion == "80mm" %}2mm{% elif formato_impresion == "58mm" %}1.5mm{% else %}7mm 10mm 6mm 8mm{% endif %};
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+
+    .print-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .receipt {
+      width: {% if formato_impresion == "80mm" %}76mm{% elif formato_impresion == "58mm" %}55mm{% else %}188mm{% endif %};
+      max-width: 100%;
+      min-height: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}auto{% else %}140mm{% endif %};
+      max-height: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}none{% else %}140mm{% endif %};
+      padding: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}0{% else %}2.2mm 1.8mm 1.6mm 1.4mm{% endif %};
+      margin: 0 auto 0 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .continuation-note {
+      margin-top: 3mm;
+      padding-top: 2mm;
+      text-align: right;
+      font-size: 7pt;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: 48mm minmax(0, 1fr);
+      gap: 2.8mm;
+      align-items: start;
+    }
+
+    .logo-box {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .logo-box img {
+      max-width: 44mm;
+      max-height: 44mm;
+      object-fit: contain;
+    }
+
+    .company-meta {
+      min-width: 0;
+    }
+
+    .company-name {
+      margin: 0;
+      font-size: 12.5pt;
+      color: #001c9c;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .company-line {
+      font-size: 7.9pt;
+      line-height: 1.12;
+    }
+
+    .company-rnc {
+      margin-top: 0.5mm;
+      font-size: 8.2pt;
+      font-weight: 800;
+    }
+
+    .sector-badge {
+      margin-top: 0.5mm;
+      text-align: right;
+      font-size: 8pt;
+      font-weight: 800;
+      color: #ff0000;
+      text-transform: uppercase;
+    }
+
+    .cancelled-badge {
+      margin-top: 0.7mm;
+      text-align: right;
+      font-size: 12pt;
+      font-weight: 900;
+      color: #c31212;
+      text-transform: uppercase;
+      letter-spacing: 1pt;
+    }
+
+    .title {
+      margin: calc(2.2mm - 30px) 0 1.8mm;
+      text-align: center;
+      font-size: 14pt;
+      font-weight: 800;
+      letter-spacing: 2.3pt;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44mm;
+      gap: 7mm;
+      align-items: start;
+    }
+
+    .info-block {
+      font-size: 8.3pt;
+      line-height: 1.18;
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: auto 2.6mm 1fr;
+      gap: 0.4mm;
+      align-items: baseline;
+    }
+
+    .info-row strong {
+      font-weight: 800;
+    }
+
+    .info-right .info-row {
+      grid-template-columns: auto 2.6mm auto;
+      justify-content: end;
+    }
+
+    .receipt-table {
+      width: 100%;
+      margin-top: 1.8mm;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 8.6pt;
+    }
+
+    .receipt-table thead th {
+      padding: 0.8mm 0.55mm;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      text-align: left;
+      font-weight: 800;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.08;
+    }
+
+    .receipt-table tbody td {
+      padding: 0.6mm 0.4mm;
+      border-bottom: 1px solid #d7d7d7;
+      font-size: 9pt;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.08;
+    }
+
+    .receipt-table .num {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .comment-payment {
+      margin-top: 1.8mm;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44mm;
+      gap: 7mm;
+      align-items: start;
+    }
+
+    .comment-box {
+      font-size: 7.5pt;
+      line-height: 1.18;
+    }
+
+    .comment-box strong {
+      display: inline-block;
+      margin-bottom: 0.3mm;
+    }
+
+    .payment-summary {
+      font-size: 7.4pt;
+      padding-top: 0.6mm;
+    }
+
+    .payment-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 2.4mm;
+      margin-bottom: 0.5mm;
+    }
+
+    .totals-grid {
+      margin-top: 1.8mm;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 54mm;
+      gap: 7mm;
+      align-items: end;
+    }
+
+    .balance-stack {
+      display: grid;
+      gap: 1.2mm;
+    }
+
+    .paid-balance-box {
+      padding: 1.1mm 1.5mm;
+      border: 1px solid #000;
+      font-size: 8pt;
+      line-height: 1.16;
+    }
+
+    .paid-balance-title {
+      margin-bottom: 0.7mm;
+      font-weight: 800;
+    }
+
+    .paid-balance-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 2.2mm;
+      margin-bottom: 0.45mm;
+      font-size: 7.6pt;
+    }
+
+    .paid-balance-line:last-child {
+      margin-bottom: 0;
+    }
+
+    .paid-balance-empty {
+      font-size: 7.4pt;
+    }
+
+    .balance-box {
+      font-size: 8.4pt;
+      font-weight: 800;
+    }
+
+    .total-box {
+      justify-self: end;
+      width: 100%;
+      font-size: 8.4pt;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .total-box .line {
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      gap: 1mm;
+      align-items: center;
+    }
+
+    .total-amount {
+      min-width: 29mm;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      text-align: right;
+      padding: 0.45mm 0.7mm;
+    }
+
+    .end-line {
+      margin: 2.5mm auto 0;
+      width: 82%;
+      text-align: center;
+      font-size: 7.2pt;
+      position: relative;
+    }
+
+    .end-line::before,
+    .end-line::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 38%;
+      border-top: 1px dashed #333;
+    }
+
+    .end-line::before {
+      left: 0;
+    }
+
+    .end-line::after {
+      right: 0;
+    }
+
+    .signatures {
+      margin-top: calc(2.5mm + 24px);
+      padding-top: 4mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16mm;
+      align-items: start;
+    }
+
+    .signature-box {
+      text-align: center;
+      font-size: 7.3pt;
+    }
+
+    .signature-box-realizado {
+      position: relative;
+    }
+
+    .signature-overlay {
+      position: absolute;
+      left: 50%;
+      bottom: 5mm;
+      transform: translateX(-50%);
+      max-width: 42mm;
+      max-height: 18mm;
+      object-fit: contain;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .signature-line {
+      width: 48mm;
+      margin: 0 auto 1mm;
+      border-top: 1px solid #000;
+      height: 0;
+    }
+
+    .footer-meta {
+      margin-top: 1.8mm;
+      padding-top: 0.8mm;
+      border-top: 1px solid #000;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 3mm;
+      align-items: center;
+      font-size: 5.8pt;
+    }
+
+    .footer-meta .center {
+      text-align: center;
+    }
+
+    .footer-meta .right {
+      text-align: right;
+    }
+
+    {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}
+    @page {
+      size: {% if formato_impresion == "80mm" %}80mm 297mm{% else %}58mm 297mm{% endif %};
+      margin: 0;
+    }
+
+    html,
+    body,
+    .print-sheet {
+      width: {% if formato_impresion == "80mm" %}80mm{% else %}58mm{% endif %};
+      min-height: auto;
+    }
+
+    .print-sheet {
+      padding: {% if formato_impresion == "80mm" %}2mm{% else %}1.5mm{% endif %};
+      overflow: visible;
+    }
+
+    .receipt {
+      width: {% if formato_impresion == "80mm" %}76mm{% else %}55mm{% endif %};
+      min-height: auto;
+      max-height: none;
+      padding: 0;
+      overflow: visible;
+    }
+
+    .header,
+    .info-grid,
+    .totals-grid,
+    .comment-payment,
+    .signatures,
+    .footer-meta {
+      display: block;
+    }
+
+    .logo-box {
+      justify-content: center;
+      margin-bottom: 1mm;
+    }
+
+    .logo-box img {
+      max-width: {% if formato_impresion == "80mm" %}32mm{% else %}24mm{% endif %};
+      max-height: {% if formato_impresion == "80mm" %}20mm{% else %}16mm{% endif %};
+    }
+
+    .company-name,
+    .company-line,
+    .company-rnc,
+    .sector-badge,
+    .cancelled-badge,
+    .title,
+    .footer-meta,
+    .end-line {
+      text-align: center;
+    }
+
+    .company-name {
+      font-size: {% if formato_impresion == "80mm" %}9pt{% else %}7.5pt{% endif %};
+    }
+
+    .company-line,
+    .company-rnc,
+    .info-block,
+    .receipt-table,
+    .totals-table,
+    .payment-table,
+    .comment-box,
+    .balance-box,
+    .amount-words,
+    .total-label,
+    .footer-meta,
+    .signature-box {
+      font-size: {% if formato_impresion == "80mm" %}7pt{% else %}6.2pt{% endif %};
+      line-height: 1.15;
+    }
+
+    .title {
+      margin: 1.5mm 0;
+      font-size: {% if formato_impresion == "80mm" %}9pt{% else %}7.5pt{% endif %};
+      letter-spacing: 0.6pt;
+    }
+
+    .receipt-table thead th,
+    .receipt-table tbody td {
+      padding: 0.55mm 0.3mm;
+    }
+
+    .info-right .info-row {
+      justify-content: start;
+    }
+
+    .signatures {
+      margin-top: 5mm;
+      padding-top: 2mm;
+    }
+
+    .signature-line {
+      width: {% if formato_impresion == "80mm" %}34mm{% else %}24mm{% endif %};
+    }
+
+    .signature-overlay {
+      max-width: {% if formato_impresion == "80mm" %}28mm{% else %}20mm{% endif %};
+      max-height: 8mm;
+    }
+    {% endif %}
+
+    /* Reglas específicas de impresión */
+    @media print {
+      .no-print-toolbar {
+        display: none !important;
+      }
+
+      html, body {
+        background: #ffffff !important;
+      }
+
+      .print-sheet {
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+    }
+
+    @media screen {
+      body {
+        background: #e2e8f0;
+      }
+
+      .print-sheet {
+        margin: 20px auto;
+        background: #ffffff;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      }
+    }
+  </style>
+</head>
+<body class="print-format-{{ formato_impresion|default:'a4' }}">
+
+  <!-- Barra Superior Flotante (solo en pantalla) -->
+  <div class="no-print-toolbar">
+    <div class="toolbar-title">
+      <span>🖨️ Lote de Recibos</span>
+      <span class="badge">{{ total_recibos }} recibo{{ total_recibos|pluralize:"s" }}</span>
+      <span class="badge">{{ copies }} copia{{ copies|pluralize:"s" }} c/u</span>
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" class="btn-toolbar-print" onclick="window.print();">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        Imprimir Todos los Recibos
+      </button>
+      <a href="{% url 'cobros:pagos_masivos_pdf_lote' %}?recibos={{ recibos_param }}&copies={{ copies }}" target="_blank" class="btn-toolbar-pdf">
+        Descargar PDF Combinado
+      </a>
+      <a href="{% url 'cobros:pagos_masivos' %}" class="btn-toolbar-back">
+        Volver a Pagos Masivos
+      </a>
+    </div>
+  </div>
+
+  <!-- Bucle sobre los recibos generados en el lote -->
+  {% for rc in receipts_contexts %}
+    {% for page in rc.page_instances %}
+      <section class="print-sheet">
+        <div class="receipt">
+          <div class="header">
+            <div class="logo-box">
+              {% if rc.empresa.logo_src %}
+                <img src="{{ rc.empresa.logo_src }}" alt="Logo empresa" />
+              {% endif %}
+            </div>
+            <div class="company-meta">
+              <h1 class="company-name">{{ rc.empresa.nombre }}</h1>
+              <div class="company-line">{{ rc.empresa.direccion }}</div>
+              <div class="company-line">Telefono: {{ rc.empresa.tel1 }} {{ rc.empresa.tel2 }}{% if rc.empresa.email %}&nbsp;&nbsp; E-Mail: {{ rc.empresa.email }}{% endif %}</div>
+              <div class="company-rnc">RNC: {{ rc.empresa.rnc }}</div>
+              <div class="sector-badge">{{ rc.cliente.sector }}</div>
+              {% if rc.is_cancelled %}
+                <div class="cancelled-badge">CANCELADO</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="title">RECIBO DE INGRESO{% if page.continued %} (CONT.){% endif %}</div>
+
+          {% if not page.continued %}
+          <div class="info-grid">
+            <div class="info-block">
+              <div class="info-row"><strong>Hemos recibido de</strong><span>:</span><span>{{ rc.cliente.nombre }}</span></div>
+              <div class="info-row"><strong>Codigo</strong><span>:</span><span>{{ rc.cliente.codigo }}</span></div>
+              <div class="info-row"><strong>RNC/Ced.</strong><span>:</span><span>{{ rc.cliente.rnc_ced }}</span></div>
+              <div class="info-row"><strong>La suma de</strong><span>:</span><span>{{ rc.documento.suma_letras }}</span></div>
+              <div class="info-row"><strong>Moneda de pago</strong><span>:</span><span>{{ rc.documento.moneda_pago|default:"RD$" }}</span></div>
+              <div class="info-row"><strong>Monto en RD$</strong><span>:</span><span>{{ rc.documento.monto_rd_fmt }}</span></div>
+            </div>
+
+            <div class="info-block info-right">
+              <div class="info-row"><strong>No. Recibo</strong><span>:</span><span style="color:#001c9c;">{{ rc.documento.no_recibo }}</span></div>
+              <div class="info-row"><strong>Fecha cont.</strong><span>:</span><span>{{ rc.documento.fecha_cont }}</span></div>
+              <div class="info-row"><strong>Moneda Doc</strong><span>:</span><span>{{ rc.documento.moneda_doc|default:"RD$" }}</span></div>
+              <div class="info-row"><strong>Tasa pago</strong><span>:</span><span>{{ rc.documento.tasa_pago_fmt }}</span></div>
+            </div>
+          </div>
+          {% endif %}
+
+          <table class="receipt-table">
+            <colgroup>
+              <col style="width: 6%;" />
+              <col style="width: 13%;" />
+              <col style="width: 7%;" />
+              <col style="width: 10%;" />
+              <col style="width: 10%;" />
+              <col style="width: 11%;" />
+              <col style="width: 7%;" />
+              <col style="width: 9%;" />
+              <col style="width: 13%;" />
+              <col style="width: 14%;" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>TDN.</th>
+                <th>Factura No.</th>
+                <th>No. cuota</th>
+                <th>Fecha cont.</th>
+                <th>Fecha venc</th>
+                <th>Balance fact</th>
+                <th>Mora</th>
+                <th>Descuento</th>
+                <th>Monto aplicado</th>
+                <th>Bce. pendiente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if page.detalle %}
+                {% for item in page.detalle %}
+                  <tr>
+                    <td>{{ item.td }}</td>
+                    <td>{{ item.no_factura }}</td>
+                    <td style="text-align:center;">{{ item.no_cuota }}</td>
+                    <td>{{ item.fecha_cont }}</td>
+                    <td>{{ item.fecha_venc }}</td>
+                    <td class="num">{{ item.balance_fact_fmt }}</td>
+                    <td class="num">{{ item.mora_fmt }}</td>
+                    <td class="num">{{ item.descuento_fmt }}</td>
+                    <td class="num">{{ item.monto_aplicado_fmt }}</td>
+                    <td class="num">{{ item.balance_pendiente_fmt }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="10">Sin lineas de detalle.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+
+          {% if page.show_summary %}
+          <div class="comment-payment">
+            <div class="comment-box">
+              <strong>Comentario:</strong><br />
+              <span>{{ rc.documento.comentario|default_if_none:""|linebreaksbr }}</span>
+            </div>
+            <div class="payment-summary">
+              {% for item in rc.metodos_pago %}
+                <div class="payment-line">
+                  <span>{{ item.label }} ---&gt;</span>
+                  <strong>{{ item.amount_fmt }}</strong>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="totals-grid">
+            <div class="balance-stack">
+              <div class="paid-balance-box">
+                <div class="paid-balance-title">Balance pendiente por factura en el Recibo</div>
+                {% if rc.balance_facturas %}
+                  {% for item in rc.balance_facturas %}
+                    <div class="paid-balance-line">
+                      <span>#{{ item.no_factura }}</span>
+                      <strong>RD$ {{ item.balance_fmt }}</strong>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="paid-balance-empty">Sin facturas aplicadas.</div>
+                {% endif %}
+              </div>
+              <div class="balance-box">Balance Total del Cliente: RD$ {{ rc.balance_rd_fmt }}</div>
+            </div>
+            <div class="total-box">
+              <div class="line">
+                <span>Total Recibo---&gt; RD$</span>
+                <span></span>
+                <span class="total-amount">{{ rc.total_recibo_fmt }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="end-line">Fin del documento</div>
+
+          <div class="signatures">
+            <div class="signature-box signature-box-realizado">
+              {% if rc.usuario_firma_src %}
+                <img class="signature-overlay" src="{{ rc.usuario_firma_src }}" alt="Firma registrada" />
+              {% endif %}
+              <div class="signature-line"></div>
+              <div>{{ rc.usuario_nombre }}</div>
+              <div>Realizado por</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line"></div>
+              <div>&nbsp;</div>
+              <div>Recibido por</div>
+            </div>
+          </div>
+
+          <div class="footer-meta">
+            <div>Page {{ page.page_no }} of {{ page.total_pages }}</div>
+            <div class="center">Impreso por: {{ rc.impreso_por_nombre }}</div>
+            <div class="right">{{ rc.impreso_fecha }} {{ rc.impreso_hora }}</div>
+          </div>
+          {% else %}
+          <div class="continuation-note">Continua en la siguiente hoja...</div>
+          {% endif %}
+        </div>
+      </section>
+    {% endfor %}
+  {% endfor %}
+
+  <script>
+    // Prompt de impresión automático al cargar
+    window.addEventListener("load", function() {
+      setTimeout(function() {
+        window.print();
+      }, 700);
+    });
+  </script>
+</body>
+</html>

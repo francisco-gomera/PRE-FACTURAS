@@ -1,0 +1,1319 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<style>
+  :root {
+    --pm-primary: #1e40af;
+    --pm-primary-hover: #1d4ed8;
+    --pm-primary-light: #eff6ff;
+    --pm-cash: #059669;
+    --pm-cash-bg: #ecfdf5;
+    --pm-transf: #0284c7;
+    --pm-transf-bg: #f0f9ff;
+    --pm-accent: #6366f1;
+    --pm-border: #e2e8f0;
+    --pm-bg-card: #ffffff;
+    --pm-text-muted: #64748b;
+  }
+
+  .pm-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-bottom: 120px;
+  }
+
+  /* Breadcrumb & Header */
+  .pm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .pm-title-group h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pm-title-group p {
+    color: var(--pm-text-muted);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .pm-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-outline-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #334155;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .btn-outline-back:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
+
+  /* Selector de Cobrador & Barra de Herramientas */
+  .pm-toolbar-card {
+    background: var(--pm-bg-card);
+    border: 1px solid var(--pm-border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .pm-toolbar-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.3fr) repeat(auto-fit, minmax(200px, 1fr));
+    gap: 18px;
+    align-items: flex-end;
+  }
+
+  .pm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pm-field label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #475569;
+  }
+
+  .pm-select,
+  .pm-input {
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #ffffff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .pm-select:focus,
+  .pm-input:focus {
+    border-color: var(--pm-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
+  }
+
+  .pm-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--pm-border);
+    align-items: center;
+  }
+
+  .pm-quick-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--pm-text-muted);
+    margin-right: 4px;
+  }
+
+  .btn-quick {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .btn-quick:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .btn-quick-primary {
+    background: var(--pm-primary-light);
+    border-color: #bfdbfe;
+    color: var(--pm-primary);
+  }
+
+  .btn-quick-primary:hover {
+    background: #dbeafe;
+  }
+
+  /* Stats Resumen Header */
+  .pm-stats-banner {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .pm-stat-box {
+    background: #ffffff;
+    border: 1px solid var(--pm-border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  }
+
+  .pm-stat-box small {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--pm-text-muted);
+    margin-bottom: 4px;
+  }
+
+  .pm-stat-box strong {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  /* Tarjetas de Clientes */
+  .pm-clients-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .pm-client-card {
+    background: var(--pm-bg-card);
+    border: 1px solid var(--pm-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.2s;
+  }
+
+  .pm-client-card.has-payment {
+    border-color: #93c5fd;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  }
+
+  .pm-client-header {
+    background: #f8fafc;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--pm-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .pm-client-main-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .pm-client-badge-code {
+    background: #e2e8f0;
+    color: #1e293b;
+    font-family: monospace;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .pm-client-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .pm-client-sub {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--pm-text-muted);
+  }
+
+  .pm-client-totals {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge-sector-pill {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .pm-badge-balance {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pm-badge-paid-up {
+    background: #dcfce7;
+    color: #166534;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Tabla de Cuentas / Facturas por Cliente */
+  .pm-accounts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .pm-accounts-table thead th {
+    background: #ffffff;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--pm-border);
+    text-align: left;
+  }
+
+  .pm-accounts-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .pm-accounts-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .pm-accounts-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+  .pm-doc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .pm-cuota-pill {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .pm-overdue-tag {
+    color: #dc2626;
+    font-weight: 700;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .pm-amount-input-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pm-input-payment {
+    width: 130px;
+    height: 36px;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: right;
+    font-family: monospace;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0 8px;
+    transition: all 0.15s;
+  }
+
+  .pm-input-payment:focus {
+    border-color: var(--pm-primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    outline: none;
+  }
+
+  .btn-pay-all {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .btn-pay-all:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .pm-select-method {
+    height: 36px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    padding: 0 8px;
+    background: #ffffff;
+  }
+
+  .pm-input-date {
+    height: 36px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    padding: 0 8px;
+  }
+
+  .pm-input-ref {
+    height: 36px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    padding: 0 8px;
+    width: 130px;
+  }
+
+  /* BARRA INFERIOR DE TOTALES FIJA (STICKY FOOTER) */
+  .pm-sticky-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: #0f172a;
+    color: #ffffff;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+    border-top: 2px solid #3b82f6;
+    padding: 14px 28px;
+  }
+
+  .pm-sticky-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .pm-totals-display {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .pm-total-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pm-total-card span {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+  }
+
+  .pm-total-card strong {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: monospace;
+    letter-spacing: 0.3px;
+  }
+
+  .pm-total-card.efectivo strong {
+    color: #4ade80;
+  }
+
+  .pm-total-card.transferencia strong {
+    color: #60a5fa;
+  }
+
+  .pm-total-card.general strong {
+    color: #fde047;
+    font-size: 22px;
+  }
+
+  .pm-btn-process {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    border: none;
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 800;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    transition: all 0.2s ease;
+  }
+
+  .pm-btn-process:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
+  }
+
+  .pm-btn-process:disabled {
+    background: #475569;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* Modal de Éxito / Impresión */
+  .pm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .pm-modal-overlay.open {
+    display: flex;
+  }
+
+  .pm-modal-box {
+    background: #ffffff;
+    width: 100%;
+    max-width: 650px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    animation: pmModalFade 0.25s ease-out;
+  }
+
+  @keyframes pmModalFade {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .pm-modal-header {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #ffffff;
+    padding: 22px 26px;
+    text-align: center;
+  }
+
+  .pm-modal-header h3 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .pm-modal-header p {
+    margin: 0;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+
+  .pm-modal-body {
+    padding: 24px 26px;
+  }
+
+  .pm-modal-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .pm-modal-sum-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .pm-modal-sum-item small {
+    display: block;
+    font-size: 11px;
+    color: var(--pm-text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .pm-modal-sum-item strong {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .pm-modal-receipts-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin-bottom: 22px;
+    font-size: 13px;
+  }
+
+  .pm-modal-receipt-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .pm-modal-receipt-row:last-child {
+    border-bottom: none;
+  }
+
+  .pm-modal-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-modal-print {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    border: none;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 800;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-modal-print:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  }
+
+  .btn-modal-pdf {
+    background: #059669;
+    color: #ffffff;
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .btn-modal-close {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+</style>
+
+<div class="pm-container">
+  <!-- Cabecera -->
+  <div class="pm-header">
+    <div class="pm-title-group">
+      <h1>
+        <span>⚡ Pagos Masivos por Cobrador</span>
+      </h1>
+      <p>Aplica pagos masivos a cuentas pendientes de clientes asignados y genera sus recibos de ingreso.</p>
+    </div>
+    <div class="pm-header-actions">
+      {% if selected_cobrador %}
+      <a href="{% url 'cobros:registros_pagos_cobrador' selected_cobrador.id_cobrador %}" class="btn-outline-back">
+        📋 Volver a Registros de Pagos
+      </a>
+      {% else %}
+      <a href="{% url 'cobros:registros_pagos' %}" class="btn-outline-back">
+        📋 Volver a Registros de Pagos
+      </a>
+      {% endif %}
+      <a href="{% url 'cobros:index' %}" class="btn-outline-back">
+        📁 Cobros
+      </a>
+    </div>
+  </div>
+
+  <!-- Barra de Configuración y Herramientas del Lote -->
+  <div class="pm-toolbar-card">
+    <div class="pm-toolbar-grid">
+      <!-- Selector de Cobrador -->
+      <div class="pm-field">
+        <label for="select_cobrador">👤 Seleccionar Cobrador</label>
+        <select id="select_cobrador" class="pm-select" onchange="location.href='{% url 'cobros:pagos_masivos' %}' + this.value + '/';">
+          {% for c in cobradores %}
+          <option value="{{ c.id_cobrador }}" {% if selected_cobrador and selected_cobrador.id_cobrador == c.id_cobrador %}selected{% endif %}>
+            {{ c.nombre }} {% if c.sector_nombre %}({{ c.sector_nombre }}){% endif %} - {{ c.total_clientes }} cliente{{ c.total_clientes|pluralize:"s" }}
+          </option>
+          {% empty %}
+          <option value="">No hay cobradores activos</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Fecha Global de Pago -->
+      <div class="pm-field">
+        <label for="batch_fecha_pago">📅 Fecha Global de Pago</label>
+        <div style="display:flex; gap:6px;">
+          <input type="date" id="batch_fecha_pago" class="pm-input" value="{{ fecha_hoy }}" />
+          <button type="button" class="btn-quick btn-quick-primary" onclick="aplicarFechaGlobal();" title="Asignar esta fecha a todas las cuentas">
+            Aplicar
+          </button>
+        </div>
+      </div>
+
+      <!-- Método Global de Pago -->
+      <div class="pm-field">
+        <label for="batch_metodo_pago">💳 Método Global</label>
+        <div style="display:flex; gap:6px;">
+          <select id="batch_metodo_pago" class="pm-select">
+            <option value="Efectivo" selected>💵 Efectivo</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+          </select>
+          <button type="button" class="btn-quick btn-quick-primary" onclick="aplicarMetodoGlobal();" title="Asignar este método a todas las cuentas">
+            Aplicar
+          </button>
+        </div>
+      </div>
+
+      <!-- Copias por Recibo -->
+      <div class="pm-field" style="max-width: 140px;">
+        <label for="batch_copias_recibo" title="Cantidad de recibos a imprimir por cada pago">🖨️ Copias / Pago</label>
+        <input type="number" id="batch_copias_recibo" class="pm-input" value="2" min="1" max="10" />
+      </div>
+
+      <!-- Terminal en Gestión de Cobros -->
+      <div class="pm-field" style="max-width: 170px;">
+        <label for="batch_terminal" title="Terminal registrada para los recibos en gestión de cobros">💻 Terminal</label>
+        <input type="text" id="batch_terminal" class="pm-input" maxlength="50" placeholder="SERVIDOR" />
+      </div>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="pm-quick-actions">
+      <span class="pm-quick-label">Acciones masivas:</span>
+      <button type="button" class="btn-quick btn-quick-primary" onclick="pagarTodoElLote();">
+        ⚡ Pagar Saldo Total a Todos
+      </button>
+      <button type="button" class="btn-quick" onclick="limpiarMontosLote();">
+        🧹 Limpiar Todos los Montos
+      </button>
+      <span style="margin-left: auto; font-size: 12px; color: var(--pm-text-muted);">
+        ℹ️ La fecha de pago se registrará en <strong>Fecha Venc., Fecha Cont. y Fecha Aplic.</strong>
+      </span>
+    </div>
+  </div>
+
+  <!-- Estadísticas del Cobrador -->
+  {% if selected_cobrador %}
+  <div class="pm-stats-banner">
+    <div class="pm-stat-box">
+      <small>Clientes Asignados</small>
+      <strong>{{ stats.total_clientes }}</strong>
+    </div>
+    <div class="pm-stat-box">
+      <small>Clientes con Saldo</small>
+      <strong style="color: #dc2626;">{{ stats.clientes_con_saldo }}</strong>
+    </div>
+    <div class="pm-stat-box">
+      <small>Cuentas / Facturas</small>
+      <strong>{{ stats.total_cuentas }}</strong>
+    </div>
+    <div class="pm-stat-box">
+      <small>Saldo Total Pendiente</small>
+      <strong style="color: #0f172a;">RD$ {{ stats.total_saldo_general|floatformat:2 }}</strong>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Listado de Clientes y Cuentas -->
+  <div class="pm-clients-stack" id="pm_clients_container">
+    {% for cl in clientes_con_cuentas %}
+    <div class="pm-client-card" id="card_client_{{ cl.id_sn }}" data-client-id="{{ cl.id_sn }}" data-client-name="{{ cl.cliente_nombre }}">
+      <!-- Cabecera del Cliente -->
+      <div class="pm-client-header">
+        <div class="pm-client-main-info">
+          <span class="pm-client-badge-code">{{ cl.id_sn }}</span>
+          <span class="pm-client-name">{{ cl.cliente_nombre }}</span>
+          {% if cl.sector %}
+          <span class="badge-sector-pill">{{ cl.sector }}</span>
+          {% endif %}
+          <div class="pm-client-sub">
+            {% if cl.cedula %}<span><strong>Cédula:</strong> {{ cl.cedula }}</span>{% endif %}
+            {% if cl.apodo %}<span><strong>Apodo:</strong> {{ cl.apodo }}</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="pm-client-totals">
+          {% if cl.tiene_pendientes %}
+          <span class="pm-badge-balance">
+            Saldo Pendiente: RD$ {{ cl.total_pendiente|floatformat:2 }}
+          </span>
+          <button type="button" class="btn-quick" onclick="pagarClienteCompleto('{{ cl.id_sn }}');" title="Pagar saldo total de este cliente">
+            Pagar Total Cliente
+          </button>
+          {% else %}
+          <span class="pm-badge-paid-up">
+            ✓ Al día (Sin balance pendiente)
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Detalle de Cuentas Pendientes -->
+      {% if cl.tiene_pendientes %}
+      <table class="pm-accounts-table">
+        <thead>
+          <tr>
+            <th>Documento</th>
+            <th>Cuota</th>
+            <th>Fecha Venc.</th>
+            <th>Atraso</th>
+            <th style="text-align: right;">Total Doc.</th>
+            <th style="text-align: right;">Saldo Pendiente</th>
+            <th style="width: 220px;">Monto a Pagar (RD$)</th>
+            <th style="width: 150px;">Fecha Pago</th>
+            <th style="width: 140px;">Método Pago</th>
+            <th style="width: 150px;">No. Referencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in cl.cuentas_pendientes %}
+          <tr class="pm-doc-row" 
+              data-client-id="{{ cl.id_sn }}"
+              data-doc-id="{{ doc.no_doc }}"
+              data-cuota="{{ doc.no_cuota }}"
+              data-td="{{ doc.td }}"
+              data-total-doc="{{ doc.monto_doc }}"
+              data-cuota-val="{{ doc.cuota }}"
+              data-balance="{{ doc.balance_doc }}"
+              data-balance-total="{{ doc.balance_total_factura }}"
+              data-tiene-fto="{% if doc.tiene_financiamiento %}1{% else %}0{% endif %}"
+              data-venc="{{ doc.fecha_venc }}"
+              data-dias="{{ doc.dias }}">
+            <td>
+              <span class="pm-doc-pill">
+                <strong>{{ doc.td }}</strong> {{ doc.no_doc }}
+              </span>
+            </td>
+            <td>
+              {% if doc.tiene_financiamiento %}
+              <span class="pm-cuota-pill">{{ doc.no_cuota }}</span>
+              {% else %}
+              <span style="color: #94a3b8;">-</span>
+              {% endif %}
+            </td>
+            <td>{{ doc.fecha_venc|default:"-" }}</td>
+            <td>
+              {% if doc.dias > 0 %}
+              <span class="pm-overdue-tag">⚠️ {{ doc.dias }} días</span>
+              {% else %}
+              <span style="color: #10b981; font-weight: 600;">Al día</span>
+              {% endif %}
+            </td>
+            <td style="text-align: right; font-family: monospace;">
+              RD$ {{ doc.monto_doc|floatformat:2 }}
+            </td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700; color: #b91c1c;">
+              RD$ {{ doc.balance_doc|floatformat:2 }}
+            </td>
+            <td>
+              <div class="pm-amount-input-box">
+                <input type="number" 
+                       step="0.01" 
+                       min="0" 
+                       max="{{ doc.balance_doc }}"
+                       class="pm-input-payment doc-payment-input" 
+                       placeholder="0.00"
+                       oninput="onPaymentAmountChanged(this);" />
+                <button type="button" class="btn-pay-all" onclick="pagarFilaTotal(this, {{ doc.balance_doc }});">
+                  Pagar Todo
+                </button>
+              </div>
+            </td>
+            <td>
+              <input type="date" class="pm-input-date doc-date-input" value="{{ fecha_hoy }}" />
+            </td>
+            <td>
+              <select class="pm-select-method doc-method-select" onchange="onMethodSelectChanged(this);">
+                <option value="Efectivo" selected>💵 Efectivo</option>
+                <option value="Transferencia">🏦 Transferencia</option>
+              </select>
+            </td>
+            <td>
+              <input type="text" class="pm-input-ref doc-ref-input" placeholder="Ref. / Banco" disabled />
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding: 18px 20px; color: #64748b; font-size: 13px;">
+        Este cliente no tiene facturas ni cuotas pendientes por cobrar en este momento.
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div style="background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 48px; text-align: center; color: #64748b;">
+      <p style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">No hay clientes asignados a este cobrador.</p>
+      <p style="font-size: 14px; margin: 0;">Puedes asignarle clientes desde el módulo de <strong>Registros de Pagos</strong>.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- BARRA FIJA INFERIOR CON TOTALES EN VIVO -->
+<div class="pm-sticky-bar">
+  <div class="pm-sticky-content">
+    <div class="pm-totals-display">
+      <div class="pm-total-card efectivo">
+        <span>Total Efectivo</span>
+        <strong id="display_total_efectivo">RD$ 0.00</strong>
+      </div>
+      <div class="pm-total-card transferencia">
+        <span>Total Transferencia</span>
+        <strong id="display_total_transferencia">RD$ 0.00</strong>
+      </div>
+      <div class="pm-total-card general">
+        <span>Total General</span>
+        <strong id="display_total_general">RD$ 0.00</strong>
+      </div>
+      <div style="display:flex; flex-direction:column; justify-content:center; border-left:1px solid #334155; padding-left:16px;">
+        <span style="font-size:11px; color:#94a3b8; font-weight:700;">RESUMEN DE COBROS</span>
+        <span id="display_items_count" style="font-size:13px; font-weight:700; color:#e2e8f0;">
+          0 pagos listos
+        </span>
+      </div>
+    </div>
+
+    <div>
+      <button type="button" id="btn_procesar_pagos" class="pm-btn-process" disabled onclick="procesarLotePagos();">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        Procesar Todos los Pagos e Imprimir
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE ÉXITO Y ENLACE DE IMPRESIÓN -->
+<div class="pm-modal-overlay" id="pm_success_modal">
+  <div class="pm-modal-box">
+    <div class="pm-modal-header">
+      <h3>🎉 ¡Pagos Procesados con Éxito!</h3>
+      <p id="modal_success_msg">Todos los pagos han sido registrados en sus cuentas y recibos correspondientes.</p>
+    </div>
+    <div class="pm-modal-body">
+      <div class="pm-modal-summary-grid">
+        <div class="pm-modal-sum-item">
+          <small>Total Efectivo</small>
+          <strong id="modal_sum_efectivo" style="color:#059669;">RD$ 0.00</strong>
+        </div>
+        <div class="pm-modal-sum-item">
+          <small>Total Transf.</small>
+          <strong id="modal_sum_transf" style="color:#0284c7;">RD$ 0.00</strong>
+        </div>
+        <div class="pm-modal-sum-item">
+          <small>Total General</small>
+          <strong id="modal_sum_general" style="color:#0f172a;">RD$ 0.00</strong>
+        </div>
+      </div>
+
+      <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px;">
+        Recibos Generados (<span id="modal_receipts_count">0</span>):
+      </div>
+      <div class="pm-modal-receipts-list" id="modal_receipts_list">
+        <!-- Rellenado dinámicamente -->
+      </div>
+
+      <div class="pm-modal-footer">
+        <a href="#" id="modal_btn_print" target="_blank" class="btn-modal-print">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span id="modal_print_label">Imprimir Recibos en Lote</span>
+        </a>
+        <a href="#" id="modal_btn_pdf" target="_blank" class="btn-modal-pdf">
+          Descargar PDF Combinado
+        </a>
+        <button type="button" class="btn-modal-close" onclick="location.reload();">
+          Cerrar y Actualizar Lista
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CSRF_TOKEN = "{{ csrf_token }}";
+  const SELECTED_COBRADOR_ID = {% if selected_cobrador %}{{ selected_cobrador.id_cobrador }}{% else %}null{% endif %};
+  const PROCESAR_URL = "{% url 'cobros:pagos_masivos_procesar' %}";
+
+  // Formato monetario
+  function fmtMoney(amount) {
+    const num = parseFloat(amount || 0);
+    return "RD$ " + num.toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Recálculo en tiempo real
+  function recalcularTotales() {
+    let totalEfectivo = 0;
+    let totalTransferencia = 0;
+    let countPagos = 0;
+
+    const rows = document.querySelectorAll(".pm-doc-row");
+    const clientCardPayments = {};
+
+    rows.forEach(row => {
+      const input = row.querySelector(".doc-payment-input");
+      const methodSelect = row.querySelector(".doc-method-select");
+      const clientId = row.getAttribute("data-client-id");
+
+      const amount = parseFloat(input.value || 0);
+      if (amount > 0.001) {
+        countPagos++;
+        clientCardPayments[clientId] = (clientCardPayments[clientId] || 0) + amount;
+
+        const method = methodSelect.value;
+        if (method === "Transferencia") {
+          totalTransferencia += amount;
+        } else {
+          totalEfectivo += amount;
+        }
+      }
+    });
+
+    const totalGeneral = totalEfectivo + totalTransferencia;
+
+    // Actualizar barra flotante
+    document.getElementById("display_total_efectivo").textContent = fmtMoney(totalEfectivo);
+    document.getElementById("display_total_transferencia").textContent = fmtMoney(totalTransferencia);
+    document.getElementById("display_total_general").textContent = fmtMoney(totalGeneral);
+    document.getElementById("display_items_count").textContent = `${countPagos} pago${countPagos === 1 ? '' : 's'} listo${countPagos === 1 ? '' : 's'}`;
+
+    // Habilitar o deshabilitar botón procesar
+    const btnProcess = document.getElementById("btn_procesar_pagos");
+    if (countPagos > 0) {
+      btnProcess.disabled = false;
+      btnProcess.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Procesar ${countPagos} Pago${countPagos === 1 ? '' : 's'} e Imprimir`;
+    } else {
+      btnProcess.disabled = true;
+      btnProcess.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Procesar Todos los Pagos e Imprimir`;
+    }
+
+    // Actualizar estilo visual en tarjetas de clientes
+    document.querySelectorAll(".pm-client-card").forEach(card => {
+      const cId = card.getAttribute("data-client-id");
+      if (clientCardPayments[cId] && clientCardPayments[cId] > 0) {
+        card.classList.add("has-payment");
+      } else {
+        card.classList.remove("has-payment");
+      }
+    });
+  }
+
+  function onPaymentAmountChanged(input) {
+    const row = input.closest(".pm-doc-row");
+    const maxBalance = parseFloat(row.getAttribute("data-balance") || 0);
+    let val = parseFloat(input.value || 0);
+
+    if (val < 0) {
+      input.value = "0";
+      val = 0;
+    } else if (val > maxBalance) {
+      input.value = maxBalance.toFixed(2);
+      val = maxBalance;
+    }
+    recalcularTotales();
+  }
+
+  function onMethodSelectChanged(select) {
+    const row = select.closest(".pm-doc-row");
+    const refInput = row.querySelector(".doc-ref-input");
+    if (select.value === "Transferencia") {
+      refInput.disabled = false;
+      refInput.focus();
+    } else {
+      refInput.disabled = true;
+      refInput.value = "";
+    }
+    recalcularTotales();
+  }
+
+  function pagarFilaTotal(btn, balance) {
+    const row = btn.closest(".pm-doc-row");
+    const input = row.querySelector(".doc-payment-input");
+    input.value = parseFloat(balance || 0).toFixed(2);
+    recalcularTotales();
+  }
+
+  function pagarClienteCompleto(clientId) {
+    const card = document.getElementById("card_client_" + clientId);
+    if (!card) return;
+    const rows = card.querySelectorAll(".pm-doc-row");
+    rows.forEach(row => {
+      const balance = parseFloat(row.getAttribute("data-balance") || 0);
+      const input = row.querySelector(".doc-payment-input");
+      input.value = balance.toFixed(2);
+    });
+    recalcularTotales();
+  }
+
+  function pagarTodoElLote() {
+    if (!confirm("¿Deseas asignar el pago total de todas las cuentas pendientes de todos los clientes de este cobrador?")) return;
+    const rows = document.querySelectorAll(".pm-doc-row");
+    rows.forEach(row => {
+      const balance = parseFloat(row.getAttribute("data-balance") || 0);
+      const input = row.querySelector(".doc-payment-input");
+      input.value = balance.toFixed(2);
+    });
+    recalcularTotales();
+  }
+
+  function limpiarMontosLote() {
+    const rows = document.querySelectorAll(".pm-doc-row");
+    rows.forEach(row => {
+      const input = row.querySelector(".doc-payment-input");
+      input.value = "";
+    });
+    recalcularTotales();
+  }
+
+  function aplicarFechaGlobal() {
+    const globalDate = document.getElementById("batch_fecha_pago").value;
+    if (!globalDate) return;
+    document.querySelectorAll(".doc-date-input").forEach(input => {
+      input.value = globalDate;
+    });
+  }
+
+  function aplicarMetodoGlobal() {
+    const globalMethod = document.getElementById("batch_metodo_pago").value;
+    document.querySelectorAll(".doc-method-select").forEach(select => {
+      select.value = globalMethod;
+      onMethodSelectChanged(select);
+    });
+    recalcularTotales();
+  }
+
+  // Procesamiento del Lote en un Único Paso
+  async function procesarLotePagos() {
+    const rows = document.querySelectorAll(".pm-doc-row");
+    const clientsMap = {};
+
+    rows.forEach(row => {
+      const input = row.querySelector(".doc-payment-input");
+      const amount = parseFloat(input.value || 0);
+      if (amount <= 0.001) return;
+
+      const clientId = row.getAttribute("data-client-id");
+      const clientCard = document.getElementById("card_client_" + clientId);
+      const clientName = clientCard ? clientCard.getAttribute("data-client-name") : "";
+
+      const docId = row.getAttribute("data-doc-id");
+      const cuota = row.getAttribute("data-cuota");
+      const td = row.getAttribute("data-td");
+      const totalDoc = parseFloat(row.getAttribute("data-total-doc") || 0);
+      const cuotaVal = parseFloat(row.getAttribute("data-cuota-val") || 0);
+      const balanceDoc = parseFloat(row.getAttribute("data-balance") || 0);
+      const balanceTotal = parseFloat(row.getAttribute("data-balance-total") || 0);
+      const tieneFto = row.getAttribute("data-tiene-fto") === "1";
+      const fechaVenc = row.getAttribute("data-venc");
+      const dias = parseInt(row.getAttribute("data-dias") || 0, 10);
+
+      const fechaPago = row.querySelector(".doc-date-input").value;
+      const metodo = row.querySelector(".doc-method-select").value;
+      const ref = row.querySelector(".doc-ref-input").value;
+
+      if (!clientsMap[clientId]) {
+        clientsMap[clientId] = {
+          id_sn: clientId,
+          cliente_nombre: clientName,
+          items: [],
+        };
+      }
+
+      clientsMap[clientId].items.push({
+        no_doc: docId,
+        no_cuota: cuota,
+        td: td,
+        monto_doc: totalDoc,
+        cuota: cuotaVal,
+        balance_doc: balanceDoc,
+        balance_total_factura: balanceTotal,
+        monto_pago: amount,
+        metodo_pago: metodo,
+        no_transferencia: ref,
+        tiene_financiamiento: tieneFto,
+        fecha_pago: fechaPago,
+        fecha_venc: fechaVenc,
+        dias: dias,
+      });
+    });
+
+    const pagosArray = Object.values(clientsMap);
+    if (pagosArray.length === 0) {
+      alert("No hay montos de pago mayores a cero para procesar.");
+      return;
+    }
+
+    const copias = parseInt(document.getElementById("batch_copias_recibo").value || 2, 10);
+    const terminalNombre = (document.getElementById("batch_terminal")?.value || "").trim();
+
+    const btn = document.getElementById("btn_procesar_pagos");
+    btn.disabled = true;
+    btn.textContent = "Procesando pagos...";
+
+    try {
+      const response = await fetch(PROCESAR_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": CSRF_TOKEN,
+        },
+        body: JSON.stringify({
+          id_cobrador: SELECTED_COBRADOR_ID,
+          copias: copias,
+          terminal_cliente: terminalNombre,
+          pagos: pagosArray,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Ocurrió un error al procesar el lote.");
+      }
+
+      // Éxito: Mostrar Modal y Abrir Impresión de Recibos
+      document.getElementById("modal_sum_efectivo").textContent = fmtMoney(data.total_efectivo);
+      document.getElementById("modal_sum_transf").textContent = fmtMoney(data.total_transferencia);
+      document.getElementById("modal_sum_general").textContent = fmtMoney(data.total_general);
+      document.getElementById("modal_receipts_count").textContent = data.total_recibos;
+      document.getElementById("modal_print_label").textContent = `Imprimir Todos los Recibos (${copias} copia${copias === 1 ? '' : 's'} c/u)`;
+
+      const receiptsList = document.getElementById("modal_receipts_list");
+      receiptsList.innerHTML = "";
+      data.recibos.forEach(r => {
+        const row = document.createElement("div");
+        row.className = "pm-modal-receipt-row";
+        row.innerHTML = `
+          <span><strong>Recibo #${r.no_recibo}</strong> - ${r.cliente_nombre}</span>
+          <span style="font-family:monospace; font-weight:700;">${fmtMoney(r.monto_total)}</span>
+        `;
+        receiptsList.appendChild(row);
+      });
+
+      document.getElementById("modal_btn_print").href = data.print_url;
+      document.getElementById("modal_btn_pdf").href = data.pdf_url;
+      document.getElementById("pm_success_modal").classList.add("open");
+
+      // Abrir ventana de impresión de todos los recibos automáticamente en una nueva pestaña
+      window.open(data.print_url, "_blank");
+
+    } catch (err) {
+      alert("Error: " + err.message);
+      btn.disabled = false;
+      recalcularTotales();
+    }
+  }
+
+  // Inicializar recálculo y terminal al cargar
+  document.addEventListener("DOMContentLoaded", function() {
+    recalcularTotales();
+
+    // Sincronizar terminal de gestión de cobros con localStorage
+    try {
+      const storedTerminal = window.localStorage.getItem("prefacturas.caja.terminal_nombre") ||
+                             window.localStorage.getItem("prefacturas.cobros.terminal_nombre") ||
+                             "SERVIDOR";
+      const terminalInput = document.getElementById("batch_terminal");
+      if (terminalInput) {
+        terminalInput.value = storedTerminal;
+        terminalInput.addEventListener("change", function() {
+          const val = this.value.trim();
+          if (val) {
+            window.localStorage.setItem("prefacturas.caja.terminal_nombre", val);
+            window.localStorage.setItem("prefacturas.cobros.terminal_nombre", val);
+          }
+        });
+      }
+    } catch(e) {}
+  });
+</script>
+{% endblock %}

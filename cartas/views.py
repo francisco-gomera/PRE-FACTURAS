@@ -41,6 +41,15 @@ def _fmt_date(value):
     return str(value)
 
 
+def _norm_doc(value):
+    if value is None:
+        return ""
+    val_str = str(value).strip()
+    if "." in val_str:
+        val_str = val_str.split(".")[0]
+    return val_str
+
+
 def _to_float(value):
     if value is None:
         return 0.0
@@ -606,6 +615,7 @@ def plantillas_view(request):
         "{{facturas_count}}",
         "{{balance_atraso}}",
         "{{total_mora}}",
+        "{{articulos}}",
     ]
     return render(request, "cartas/plantillas.html", ctx)
 
@@ -632,6 +642,7 @@ def saldo_detalle_view(request):
 
     facturas = []
     cuotas_meta_by_doc = {}
+    articulos_by_doc = {}
     try:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -651,20 +662,47 @@ def saldo_detalle_view(request):
         if docs:
             placeholders = ", ".join(["%s"] * len(docs))
             with connection.cursor() as cursor:
-                cursor.execute(
-                    f"""
-                    SELECT NO_DOC, COUNT(*), MAX(NO_CUOTA)
-                    FROM DET_PRESTAMO
-                    WHERE NO_DOC IN ({placeholders})
-                    GROUP BY NO_DOC
-                    """,
-                    docs,
-                )
-                for no_doc, total_cuotas, max_no_cuota in cursor.fetchall():
-                    cuotas_meta_by_doc[no_doc] = {
-                        "total_cuotas": int(total_cuotas or 0),
-                        "no_cuota": max_no_cuota,
-                    }
+                try:
+                    cursor.execute(
+                        f"""
+                        SELECT NO_DOC, COUNT(*), MAX(NO_CUOTA)
+                        FROM DET_PRESTAMO
+                        WHERE NO_DOC IN ({placeholders})
+                        GROUP BY NO_DOC
+                        """,
+                        docs,
+                    )
+                    for no_doc, total_cuotas, max_no_cuota in cursor.fetchall():
+                        cuotas_meta_by_doc[no_doc] = {
+                            "total_cuotas": int(total_cuotas or 0),
+                            "no_cuota": max_no_cuota,
+                        }
+                except Exception:
+                    pass
+
+                try:
+                    cursor.execute(
+                        f"""
+                        SELECT ID_DOC, ID_ARTICULO, DESCRIP_ART, CANTIDAD, PRECIO, TOTAL_LINEA
+                        FROM DET_FACTURA
+                        WHERE ID_DOC IN ({placeholders})
+                        ORDER BY ID_DOC, No_LINEA, ID_DETALLE
+                        """,
+                        docs,
+                    )
+                    for doc_id, id_articulo, descrip_art, cantidad, precio, total_linea in cursor.fetchall():
+                        key = _norm_doc(doc_id)
+                        articulos_by_doc.setdefault(key, []).append(
+                            {
+                                "id_articulo": str(id_articulo or "").strip(),
+                                "descripcion": str(descrip_art or "").strip(),
+                                "cantidad": _to_float(cantidad),
+                                "precio": _to_float(precio),
+                                "total": _to_float(total_linea),
+                            }
+                        )
+                except Exception:
+                    pass
     except Exception:
         return JsonResponse({"detail": "No se pudo consultar las facturas."}, status=500)
 
@@ -713,6 +751,10 @@ def saldo_detalle_view(request):
         except Exception as e:
             fecha_pago_str = f"Error: {e}"
 
+        norm_key = _norm_doc(id_doc)
+        doc_articulos = articulos_by_doc.get(norm_key, [])
+        articulos_str = ", ".join([a["descripcion"] for a in doc_articulos if a.get("descripcion")])
+
         facturas.append(
             {
                 "id_doc": id_doc,
@@ -722,6 +764,8 @@ def saldo_detalle_view(request):
                 "pagado": pagado,
                 "saldo": saldo_doc,
                 "fecha_pago": fecha_pago_str,
+                "articulos": doc_articulos,
+                "articulos_str": articulos_str,
             }
         )
 

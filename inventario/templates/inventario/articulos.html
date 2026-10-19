@@ -484,16 +484,17 @@
       <table class="grid-table">
         <thead>
           <tr>
-            <th style="width: 110px;">Código</th>
+            <th style="width: 100px;">Código</th>
             <th>Descripción</th>
-            <th style="width: 140px;">Referencia</th>
-            <th style="width: 160px;">Código de Barras</th>
-            <th style="width: 100px; text-align: right;">Costo</th>
-            <th style="width: 100px; text-align: right;">Precio Venta</th>
-            <th style="width: 80px; text-align: center;">ITBIS</th>
-            <th style="width: 80px; text-align: center;">UOM</th>
-            <th style="width: 110px; text-align: center;">Estado</th>
-            <th style="width: 80px; text-align: center;">Acciones</th>
+            <th style="width: 130px;">Referencia</th>
+            <th style="width: 140px;">Código de Barras</th>
+            <th style="width: 95px; text-align: right;">Costo</th>
+            <th style="width: 105px; text-align: right;">Precio Crédito</th>
+            <th style="width: 105px; text-align: right;">Precio Contado</th>
+            <th style="width: 75px; text-align: center;">ITBIS</th>
+            <th style="width: 75px; text-align: center;">UOM</th>
+            <th style="width: 95px; text-align: center;">Estado</th>
+            <th style="width: 75px; text-align: center;">Acciones</th>
           </tr>
         </thead>
         <tbody id="articles-tbody">
@@ -557,18 +558,14 @@
             <input type="number" id="form-costo" value="0.00" step="0.0001" min="0" />
           </div>
           <div class="form-group">
-            <label for="form-precio-det">Precio de Venta (RD$)</label>
+            <label for="form-precio-det">Precio a Crédito (RD$)</label>
             <input type="number" id="form-precio-det" value="0.00" step="0.0001" min="0" />
+            <span class="form-helper">Precio regular de venta a crédito</span>
           </div>
           <div class="form-group">
-            <label for="form-tarifa-vt">Tasa de Impuesto (ITBIS)</label>
-            <select id="form-tarifa-vt">
-              <option value="18.0" selected>18% - ITBIS General</option>
-              <option value="8.0">8% - ITBIS Reducido</option>
-              <option value="16.0">16% - ITBIS Especial</option>
-              <option value="0.0">0% - Exento</option>
-            </select>
-          </div>
+            <label for="form-precio-ya">Precio al Contado / Cash (RD$)</label>
+            <input type="number" id="form-precio-ya" value="0.00" step="0.0001" min="0" />
+            <span class="form-helper">Precio especial para pago al contado o cash</span>
           <div class="form-group checkbox-group form-group-full">
             <input type="checkbox" id="form-has-conversion" />
             <label for="form-has-conversion">Este artículo descuenta stock de un artículo base (Equivalencia / Unidad)</label>
@@ -637,7 +634,7 @@
     var formUmVenta = document.getElementById("form-um-venta");
     var formCosto = document.getElementById("form-costo");
     var formPrecioDet = document.getElementById("form-precio-det");
-    var formTarifaVt = document.getElementById("form-tarifa-vt");
+    var formPrecioYa = document.getElementById("form-precio-ya");
     var formBloqueado = document.getElementById("form-bloqueado");
     var codeHelper = document.getElementById("code-helper");
 
@@ -741,7 +738,7 @@
         var data = await res.json().catch(function () { return {}; });
 
         if (!res.ok) {
-          articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">' + escapeHtml(data.detail || "Error al cargar la lista de artículos.") + '</td></tr>';
+          articlesTbody.innerHTML = '<tr><td colspan="11" class="result-empty">' + escapeHtml(data.detail || "Error al cargar la lista de artículos.") + '</td></tr>';
           paginationInfo.textContent = "Error al cargar datos.";
           return;
         }
@@ -763,7 +760,7 @@
           paginationInfo.textContent = "Mostrando " + startRange + "-" + endRange + " de " + data.total_count + " artículos (Pág. " + currentPage + "/" + totalPages + ")";
         }
       } catch (error) {
-        articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">Error de conexión al cargar artículos.</td></tr>';
+        articlesTbody.innerHTML = '<tr><td colspan="11" class="result-empty">Error de conexión al cargar artículos.</td></tr>';
         paginationInfo.textContent = "Error de conexión.";
       } finally {
         gridLoading.classList.remove("active");
@@ -772,7 +769,7 @@
 
     function renderArticles(rows) {
       if (!rows || rows.length === 0) {
-        articlesTbody.innerHTML = '<tr><td colspan="10" class="result-empty">No se encontraron artículos que coincidan con la búsqueda.</td></tr>';
+        articlesTbody.innerHTML = '<tr><td colspan="11" class="result-empty">No se encontraron artículos que coincidan con la búsqueda.</td></tr>';
         return;
       }
 
@@ -791,6 +788,7 @@
           '<td>' + escapeHtml(row.cod_barra) + '</td>' +
           '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + escapeHtml(formatCurrency(row.costo)) + '</td>' +
           '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + escapeHtml(formatCurrency(row.precio_det)) + '</td>' +
+          '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + escapeHtml(formatCurrency(row.precio_ya)) + '</td>' +
           '<td style="text-align: center;">' + escapeHtml(row.tarifa_vt) + '%</td>' +
           '<td style="text-align: center;">' + escapeHtml(row.um_venta) + '</td>' +
           '<td style="text-align: center;">' + statusBadge + '</td>' +
@@ -817,6 +815,7 @@
       isEditMode = editMode;
       hideStatus();
       articleForm.reset();
+      btnFormSubmit.disabled = false;
 
       if (isEditMode) {
         modalTitle.textContent = "Editar Artículo";
@@ -831,29 +830,7 @@
         formUmVenta.value = data.um_venta;
         formCosto.value = data.costo;
         formPrecioDet.value = data.precio_det;
-        
-        // Select matching tarifa
-        var matchedTarifa = "18.0";
-        var availableTarifas = ["18.0", "8.0", "16.0", "0.0"];
-        var tFloatStr = parseFloat(data.tarifa_vt).toFixed(1);
-        if (availableTarifas.indexOf(tFloatStr) !== -1) {
-          matchedTarifa = tFloatStr;
-        } else {
-          matchedTarifa = parseFloat(data.tarifa_vt).toString();
-        }
-        
-        // Find if option exists, otherwise add it dynamically
-        var optExists = Array.prototype.some.call(formTarifaVt.options, function(opt) {
-          return parseFloat(opt.value) === parseFloat(matchedTarifa);
-        });
-        if (!optExists) {
-          var newOpt = document.createElement("option");
-          newOpt.value = matchedTarifa;
-          newOpt.textContent = matchedTarifa + "% - ITBIS Especial";
-          formTarifaVt.appendChild(newOpt);
-        }
-        formTarifaVt.value = matchedTarifa;
-        
+        formPrecioYa.value = data.precio_ya;
         formBloqueado.checked = data.bloqueado;
 
         if (data.has_conversion) {
@@ -879,9 +856,9 @@
         codeHelper.style.display = "block";
 
         formUmVenta.value = "UND";
-        formTarifaVt.value = "18.0";
         formCosto.value = "0.00";
         formPrecioDet.value = "0.00";
+        formPrecioYa.value = "0.00";
         formBloqueado.checked = false;
 
         formHasConversion.checked = false;
@@ -908,6 +885,7 @@
       articleModal.setAttribute("aria-hidden", "true");
       hideStatus();
       articleForm.reset();
+      btnFormSubmit.disabled = false;
     }
 
     function showStatus(msg, isError) {
@@ -954,18 +932,22 @@
         um_venta: formUmVenta.value,
         costo: parseFloat(formCosto.value) || 0,
         precio_det: parseFloat(formPrecioDet.value) || 0,
-        tarifa_vt: parseFloat(formTarifaVt.value) || 0,
+        precio_ya: parseFloat(formPrecioYa.value) || 0,
+        tarifa_vt: 0,
         bloqueado: formBloqueado.checked,
         id_articulo_base: formHasConversion.checked ? formIdArticuloBase.value.trim() : "",
         factor_conversion: formHasConversion.checked ? parseFloat(formFactorConversion.value) : 1.0
       };
 
       try {
+        var csrfMatch = document.cookie.split("; ").find(function(c) { return c.startsWith("csrftoken="); });
+        var csrfVal = (csrfMatch ? csrfMatch.split("=")[1] : "") || window.CA_CSRF_TOKEN || "";
+
         var res = await fetch(config.saveUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken": window.CA_CSRF_TOKEN || "",
+            "X-CSRFToken": csrfVal,
             "X-Requested-With": "XMLHttpRequest"
           },
           body: JSON.stringify(payload)
@@ -980,6 +962,7 @@
         }
 
         showStatus("¡Artículo guardado exitosamente!", false);
+        btnFormSubmit.disabled = false;
         setTimeout(function () {
           closeModal();
           // Reload current page to see changes

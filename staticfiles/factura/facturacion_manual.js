@@ -38,6 +38,15 @@
   const articuloSearchInput = document.getElementById("facturacion_articulo_q");
   const articuloSearchFilter = document.getElementById("facturacion_articulo_filtro");
   const articuloResultsBody = document.getElementById("facturacion_articulo_results_body");
+  const globalTipoArticulo = document.getElementById("facturacion_articulo_tipo_precio_global");
+  if (globalTipoArticulo) {
+    globalTipoArticulo.addEventListener("change", () => {
+      const val = globalTipoArticulo.value || "credito";
+      articuloResultsBody.querySelectorAll(".art-row-tipo-precio").forEach((sel) => {
+        sel.value = val;
+      });
+    });
+  }
   const alertBackdrop = document.getElementById("facturacion_alert_backdrop");
   const alertMessage = document.getElementById("facturacion_alert_message");
   const btnAlertClose = document.getElementById("btn_facturacion_alert_close");
@@ -1713,7 +1722,7 @@
     row.querySelector(".detalle-desc").value = data.descrip_art || "";
     row.querySelector(".detalle-art").value = data.id_articulo || "";
     row.querySelector(".detalle-uom").innerHTML = renderUnidadMedidaOptions(data.um_inv || getUnidadMedidaDefault());
-    row.querySelector(".detalle-precio-unit").value = fmtNum(data.precio_det || 0, 2);
+    row.querySelector(".detalle-precio-unit").value = fmtNum(data.precio_aplicado ?? data.precio_det ?? 0, 2);
     row.querySelector("[data-col='id_itbis']").textContent = String(data.id_impto_vt || "");
     updateRowCalculations(row);
     applyDetalleEditableAvailability();
@@ -2247,23 +2256,46 @@
 
   function renderArticulosResults(rows) {
     if (!rows.length) {
-      articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se encontraron articulos.</td></tr>";
+      articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se encontraron articulos.</td></tr>";
       return;
     }
-    articuloResultsBody.innerHTML = rows.map((row) => `
+    const globalTipoSelect = document.getElementById("facturacion_articulo_tipo_precio_global");
+    const defaultTipo = globalTipoSelect ? (globalTipoSelect.value || "credito") : "credito";
+    articuloResultsBody.innerHTML = rows.map((row) => {
+      const pCred = fmtNum(row.precio_det || 0, 2);
+      const pCont = (row.precio_ya !== null && row.precio_ya !== undefined && row.precio_ya !== "") ? fmtNum(row.precio_ya, 2) : pCred;
+      return `
       <tr class="click-row" data-row="${encodeURIComponent(JSON.stringify(row))}">
         <td>${escapeHtml(row.referencia || row.id_articulo || "")}</td>
         <td>${escapeHtml(row.descrip_art || "")}</td>
-        <td>${escapeHtml(fmtNum(row.precio_det || 0, 2))}</td>
-        <td>${escapeHtml(fmtNum(row.stock || 0, 2))}</td>
+        <td class="art-cell-credito" style="text-align:right;" title="Clic para seleccionar precio a crédito">${escapeHtml(pCred)}</td>
+        <td class="art-cell-contado" style="text-align:right;" title="Clic para seleccionar precio al contado">${escapeHtml(pCont)}</td>
+        <td style="text-align:center;" onclick="event.stopPropagation();">
+          <select class="art-row-tipo-precio" style="width: 100%; font-size: 11px; padding: 1px 3px; height: 22px; border: 1px solid #aaa; border-radius: 3px; background: #fff;" onclick="event.stopPropagation();">
+            <option value="credito" ${defaultTipo === "credito" ? "selected" : ""}>Crédito</option>
+            <option value="contado" ${defaultTipo === "contado" ? "selected" : ""}>Contado</option>
+          </select>
+        </td>
+        <td style="text-align:right;">${escapeHtml(fmtNum(row.stock || 0, 2))}</td>
       </tr>
-    `).join("");
+      `;
+    }).join("");
     articuloResultsBody.querySelectorAll("tr[data-row]").forEach((row) => {
-      row.addEventListener("click", async () => {
+      row.addEventListener("click", async (event) => {
         if (!articuloTargetRow) {
           return;
         }
         const data = JSON.parse(decodeURIComponent(row.dataset.row || "{}"));
+        const tipoSelect = row.querySelector(".art-row-tipo-precio");
+        const clickedContado = !!event.target.closest(".art-cell-contado");
+        const clickedCredito = !!event.target.closest(".art-cell-credito");
+        let tipo = tipoSelect ? (tipoSelect.value || "credito") : "credito";
+        if (clickedContado) tipo = "contado";
+        else if (clickedCredito) tipo = "credito";
+        const pCred = parseFloat(data.precio_det) || 0;
+        const pCont = (data.precio_ya !== null && data.precio_ya !== undefined && data.precio_ya !== "") ? (parseFloat(data.precio_ya) || 0) : pCred;
+        data.tipo_precio = tipo;
+        data.precio_aplicado = (tipo === "contado" && pCont > 0) ? pCont : pCred;
         await applyArticuloToFacturaRow(articuloTargetRow, data);
         closeArticuloModal();
       });
@@ -2273,19 +2305,19 @@
   async function fetchArticulos() {
     const q = (articuloSearchInput.value || "").trim();
     const filtro = (articuloSearchFilter.value || "descripcion").trim();
-    articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Buscando...</td></tr>";
+    articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Buscando...</td></tr>";
     try {
       const res = await fetch(`${config.articuloBuscarUrl}?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`, {
         headers: { "X-Requested-With": "XMLHttpRequest" },
       });
       if (!res.ok) {
-        articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se pudo consultar articulos.</td></tr>";
+        articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se pudo consultar articulos.</td></tr>";
         return;
       }
       const data = await res.json().catch(() => ({}));
       renderArticulosResults(Array.isArray(data.results) ? data.results : []);
     } catch (error) {
-      articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Error de conexion.</td></tr>";
+      articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Error de conexion.</td></tr>";
     }
   }
 

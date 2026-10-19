@@ -2157,7 +2157,7 @@ def facturacion_articulos_buscar_view(request):
 
     if query:
         if filtro == "codigo":
-            qs = qs.filter(Q(referencia__icontains=query) | Q(id_articulo__icontains=query))
+            qs = qs.filter(Q(referencia__icontains=query) | Q(id_articulo__icontains=query) | Q(cod_barra__icontains=query))
         else:
             qs = qs.filter(descrip_art__icontains=query)
 
@@ -2171,6 +2171,7 @@ def facturacion_articulos_buscar_view(request):
         "descrip_art",
         "referencia",
         "precio_det",
+        "precio_ya",
         "id_impto_vt",
         "um_inv",
         "bloqueado",
@@ -2180,6 +2181,7 @@ def facturacion_articulos_buscar_view(request):
     if values:
         articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
         tarj_stock = {}
+        det_precios = {}
         if articulo_ids:
             with connection.cursor() as cursor:
                 placeholders = ", ".join(["%s"] * len(articulo_ids))
@@ -2188,16 +2190,31 @@ def facturacion_articulos_buscar_view(request):
                     articulo_ids
                 )
                 tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM DET_PRECIO WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                det_precios = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM PRECIO_ART WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                for row in cursor.fetchall():
+                    k = str(row[0] or "").strip()
+                    if row[1] is not None:
+                        det_precios[k] = float(row[1] or 0)
 
         for row in values:
             art_id = row.get("id_articulo") or ""
             stock_val = tarj_stock.get(art_id, 0.0)
+            precio_credito = det_precios.get(art_id, _num(row.get("precio_det")) or 0.0)
             results.append(
                 {
                     "id_articulo": art_id,
                     "descrip_art": row.get("descrip_art") or "",
                     "referencia": row.get("referencia") or "",
-                    "precio_det": _num(row.get("precio_det")),
+                    "precio_det": precio_credito,
+                    "precio_ya": _num(row.get("precio_ya")),
                     "stock": stock_val,
                     "id_impto_vt": row.get("id_impto_vt"),
                     "um_inv": row.get("um_inv") or "",

@@ -978,6 +978,7 @@
                 <tr>
                   <th>Descripcion art./serv.</th>
                   <th>Articulo</th>
+                  <th>Referencia</th>
                   <th>Cant. Emp.</th>
                   <th>Cant.</th>
                   <th>UoM</th>
@@ -992,7 +993,7 @@
               </thead>
               <tbody id="entrada_detalle_body">
                 <tr class="entry-grid-empty">
-                  <td colspan="12">La rejilla del detalle quedara disponible aqui para capturar los articulos de entrada.</td>
+                  <td colspan="13">La rejilla del detalle quedara disponible aqui para capturar los articulos de entrada.</td>
                 </tr>
               </tbody>
             </table>
@@ -1070,10 +1071,11 @@
                 <th>Fecha</th>
                 <th>Total</th>
                 <th>Estado</th>
+                <th style="width:75px; text-align:center;">Acción</th>
               </tr>
             </thead>
             <tbody id="entrada_search_results_body">
-              <tr><td colspan="7" class="result-empty">Pulsa Buscar para consultar las entradas registradas.</td></tr>
+              <tr><td colspan="8" class="result-empty">Pulsa Buscar para consultar las entradas registradas.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1219,6 +1221,7 @@
     var config = {
       searchUrl: "{% url 'inventario:entrada_articulos_buscar' %}",
       detailUrl: "{% url 'inventario:entrada_articulos_detalle' %}",
+      imprimirUrl: "{% url 'inventario:entrada_articulos_imprimir' %}",
       proveedoresUrl: "{% url 'inventario:entrada_articulos_proveedores' %}",
       articulosUrl: "{% url 'inventario:entrada_articulos_articulos' %}",
       guardarUrl: "{% url 'inventario:entrada_articulos_guardar' %}",
@@ -1283,7 +1286,7 @@
 
     function resetDetailPlaceholder(message) {
       if (!detailBody) return;
-      detailBody.innerHTML = '<tr class="entry-grid-empty"><td colspan="12">' + escapeHtml(message || "Sin detalle disponible.") + "</td></tr>";
+      detailBody.innerHTML = '<tr class="entry-grid-empty"><td colspan="13">' + escapeHtml(message || "Sin detalle disponible.") + "</td></tr>";
     }
 
     function parseNum(value) {
@@ -1471,6 +1474,7 @@
         '<tr class="entry-detalle-row">' +
           '<td class="entry-edit-cell"><input class="entry-cell-input detalle-desc" type="text" value="' + escapeHtml(item.descripcion || item.descrip_art || "") + '" /></td>' +
           '<td class="entry-edit-cell"><input class="entry-cell-input detalle-art" type="text" value="' + escapeHtml(item.id_articulo || "") + '" readonly /></td>' +
+          '<td class="entry-edit-cell"><input class="entry-cell-input detalle-ref" type="text" value="' + escapeHtml(item.referencia || "") + '" readonly /></td>' +
           '<td class="entry-edit-cell"><input class="entry-cell-input detalle-cant-emp is-num" type="text" value="' + escapeHtml(cantEmp) + '" readonly /></td>' +
           '<td class="entry-edit-cell"><input class="entry-cell-input detalle-cantidad is-num" type="text" inputmode="decimal" value="' + escapeHtml(fmtNum(qty, 2)) + '" /></td>' +
           '<td class="entry-edit-cell"><input class="entry-cell-input detalle-uom" type="text" value="' + escapeHtml(item.uom || item.um_inv || "") + '" readonly /></td>' +
@@ -1495,6 +1499,7 @@
         return "<tr>" +
           "<td>" + escapeHtml(row.descripcion || "") + "</td>" +
           "<td>" + escapeHtml(row.articulo || "") + "</td>" +
+          "<td>" + escapeHtml(row.referencia || "") + "</td>" +
           "<td>" + escapeHtml(row.cant_emp || "") + "</td>" +
           "<td style=\"text-align:right;\">" + escapeHtml(row.cantidad || "") + "</td>" +
           "<td>" + escapeHtml(row.uom || "") + "</td>" +
@@ -1719,7 +1724,7 @@
       setButtonDisabled(btnNuevo, false);
       setButtonDisabled(btnBuscar, false);
       setButtonDisabled(btnCancel, false);
-      setButtonDisabled(btnPrint, true);
+      setButtonDisabled(btnPrint, !activeLookup);
       setButtonDisabled(btnGrabar, true);
       clearDetalleSelection();
       updateDeleteLineButton();
@@ -1770,6 +1775,7 @@
         return "<tr>" +
           "<td>" + escapeHtml(row.descripcion || "") + "</td>" +
           "<td>" + escapeHtml(row.articulo || "") + "</td>" +
+          "<td>" + escapeHtml(row.referencia || "") + "</td>" +
           "<td>" + escapeHtml(row.cant_emp || "") + "</td>" +
           "<td style=\"text-align:right;\">" + escapeHtml(row.cantidad || "") + "</td>" +
           "<td>" + escapeHtml(row.uom || "") + "</td>" +
@@ -1874,12 +1880,14 @@
       return getEditableRows().map(function (row) {
         var idArticulo = String((row.querySelector(".detalle-art") || {}).value || "").trim();
         var descripcion = String((row.querySelector(".detalle-desc") || {}).value || "").trim();
+        var referencia = String((row.querySelector(".detalle-ref") || {}).value || "").trim();
         if (!idArticulo && !descripcion) {
           return null;
         }
         return {
           id_articulo: idArticulo,
           descripcion: descripcion,
+          referencia: referencia,
           cant_emp: parseNum((row.querySelector(".detalle-cant-emp") || {}).value),
           cantidad: parseNum((row.querySelector(".detalle-cantidad") || {}).value),
           uom: String((row.querySelector(".detalle-uom") || {}).value || "").trim(),
@@ -1937,11 +1945,16 @@
           setButtonDisabled(btnGrabar, false);
           return;
         }
-        setInitialState();
+        if (data.record) {
+          fillEntryRecord(data.record);
+          setButtonDisabled(btnPrint, false);
+        } else {
+          setInitialState();
+        }
         if (requestedNotification) {
           window.dispatchEvent(new CustomEvent("stock-requests-updated"));
         }
-        showMessage("Entrada de articulos grabada correctamente.");
+        showMessage("Entrada de articulos grabada correctamente. Ya puedes imprimirla con el botón Printer.");
       } catch (error) {
         showMessage("Error de conexion guardando la entrada.");
         setButtonDisabled(btnGrabar, false);
@@ -1951,11 +1964,12 @@
     function renderSearchResults(rows) {
       if (!searchResultsBody) return;
       if (!Array.isArray(rows) || !rows.length) {
-        searchResultsBody.innerHTML = '<tr><td colspan="7" class="result-empty">No se encontraron entradas.</td></tr>';
+        searchResultsBody.innerHTML = '<tr><td colspan="8" class="result-empty">No se encontraron entradas.</td></tr>';
         return;
       }
       searchResultsBody.innerHTML = rows.map(function (row) {
         var proveedor = [row.proveedor_codigo || "", row.proveedor_nombre || ""].filter(Boolean).join(" - ");
+        var printBtn = '<button type="button" class="entry-toolbar-btn entry-print-row-btn" data-print-no="' + escapeHtml(row.no_doc || "") + '" style="padding:2px 8px; font-size:11px;" title="Imprimir entrada">Imprimir</button>';
         return "<tr class=\"click-row\" data-lookup=\"" + escapeHtml(row.no_doc || "") + "\">" +
           "<td>" + escapeHtml(row.no_doc || "") + "</td>" +
           "<td>" + escapeHtml(row.codigo || "") + "</td>" +
@@ -1964,8 +1978,18 @@
           "<td>" + escapeHtml(row.fecha_doc || "") + "</td>" +
           "<td style=\"text-align:right;\">" + escapeHtml(row.total_doc_fmt || "") + "</td>" +
           "<td>" + escapeHtml(row.estado || "") + "</td>" +
+          "<td style=\"text-align:center;\">" + printBtn + "</td>" +
         "</tr>";
       }).join("");
+      Array.prototype.forEach.call(searchResultsBody.querySelectorAll(".entry-print-row-btn"), function (btn) {
+        btn.addEventListener("click", function (evt) {
+          evt.stopPropagation();
+          var docNo = btn.getAttribute("data-print-no");
+          if (docNo) {
+            printEntrada(docNo);
+          }
+        });
+      });
       Array.prototype.forEach.call(searchResultsBody.querySelectorAll("tr[data-lookup]"), function (row) {
         row.addEventListener("click", function () {
           loadEntryRecord(row.getAttribute("data-lookup") || "");
@@ -2063,6 +2087,10 @@
       var qtyValue = parseNum((row.querySelector(".detalle-cantidad") || {}).value) || 1;
       row.querySelector(".detalle-desc").value = data.descrip_art || "";
       row.querySelector(".detalle-art").value = data.id_articulo || "";
+      var refInput = row.querySelector(".detalle-ref");
+      if (refInput) {
+        refInput.value = data.referencia || "";
+      }
       row.querySelector(".detalle-cant-emp").value = fmtNum(qtyValue, 2);
       row.querySelector(".detalle-uom").value = data.um_inv || "";
       row.querySelector(".detalle-alm").value = data.alm_dft || "";
@@ -2148,6 +2176,46 @@
     }
     if (btnGrabar) {
       btnGrabar.addEventListener("click", saveEntry);
+    }
+    if (btnPrint) {
+      btnPrint.addEventListener("click", function () {
+        var docNo = activeLookup || (fieldNo && fieldNo.value) || "";
+        if (!docNo) {
+          showMessage("Debes seleccionar o grabar una entrada para poder imprimirla.");
+          return;
+        }
+        printEntrada(docNo);
+      });
+    }
+
+    function printEntrada(docNo) {
+      var target = String(docNo || activeLookup || (fieldNo && fieldNo.value) || "").trim();
+      if (!target) {
+        showMessage("Debes seleccionar o guardar una entrada para poder imprimirla.");
+        return;
+      }
+      var url = config.imprimirUrl + "?no_doc=" + encodeURIComponent(target);
+      var printWindow = window.open(url, "_blank");
+      if (!printWindow || printWindow.closed || typeof printWindow.closed === "undefined") {
+        var printFrame = document.createElement("iframe");
+        printFrame.style.position = "fixed";
+        printFrame.style.right = "0";
+        printFrame.style.bottom = "0";
+        printFrame.style.width = "0";
+        printFrame.style.height = "0";
+        printFrame.style.border = "0";
+        printFrame.src = url;
+        document.body.appendChild(printFrame);
+        printFrame.onload = function () {
+          try {
+            printFrame.contentWindow.focus();
+            printFrame.contentWindow.print();
+          } catch (e) {}
+          setTimeout(function () {
+            printFrame.remove();
+          }, 3000);
+        };
+      }
     }
     if (btnCloseSearch) {
       btnCloseSearch.addEventListener("click", closeSearchModal);

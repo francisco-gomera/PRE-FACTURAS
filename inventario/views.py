@@ -6,7 +6,7 @@ import socket
 
 from django.db import connection, transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from ajustes.permissions import has_perm
 from core.realtime import broadcast_inventario_solicitudes_refresh, broadcast_notification_refresh
-from core.views import _base_context, render_denied
+from core.views import _base_context, _get_empresa_data, render_denied
 from inventario.models import SolicitudExistencia
 from cobros.models import CobroAcuerdo
 from prefacturas_app.models_existing import MaestroArticulo
@@ -861,6 +861,7 @@ def _load_entrada_articulos_articulo_rows(*, query="", filtro="descripcion"):
     )[:80])
 
     tarj_stock = {}
+    det_precios = {}
     if values:
         articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
         if articulo_ids:
@@ -871,13 +872,26 @@ def _load_entrada_articulos_articulo_rows(*, query="", filtro="descripcion"):
                     articulo_ids
                 )
                 tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM DET_PRECIO WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                det_precios = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM PRECIO_ART WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                for row in cursor.fetchall():
+                    k = str(row[0] or "").strip()
+                    if row[1] is not None:
+                        det_precios[k] = float(row[1] or 0)
 
     return [
         {
             "id_articulo": row.get("id_articulo") or "",
             "descrip_art": row.get("descrip_art") or "",
             "referencia": row.get("referencia") or "",
-            "precio_det": float(_to_decimal(row.get("precio_det"))),
+            "precio_det": det_precios.get(str(row.get("id_articulo") or "").strip(), float(_to_decimal(row.get("precio_det")))),
             "stock": tarj_stock.get(str(row.get("id_articulo") or "").strip(), 0.0),
             "um_inv": row.get("um_inv") or "",
             "porc_com": 0,
@@ -1028,6 +1042,7 @@ def _load_entrada_articulos_record(lookup_value):
         det_costo_col = _pick_existing_column(det_columns, "PRECIO", "COSTO_UNIT", "COSTO", "COSTO_UNITARIO")
         det_valor_col = _pick_existing_column(det_columns, "TOTAL_PRECIO", "VALOR", "TOTAL_LINEA", "TOTAL", "IMPORTE")
         det_cta_col = _pick_existing_column(det_columns, "CTA_AUM_STOCK", "CTA_MAYOR", "CUENTA_MAYOR", "CTA_LM", "CUENTA")
+        det_ref_col = _pick_existing_column(det_columns, "REFERENCIA", "REF", "REF_ART")
 
         if det_doc_col or det_no_col:
             where_sql, where_params = _build_multi_lookup_where([det_doc_col, det_no_col], document_values)
@@ -1043,6 +1058,7 @@ def _load_entrada_articulos_record(lookup_value):
                         "linea": _stringify_doc(_pick_row_value(row, det_line_col, default="")),
                         "descripcion": str(_pick_row_value(row, det_desc_col, default="", allow_blank=True) or "").strip(),
                         "articulo": str(_pick_row_value(row, det_art_col, default="", allow_blank=True) or "").strip(),
+                        "referencia": str(_pick_row_value(row, det_ref_col, default="", allow_blank=True) or "").strip(),
                         "cant_emp": str(_pick_row_value(row, det_cant_emp_col, default="", allow_blank=True) or "").strip(),
                         "cantidad": _format_money(_pick_row_value(row, det_cantidad_col, default=Decimal("0"))),
                         "uom": str(_pick_row_value(row, det_uom_col, default="", allow_blank=True) or "").strip(),
@@ -1055,6 +1071,23 @@ def _load_entrada_articulos_record(lookup_value):
                         "cuenta_mayor": str(_pick_row_value(row, det_cta_col, default="", allow_blank=True) or "").strip(),
                     }
                 )
+            missing_ref_articulos = [
+                item["articulo"]
+                for item in parsed_rows
+                if not item["referencia"] and item["articulo"]
+            ]
+            if missing_ref_articulos:
+                unique_articulos = list(dict.fromkeys(missing_ref_articulos))
+                with connection.cursor() as cursor:
+                    placeholders = ", ".join(["%s"] * len(unique_articulos))
+                    cursor.execute(
+                        f"SELECT ID_ARTICULO, REFERENCIA FROM MAESTRO_ARTICULO WHERE ID_ARTICULO IN ({placeholders})",
+                        unique_articulos,
+                    )
+                    ref_map = {str(r[0] or "").strip(): str(r[1] or "").strip() for r in cursor.fetchall()}
+                for item in parsed_rows:
+                    if not item["referencia"]:
+                        item["referencia"] = ref_map.get(str(item["articulo"] or "").strip(), "")
             detalles = sorted(parsed_rows, key=lambda item: (Decimal(item["linea"]) if str(item["linea"]).replace(".", "", 1).isdigit() else Decimal("999999"), item["linea"]))
 
     total_doc = _to_decimal(_pick_row_value(header_row, total_col, default=Decimal("0")))
@@ -1081,8 +1114,11 @@ def _load_entrada_articulos_record(lookup_value):
             "proveedor_nombre": str(_pick_row_value(header_row, proveedor_nombre_col, default="", allow_blank=True) or "").strip(),
             "estado": str(_pick_row_value(header_row, estado_col, default="", allow_blank=True) or "").strip(),
             "fecha_cont": _fmt_date_input(_pick_row_value(header_row, fecha_cont_col, default="")),
+            "fecha_cont_fmt": _fmt_date_flexible(_pick_row_value(header_row, fecha_cont_col, default="")),
             "fecha_venc": _fmt_date_input(_pick_row_value(header_row, fecha_venc_col, default="")),
+            "fecha_venc_fmt": _fmt_date_flexible(_pick_row_value(header_row, fecha_venc_col, default="")),
             "fecha_doc": _fmt_date_input(_pick_row_value(header_row, fecha_doc_col, default="")),
+            "fecha_doc_fmt": _fmt_date_flexible(_pick_row_value(header_row, fecha_doc_col, default="")),
             "comentario": str(_pick_row_value(header_row, comentario_col, default="", allow_blank=True) or "").strip(),
             "total_doc": _format_money(total_doc),
         },
@@ -1290,6 +1326,7 @@ def _persist_entrada_articulos_record(
                 "linea": index,
                 "id_articulo": id_articulo,
                 "descripcion": descripcion,
+                "referencia": str(detalle.get("referencia") or "").strip()[:15],
                 "cant_emp": _to_decimal(detalle.get("cant_emp")),
                 "cantidad": cantidad,
                 "uom": str(detalle.get("uom") or "").strip(),
@@ -1305,6 +1342,24 @@ def _persist_entrada_articulos_record(
 
     if not cleaned_details:
         raise ValueError("Debes agregar al menos una linea con articulo.")
+
+    missing_art_ids = [
+        item["id_articulo"]
+        for item in cleaned_details
+        if not item.get("referencia") and item.get("id_articulo")
+    ]
+    if missing_art_ids:
+        unique_art_ids = list(dict.fromkeys(missing_art_ids))
+        with connection.cursor() as cur_ref:
+            placeholders = ", ".join(["%s"] * len(unique_art_ids))
+            cur_ref.execute(
+                f"SELECT ID_ARTICULO, REFERENCIA FROM MAESTRO_ARTICULO WHERE ID_ARTICULO IN ({placeholders})",
+                unique_art_ids,
+            )
+            article_refs = {str(r[0] or "").strip(): str(r[1] or "").strip() for r in cur_ref.fetchall()}
+        for item in cleaned_details:
+            if not item.get("referencia"):
+                item["referencia"] = article_refs.get(item["id_articulo"], "")[:15]
 
     header_values = {}
     if next_no_value is not None:
@@ -1364,6 +1419,7 @@ def _persist_entrada_articulos_record(
             _assign_existing_values(detail_values, det_columns, detalle["linea"], det_line_col)
         _assign_existing_values(detail_values, det_columns, detalle["descripcion"], "DESCRIP_ART", "DESCRIPCION", "DESCRIP", "DESCRIP_ART_SERV")
         _assign_existing_values(detail_values, det_columns, detalle["id_articulo"], "ID_ARTICULO", "ARTICULO", "COD_ART", "CODIGO")
+        _assign_existing_values(detail_values, det_columns, detalle.get("referencia", ""), "REFERENCIA", "REF", "REF_ART")
         _assign_existing_values(detail_values, det_columns, "Articulo", "CLASE_ART")
         _assign_existing_values(detail_values, det_columns, detalle["cant_emp"], "PORC_COM", "CANT_EMP", "CANT_EMPAQUE", "CANT_UND", "CANT_UNIDADES")
         _assign_existing_values(detail_values, det_columns, detalle["cantidad"], "CANTIDAD", "CANT")
@@ -2544,6 +2600,38 @@ def entrada_articulos_guardar_view(request):
         return JsonResponse({"detail": f"No se pudo guardar la entrada: {exc}"}, status=500)
 
 
+def entrada_articulos_imprimir_view(request):
+    auth_payload = _get_auth_payload(request)
+    if not auth_payload:
+        return redirect("login")
+    if not has_perm(auth_payload.get("usuario_id"), "inventario", "ver_entrada_articulos"):
+        return render_denied(request, active_nav="inventario")
+
+    no_doc = (request.GET.get("no_doc") or "").strip()
+    if not no_doc:
+        return HttpResponse("Parámetro no_doc requerido.", status=400)
+
+    try:
+        record = _load_entrada_articulos_record(no_doc)
+    except Exception:
+        record = None
+
+    if not record:
+        return HttpResponse("Entrada de artículos no encontrada.", status=404)
+
+    empresa = _get_empresa_data()
+    ctx = {
+        "record": record,
+        "entry": record.get("entry", {}),
+        "detalles": record.get("detalles", []),
+        "empresa": empresa,
+        "empresa_nombre": empresa.get("nombre", "COMERCIAL ANITA SRL"),
+        "usuario_nombre": auth_payload.get("usuario_nombre", ""),
+        "fecha_impresion": timezone.localtime(),
+    }
+    return render(request, "inventario/entrada_articulos_print.html", ctx)
+
+
 def salida_articulos_view(request):
     ctx = _base_context(request, page_title="Salida de articulos", active_nav="inventario")
     if not ctx:
@@ -2692,14 +2780,36 @@ def articulos_list_view(request):
     
     articles_slice = qs[start:end]
     
+    article_ids = [a.id_articulo.strip() for a in articles_slice if a.id_articulo]
+    det_precios = {}
+    if article_ids:
+        with connection.cursor() as cursor:
+            placeholders = ", ".join(["%s"] * len(article_ids))
+            cursor.execute(
+                f"SELECT ID_ARTICULO, PRECIO FROM DET_PRECIO WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                article_ids
+            )
+            det_precios = {str(r[0] or "").strip(): float(r[1] or 0) for r in cursor.fetchall()}
+            cursor.execute(
+                f"SELECT ID_ARTICULO, PRECIO FROM PRECIO_ART WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                article_ids
+            )
+            for r in cursor.fetchall():
+                k = str(r[0] or "").strip()
+                if r[1] is not None:
+                    det_precios[k] = float(r[1] or 0)
+
     results = []
     for a in articles_slice:
+        art_id = a.id_articulo.strip() if a.id_articulo else ""
+        precio_credito = det_precios.get(art_id, float(a.precio_det or 0))
         results.append({
-            "id_articulo": a.id_articulo.strip() if a.id_articulo else "",
+            "id_articulo": art_id,
             "descrip_art": a.descrip_art.strip() if a.descrip_art else "",
             "referencia": a.referencia.strip() if a.referencia else "",
             "cod_barra": a.cod_barra.strip() if a.cod_barra else "",
-            "precio_det": float(a.precio_det or 0),
+            "precio_det": precio_credito,
+            "precio_ya": float(a.precio_ya or 0),
             "costo": float(a.costo or 0),
             "tarifa_vt": float(a.tarifa_vt or 0),
             "um_venta": a.um_venta.strip() if a.um_venta else "UND",
@@ -2754,6 +2864,7 @@ def articulo_save_view(request):
         cod_barra = str(payload.get("cod_barra") or "").strip()
         costo = float(payload.get("costo") or 0)
         precio_det = float(payload.get("precio_det") or 0)
+        precio_ya = float(payload.get("precio_ya") or payload.get("precio_contado") or 0)
         raw_tarifa = payload.get("tarifa_vt")
         tarifa_vt = float(raw_tarifa) if raw_tarifa is not None else 18.0
         um_venta = str(payload.get("um_venta") or "UND").strip().upper()
@@ -2799,24 +2910,70 @@ def articulo_save_view(request):
                 articulo.cod_barra = cod_barra if cod_barra else id_articulo
                 articulo.costo = costo
                 articulo.precio_det = precio_det
-                articulo.tarifa_vt = tarifa_vt
-                articulo.id_impto_vt = 1 if tarifa_vt > 0 else 2
-                articulo.cod_impto_vt = "ITBIS" if tarifa_vt > 0 else "EXENTO"
-                articulo.um_venta = um_venta
+                articulo.precio_ya = precio_ya
+                articulo.id_precio = 1
+                articulo.descrip_precio = "Lista de Precio"
+                articulo.factor_precio = Decimal("1.0000")
+                articulo.tarifa_vt = Decimal("0.0000")
+                articulo.id_impto_vt = 1
+                articulo.cod_impto_vt = None
+                articulo.id_impto_oc = 1
+                articulo.um_venta = None
+                articulo.cta_impto_vt = "21020301"
+                articulo.cta_impto_oc = "21020302"
+                articulo.cta_inv = "11030101"
+                articulo.nom_6 = "Mercancia Disponible para la Venta"
+                articulo.cta_dotacion = "21010199"
+                articulo.cta_desviacion = "51010101"
+                articulo.cta_dev_venta = "41020201"
+                articulo.cta_dif_precio = "51010101"
+                articulo.cta_dif_inv = "51010102"
+                articulo.cta_red_stock = "51010102"
+                articulo.cta_aum_stock = "51010102"
+                articulo.cta_comp_gasto = "11030102"
+                articulo.cta_desv_wip = "11030102"
+                articulo.cta_stock_proc = "11030102"
+                articulo.ceco = "P01"
                 articulo.um_inv = um_inv_val
                 articulo.bloqueado = bloqueado_val
                 articulo.fecha_act = timezone.localtime()
                 articulo.terminal = terminal_name
+                final_cod_barra = cod_barra if cod_barra else id_articulo
+                grp_val = articulo.descrip_grupo or "MERCANCIAS"
+                subgrp_val = articulo.nomsubgrupo or "Generico"
+                cat_val = articulo.nomcategoria or "Generico"
+                articulo.cadena = f"{id_articulo}{final_cod_barra}{descrip_art}{referencia}{grp_val}{subgrp_val}{cat_val}"
                 articulo.save(update_fields=[
                     'descrip_art',
                     'referencia',
                     'cod_barra',
                     'costo',
                     'precio_det',
+                    'precio_ya',
+                    'id_precio',
+                    'descrip_precio',
+                    'factor_precio',
                     'tarifa_vt',
                     'id_impto_vt',
                     'cod_impto_vt',
+                    'id_impto_oc',
                     'um_venta',
+                    'cta_impto_vt',
+                    'cta_impto_oc',
+                    'cta_inv',
+                    'nom_6',
+                    'cta_dotacion',
+                    'cta_desviacion',
+                    'cta_dev_venta',
+                    'cta_dif_precio',
+                    'cta_dif_inv',
+                    'cta_red_stock',
+                    'cta_aum_stock',
+                    'cta_comp_gasto',
+                    'cta_desv_wip',
+                    'cta_stock_proc',
+                    'ceco',
+                    'cadena',
                     'um_inv',
                     'bloqueado',
                     'fecha_act',
@@ -2838,21 +2995,27 @@ def articulo_save_view(request):
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         INSERT INTO MAESTRO_ARTICULO (
-                            ID_ARTICULO, DESCRIP_ART, REFERENCIA, COD_BARRA, COSTO, PRECIO_DET, TARIFA_VT,
-                            ID_IMPTO_VT, COD_IMPTO_VT, UM_VENTA, BLOQUEADO, FECHA_CREACION, FECHA_ACT,
+                            ID_ARTICULO, DESCRIP_ART, REFERENCIA, COD_BARRA, COSTO, PRECIO_DET, PRECIO_YA, TARIFA_VT,
+                            ID_IMPTO_VT, COD_IMPTO_VT, ID_IMPTO_OC, UM_VENTA, BLOQUEADO, FECHA_CREACION, FECHA_ACT,
                             ALM_DFT, MONEDA, STOCK, ART_COMPRA, ART_VENTA, ART_INV, LOTE,
                             ID_GRUPO, DESCRIP_GRUPO, SECUENCIA, CTA_INGRESO, NOM_1, ID_USUARIO,
-                            ID_PRECIO, DESCRIP_PRECIO, TIPO_PRECIO, CTA_GASTO, NOM_2,
+                            ID_PRECIO, DESCRIP_PRECIO, FACTOR_PRECIO, TIPO_PRECIO, CTA_GASTO, NOM_2,
                             CTA_COSTO, NOM_3, CLASE_ART, UM_INV, TERMINAL,
-                            IDSUBGRUPO, NOMSUBGRUPO, IDCATEGORIA, NOMCATEGORIA
+                            IDSUBGRUPO, NOMSUBGRUPO, IDCATEGORIA, NOMCATEGORIA,
+                            CTA_IMPTO_VT, CTA_IMPTO_OC, CTA_INV, NOM_6, CTA_DOTACION, CTA_DESVIACION,
+                            CTA_DEV_VENTA, CTA_DIF_PRECIO, CTA_DIF_INV, CTA_RED_STOCK, CTA_AUM_STOCK,
+                            CTA_COMP_GASTO, CTA_DESV_WIP, CTA_STOCK_PROC, CECO, CADENA
                         ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s,
-                            %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s,
-                            %s, %s, %s, %s
+                            %s, %s, %s, %s, %s
                         )
                     """, [
                         id_articulo,
@@ -2861,10 +3024,12 @@ def articulo_save_view(request):
                         cod_barra if cod_barra else id_articulo,
                         costo,
                         precio_det,
-                        tarifa_vt,
-                        1 if tarifa_vt > 0 else 2,
-                        "ITBIS" if tarifa_vt > 0 else "EXENTO",
-                        um_venta,
+                        precio_ya,
+                        0.0,
+                        1,
+                        None,
+                        1,
+                        None,
                         bloqueado_val,
                         timezone.localtime(),
                         timezone.localtime(),
@@ -2883,6 +3048,7 @@ def articulo_save_view(request):
                         auth_payload.get("usuario_id"),
                         1,
                         "Lista de Precio",
+                        1.0,
                         "Fijo",
                         "11030102",
                         "Mercancias en Tránsito",
@@ -2894,8 +3060,70 @@ def articulo_save_view(request):
                         1,
                         "Generico",
                         1,
-                        "Generico"
+                        "Generico",
+                        "21020301",
+                        "21020302",
+                        "11030101",
+                        "Mercancia Disponible para la Venta",
+                        "21010199",
+                        "51010101",
+                        "41020201",
+                        "51010101",
+                        "51010102",
+                        "51010102",
+                        "51010102",
+                        "11030102",
+                        "11030102",
+                        "11030102",
+                        "P01",
+                        f"{id_articulo}{cod_barra if cod_barra else id_articulo}{descrip_art}{referencia}MERCANCIASGenericoGenerico"
                     ])
+
+            # Sincronizar PRECIO_ART y DET_PRECIO con ID_PRECIO = 1
+            now_dt = timezone.localtime()
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    IF EXISTS (SELECT 1 FROM PRECIO_ART WHERE ID_PRECIO = 1 AND ID_ARTICULO = %s)
+                    BEGIN
+                        UPDATE PRECIO_ART
+                        SET PRECIO = %s, FACTOR = 1.0, NIVEL = 1
+                        WHERE ID_PRECIO = 1 AND ID_ARTICULO = %s
+                    END
+                    ELSE
+                    BEGIN
+                        INSERT INTO PRECIO_ART (
+                            ID_ARTICULO, ID_PRECIO, FACTOR, PRECIO, NIVEL, MARGEN
+                        ) VALUES (
+                            %s, 1, 1.0, %s, 1, 1.0
+                        )
+                    END
+                """, [
+                    id_articulo,
+                    precio_det, id_articulo,
+                    id_articulo, precio_det
+                ])
+
+                cursor.execute("""
+                    IF EXISTS (SELECT 1 FROM DET_PRECIO WHERE ID_PRECIO = 1 AND ID_ARTICULO = %s)
+                    BEGIN
+                        UPDATE DET_PRECIO
+                        SET PRECIO = %s, FECHAEDIT = %s, EDIT = 'Y'
+                        WHERE ID_PRECIO = 1 AND ID_ARTICULO = %s
+                    END
+                    ELSE
+                    BEGIN
+                        INSERT INTO DET_PRECIO (
+                            ID_PRECIO, ID_ARTICULO, PRECIO, PORCDESC, MONEDA,
+                            CREACION, FECHAEDIT, EDIT
+                        ) VALUES (
+                            1, %s, %s, 0, 'RD$', %s, %s, 'N'
+                        )
+                    END
+                """, [
+                    id_articulo,
+                    precio_det, now_dt, id_articulo,
+                    id_articulo, precio_det, now_dt, now_dt
+                ])
                 
             # Save or delete ArticuloConversion
             if id_articulo_base:

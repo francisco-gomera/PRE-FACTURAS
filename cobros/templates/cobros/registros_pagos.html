@@ -1,0 +1,1303 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Registros de Pagos</h2>
+      <p class="page-subtitle">Gestión de cobradores y asignación de clientes para planillas manuales de cobro.</p>
+    </div>
+    <div class="header-actions">
+      <a href="{% url 'cobros:pagos_masivos' %}" style="background: linear-gradient(135deg, #16a34a, #15803d); color:#fff; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(22,163,74,0.3);">
+        ⚡ Pagos Masivos
+      </a>
+      <a href="{% url 'cobros:index' %}" class="btn-secondary-link">&larr; Volver a Cobros</a>
+      <button type="button" class="btn-primary-action" id="btn_nuevo_cobrador">+ Nuevo Cobrador</button>
+    </div>
+  </div>
+
+  {% if error_message %}
+  <div class="alert error">{{ error_message }}</div>
+  {% endif %}
+  {% if success_message %}
+  <div class="alert success">{{ success_message }}</div>
+  {% endif %}
+
+  <div class="registros-layout">
+    <!-- Panel Izquierdo: Lista de Cobradores -->
+    <aside class="cobradores-panel info-card">
+      <div class="panel-head">
+        <h3>Cobradores</h3>
+        <span class="count-pill">{{ cobradores|length }}</span>
+      </div>
+      <div class="search-box">
+        <input type="text" id="filter_cobradores" placeholder="Filtrar cobrador o sector..." />
+      </div>
+      <div class="cobradores-list" id="cobradores_list">
+        {% for c in cobradores %}
+        <div class="cobrador-card {% if selected_cobrador and selected_cobrador.id_cobrador == c.id_cobrador %}active{% endif %}"
+             data-id="{{ c.id_cobrador }}"
+             data-nombre="{{ c.nombre }}"
+             data-sector-id="{{ c.id_sector|default:'' }}"
+             data-sector="{{ c.sector_nombre }}"
+             data-tel="{{ c.telefono }}"
+             data-activo="{{ c.activo|yesno:'1,0' }}">
+          <div class="card-top">
+            <a href="{% url 'cobros:registros_pagos_cobrador' c.id_cobrador %}" class="cobrador-name-link">
+              <strong>{{ c.nombre }}</strong>
+            </a>
+            <div class="card-actions">
+              <button type="button" class="btn-icon btn-edit-cobrador" title="Editar cobrador" data-id="{{ c.id_cobrador }}">&#9998;</button>
+              <form method="post" class="form-del-cobrador" onsubmit="return confirm('¿Seguro que deseas eliminar este cobrador y sus asignaciones?');" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_cobrador" />
+                <input type="hidden" name="id_cobrador" value="{{ c.id_cobrador }}" />
+                <button type="submit" class="btn-icon btn-delete" title="Eliminar cobrador">&times;</button>
+              </form>
+            </div>
+          </div>
+          <div class="card-sub">
+            {% if c.sector_nombre %}
+            <span class="badge-sector">{{ c.sector_nombre }}</span>
+            {% else %}
+            <span class="badge-empty">Sin sector asignado</span>
+            {% endif %}
+            <span class="badge-count">{{ c.total_clientes }} cliente{{ c.total_clientes|pluralize:"s" }}</span>
+          </div>
+          {% if c.telefono %}
+          <div class="card-meta">
+            <small>Tel: {{ c.telefono }}</small>
+          </div>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div class="empty-list">
+          <p>No hay cobradores registrados.</p>
+          <button type="button" class="btn-small" onclick="document.getElementById('btn_nuevo_cobrador').click();">+ Crear primer cobrador</button>
+        </div>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <!-- Panel Derecho: Clientes Asignados al Cobrador -->
+    <main class="clientes-panel info-card">
+      {% if selected_cobrador %}
+      <div class="selected-header">
+        <div class="selected-info">
+          <div class="title-row">
+            <h2>{{ selected_cobrador.nombre }}</h2>
+            {% if selected_cobrador.activo %}
+            <span class="badge-status active">Activo</span>
+            {% else %}
+            <span class="badge-status inactive">Inactivo</span>
+            {% endif %}
+          </div>
+          <div class="meta-row">
+            <span><strong>Sector Asignado:</strong> 
+              {% if selected_cobrador.sector_nombre %}
+              <span class="sector-highlight">{{ selected_cobrador.sector_nombre }}</span>
+              {% else %}
+              <em class="text-muted">Ninguno (general)</em>
+              {% endif %}
+            </span>
+            {% if selected_cobrador.telefono %}
+            <span><strong>Teléfono:</strong> {{ selected_cobrador.telefono }}</span>
+            {% endif %}
+            <span><strong>Total Clientes:</strong> <span id="total_clientes_badge" class="badge-pill">{{ total_clientes }}</span></span>
+          </div>
+        </div>
+
+        <div class="selected-actions">
+          <a href="{% url 'cobros:pagos_masivos_cobrador' selected_cobrador.id_cobrador %}" class="btn-print-action" style="background: linear-gradient(135deg, #16a34a, #15803d); color: #fff;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            Pagos Masivos
+          </a>
+          <a href="{% url 'cobros:registros_pagos_impresion' selected_cobrador.id_cobrador %}" target="_blank" class="btn-print-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Imprimir Planilla
+          </a>
+          <button type="button" class="btn-primary" id="btn_open_search_cliente">+ Añadir Cliente</button>
+          <button type="button" class="btn-secondary" id="btn_open_sector_lote">&#9889; Añadir por Sector</button>
+          {% if clientes_asignados %}
+          <form method="post" id="form_clear_clientes" onsubmit="return confirm('¿Seguro que deseas quitar todos los clientes asignados a este cobrador?');" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_clientes" />
+            <input type="hidden" name="id_cobrador" value="{{ selected_cobrador.id_cobrador }}" />
+            <button type="submit" class="btn-danger-outline" title="Quitar todos los clientes">Limpiar Lista</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <input type="text" id="filter_clientes_asignados" placeholder="Buscar en lista de asignados por nombre, cédula o apodo..." />
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table" id="tabla_clientes_asignados">
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th style="width: 130px;">Cédula</th>
+              <th style="width: 140px;">Apodo</th>
+              <th>Nombre del Cliente</th>
+              <th style="width: 140px;">Sector</th>
+              <th style="width: 90px; text-align: center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tbody_clientes_asignados">
+            {% for c in clientes_asignados %}
+            <tr data-sn="{{ c.id_sn }}" data-nombre="{{ c.cliente_nombre|lower }}" data-cedula="{{ c.cedula|lower }}" data-apodo="{{ c.apodo|lower }}">
+              <td class="col-index">{{ forloop.counter }}</td>
+              <td><strong>{{ c.cedula|default:c.id_sn }}</strong></td>
+              <td class="col-apodo">{{ c.apodo|default:"-" }}</td>
+              <td>{{ c.cliente_nombre }}</td>
+              <td>{{ c.sector|default:"-" }}</td>
+              <td style="text-align: center;">
+                <form method="post" class="form-remove-cliente" style="margin:0; display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="remove_cliente" />
+                  <input type="hidden" name="id_cobrador" value="{{ selected_cobrador.id_cobrador }}" />
+                  <input type="hidden" name="id_asignacion" value="{{ c.id_asignacion }}" />
+                  <input type="hidden" name="id_sn" value="{{ c.id_sn }}" />
+                  <button type="submit" class="btn-remove" title="Quitar cliente de este cobrador">&times; Quitar</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-row" id="row_empty_clientes">
+              <td colspan="6">
+                <div class="empty-box">
+                  <p>Este cobrador no tiene clientes asignados actualmente.</p>
+                  <p class="empty-sub">Pulsa en <strong>"+ Añadir Cliente"</strong> o <strong>"⚡ Añadir por Sector"</strong> para comenzar a asignarle clientes.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="no-selection">
+        <h3>Selecciona o registra un cobrador</h3>
+        <p>Selecciona un cobrador de la lista a la izquierda para ver y gestionar sus clientes asignados.</p>
+        <button type="button" class="btn-primary" onclick="document.getElementById('btn_nuevo_cobrador').click();">+ Registrar Nuevo Cobrador</button>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+</div>
+
+<!-- Modal: Registrar / Editar Cobrador -->
+<div id="modal_cobrador" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal_cobrador_title">
+    <div class="modal-head">
+      <h3 id="modal_cobrador_title">Registrar Cobrador</h3>
+      <button type="button" class="btn-close-modal" id="btn_close_cobrador_modal">&times;</button>
+    </div>
+    <form method="post" id="form_cobrador">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_cobrador" />
+      <input type="hidden" name="id_cobrador" id="field_id_cobrador" value="" />
+      
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="field_nombre_cobrador">Nombre del Cobrador <span class="required">*</span></label>
+          <input type="text" id="field_nombre_cobrador" name="nombre" required placeholder="Ej: Juan Pérez" />
+        </div>
+
+        <div class="form-group">
+          <label for="field_sector_cobrador">Sector Asignado (Opcional)</label>
+          <select id="field_sector_cobrador" name="id_sector">
+            <option value="">-- Sin sector específico (Opcional) --</option>
+            {% for s in sectores %}
+            <option value="{{ s.id_codigo }}">{{ s.descripcion }}</option>
+            {% endfor %}
+          </select>
+          <small class="help-text">Al asignarle un sector, podrás añadir fácilmente todos los clientes de dicha zona.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="field_telefono_cobrador">Teléfono (Opcional)</label>
+          <input type="text" id="field_telefono_cobrador" name="telefono" placeholder="Ej: 809-555-1234" />
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="field_activo_cobrador" name="activo" value="1" checked />
+            Cobrador activo
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn-secondary" id="btn_cancel_cobrador">Cancelar</button>
+        <button type="submit" class="btn-primary" id="btn_submit_cobrador">Guardar Cobrador</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Buscar y Añadir Cliente Individual -->
+<div id="modal_buscar_cliente" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="modal_search_title">
+    <div class="modal-head">
+      <h3 id="modal_search_title">Buscar y Añadir Cliente al Cobrador</h3>
+      <button type="button" class="btn-close-modal" id="btn_close_search_modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="search-filters-bar">
+        <input type="text" id="cliente_q_input" placeholder="Escribe Código, Nombre, Cédula o Apodo y presiona Enter..." autofocus />
+        <select id="cliente_filtro_select">
+          <option value="nombre" selected>Nombre</option>
+          <option value="apodo">Apodo (CONTACTO)</option>
+          <option value="rnc">Cédula/RNC</option>
+          <option value="codigo">Código</option>
+          <option value="telefono">Teléfono</option>
+        </select>
+        <button type="button" class="btn-primary" id="btn_ejecutar_busqueda">Buscar</button>
+      </div>
+
+      <div class="modal-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 90px;">Código</th>
+              <th style="width: 120px;">Cédula/RNC</th>
+              <th>Nombre</th>
+              <th style="width: 130px;">Apodo</th>
+              <th style="width: 100px; text-align: center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="search_results_body">
+            <tr>
+              <td colspan="5" class="empty-state-cell">Ingresa un término de búsqueda para ver clientes.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" id="btn_close_search_footer">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Añadir Clientes por Sector en Lote -->
+<div id="modal_sector_lote" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="modal_sector_title">
+    <div class="modal-head">
+      <h3 id="modal_sector_title">Añadir Clientes del Sector</h3>
+      <button type="button" class="btn-close-modal" id="btn_close_sector_modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="sector-select-bar">
+        <label for="sector_lote_select"><strong>Sector a consultar:</strong></label>
+        <select id="sector_lote_select">
+          <option value="">-- Selecciona un sector --</option>
+          {% for s in sectores %}
+          <option value="{{ s.id_codigo }}" {% if selected_cobrador and selected_cobrador.id_sector == s.id_codigo %}selected{% endif %}>
+            {{ s.descripcion }}
+          </option>
+          {% endfor %}
+        </select>
+        <button type="button" class="btn-primary" id="btn_cargar_clientes_sector">Cargar Clientes</button>
+      </div>
+
+      <div class="sector-results-actions" id="sector_actions_bar" style="display: none;">
+        <label>
+          <input type="checkbox" id="check_select_all_sector" />
+          <strong>Seleccionar todos los clientes disponibles</strong>
+        </label>
+        <span id="sector_summary_text" class="text-muted"></span>
+      </div>
+
+      <div class="modal-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 40px; text-align: center;">Sel.</th>
+              <th style="width: 120px;">Cédula</th>
+              <th style="width: 130px;">Apodo</th>
+              <th>Nombre</th>
+              <th style="width: 120px;">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="sector_clients_body">
+            <tr>
+              <td colspan="5" class="empty-state-cell">Selecciona un sector y pulsa "Cargar Clientes".</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" id="btn_close_sector_footer">Cancelar</button>
+      <button type="button" class="btn-primary" id="btn_guardar_lote_sector" disabled>+ Añadir Seleccionados al Cobrador</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --page-bg: #f3f6fb;
+    --card-bg: #ffffff;
+    --border-color: #d8e2f3;
+    --text-color: #334e68;
+    --text-light: #627d98;
+    --primary-color: #1f5fbf;
+    --primary-hover: #164790;
+    --success-bg: #edfdf3;
+    --success-text: #17663a;
+    --error-bg: #fff1f2;
+    --error-text: #a11a2b;
+    --shadow: 0 4px 16px rgba(18, 52, 102, 0.06);
+    --radius: 12px;
+  }
+
+  .page-container {
+    padding: 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .page-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #102a43;
+    margin: 0 0 4px 0;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
+    color: var(--text-light);
+    margin: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-primary-action {
+    background: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(31, 95, 191, 0.25);
+    transition: background 0.15s ease;
+  }
+
+  .btn-primary-action:hover {
+    background: var(--primary-hover);
+  }
+
+  .btn-secondary-link {
+    background: #ffffff;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  .btn-secondary-link:hover {
+    background: #f8fafc;
+  }
+
+  /* Layout principal */
+  .registros-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 1024px) {
+    .registros-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  /* Panel Cobradores */
+  .cobradores-panel .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .cobradores-panel .panel-head h3 {
+    margin: 0;
+    font-size: 17px;
+    color: #102a43;
+  }
+
+  .count-pill {
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+  }
+
+  .cobradores-list {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+  }
+
+  .cobrador-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    background: #ffffff;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+
+  .cobrador-card:hover {
+    border-color: #93c5fd;
+    background: #f8fbff;
+  }
+
+  .cobrador-card.active {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    box-shadow: 0 0 0 1.5px var(--primary-color);
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .cobrador-name-link {
+    color: #102a43;
+    text-decoration: none;
+    font-size: 14.5px;
+  }
+
+  .cobrador-card.active .cobrador-name-link {
+    color: var(--primary-color);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .btn-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #64748b;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .btn-icon:hover {
+    color: #1e293b;
+    background: #e2e8f0;
+  }
+
+  .btn-icon.btn-delete:hover {
+    color: #dc2626;
+    background: #fee2e2;
+  }
+
+  .card-sub {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 11.5px;
+  }
+
+  .badge-sector {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  .badge-empty {
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .badge-count {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .card-meta {
+    margin-top: 4px;
+    color: #64748b;
+  }
+
+  /* Panel Clientes Asignados */
+  .selected-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .selected-info .title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .selected-info h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #0f172a;
+  }
+
+  .badge-status {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .badge-status.active {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .badge-status.inactive {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 16px;
+    color: #475569;
+    font-size: 13px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .sector-highlight {
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+  }
+
+  .badge-pill {
+    background: #e0e7ff;
+    color: #3730a3;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .selected-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn-print-action {
+    background: #15803d;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 8px;
+    padding: 9px 15px;
+    font-weight: 700;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(21, 128, 61, 0.25);
+  }
+
+  .btn-print-action:hover {
+    background: #166534;
+  }
+
+  .btn-primary {
+    background: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .btn-secondary {
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+  }
+
+  .btn-danger-outline {
+    background: #ffffff;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+
+  .btn-danger-outline:hover {
+    background: #fee2e2;
+  }
+
+  .table-toolbar input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .data-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf2f7;
+    color: #1e293b;
+    vertical-align: middle;
+  }
+
+  .data-table tr:hover td {
+    background: #f8fafc;
+  }
+
+  .col-index {
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .col-apodo {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .btn-remove {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-remove:hover {
+    background: #fecaca;
+  }
+
+  .empty-box {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+  }
+
+  .empty-box p {
+    margin: 4px 0;
+  }
+
+  .empty-sub {
+    font-size: 12px;
+  }
+
+  .no-selection {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+  }
+
+  /* Modales */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    padding: 16px;
+  }
+
+  .modal-card {
+    background: #ffffff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+
+  .modal-card.modal-lg {
+    max-width: 850px;
+  }
+
+  .modal-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-head h3 {
+    margin: 0;
+    font-size: 17px;
+    color: #0f172a;
+  }
+
+  .btn-close-modal {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #64748b;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .btn-close-modal:hover {
+    color: #0f172a;
+  }
+
+  .modal-body {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .modal-foot {
+    padding: 14px 20px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #f8fafc;
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #1e293b;
+  }
+
+  .form-group input[type="text"],
+  .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13.5px;
+    box-sizing: border-box;
+  }
+
+  .help-text {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 11.5px;
+  }
+
+  .checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: normal;
+    cursor: pointer;
+  }
+
+  .search-filters-bar,
+  .sector-select-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .search-filters-bar input,
+  .sector-select-bar select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .sector-results-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+
+  .modal-table-wrap {
+    max-height: 380px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+
+  .empty-state-cell {
+    text-align: center;
+    padding: 30px 10px;
+    color: #64748b;
+    font-style: italic;
+  }
+
+  .btn-add-client {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-add-client:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-add-client:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+  }
+</style>
+
+<script>
+  // Datos actuales
+  const CURRENT_COBRADOR_ID = {% if selected_cobrador %}{{ selected_cobrador.id_cobrador }}{% else %}null{% endif %};
+  const CSRF_TOKEN = "{{ csrf_token }}";
+
+  // Modales
+  const modalCobrador = document.getElementById("modal_cobrador");
+  const modalBuscarCliente = document.getElementById("modal_buscar_cliente");
+  const modalSectorLote = document.getElementById("modal_sector_lote");
+
+  // Elementos Cobrador Form
+  const btnNuevoCobrador = document.getElementById("btn_nuevo_cobrador");
+  const btnCloseCobradorModal = document.getElementById("btn_close_cobrador_modal");
+  const btnCancelCobrador = document.getElementById("btn_cancel_cobrador");
+  const formCobrador = document.getElementById("form_cobrador");
+  const modalCobradorTitle = document.getElementById("modal_cobrador_title");
+  const fieldIdCobrador = document.getElementById("field_id_cobrador");
+  const fieldNombreCobrador = document.getElementById("field_nombre_cobrador");
+  const fieldSectorCobrador = document.getElementById("field_sector_cobrador");
+  const fieldTelefonoCobrador = document.getElementById("field_telefono_cobrador");
+  const fieldActivoCobrador = document.getElementById("field_activo_cobrador");
+
+  // Botones apertura
+  btnNuevoCobrador?.addEventListener("click", () => {
+    modalCobradorTitle.textContent = "Registrar Nuevo Cobrador";
+    fieldIdCobrador.value = "";
+    fieldNombreCobrador.value = "";
+    fieldSectorCobrador.value = "";
+    fieldTelefonoCobrador.value = "";
+    fieldActivoCobrador.checked = true;
+    modalCobrador.style.display = "flex";
+    fieldNombreCobrador.focus();
+  });
+
+  document.querySelectorAll(".btn-edit-cobrador").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const card = btn.closest(".cobrador-card");
+      if (!card) return;
+      modalCobradorTitle.textContent = "Editar Cobrador";
+      fieldIdCobrador.value = card.dataset.id || "";
+      fieldNombreCobrador.value = card.dataset.nombre || "";
+      fieldSectorCobrador.value = card.dataset.sectorId || "";
+      fieldTelefonoCobrador.value = card.dataset.tel || "";
+      fieldActivoCobrador.checked = card.dataset.activo === "1";
+      modalCobrador.style.display = "flex";
+    });
+  });
+
+  btnCloseCobradorModal?.addEventListener("click", () => modalCobrador.style.display = "none");
+  btnCancelCobrador?.addEventListener("click", () => modalCobrador.style.display = "none");
+
+  // Filtrar lista cobradores en vivo
+  const filterCobradoresInput = document.getElementById("filter_cobradores");
+  filterCobradoresInput?.addEventListener("input", (e) => {
+    const val = (e.target.value || "").trim().toLowerCase();
+    document.querySelectorAll(".cobrador-card").forEach(card => {
+      const nombre = (card.dataset.nombre || "").toLowerCase();
+      const sector = (card.dataset.sector || "").toLowerCase();
+      if (!val || nombre.includes(val) || sector.includes(val)) {
+        card.style.display = "block";
+      } else {
+        card.style.display = "none";
+      }
+    });
+  });
+
+  // Filtrar clientes asignados en vivo
+  const filterClientesAsignados = document.getElementById("filter_clientes_asignados");
+  filterClientesAsignados?.addEventListener("input", (e) => {
+    const val = (e.target.value || "").trim().toLowerCase();
+    document.querySelectorAll("#tbody_clientes_asignados tr:not(.empty-row)").forEach(tr => {
+      const nombre = (tr.dataset.nombre || "");
+      const cedula = (tr.dataset.cedula || "");
+      const apodo = (tr.dataset.apodo || "");
+      if (!val || nombre.includes(val) || cedula.includes(val) || apodo.includes(val)) {
+        tr.style.display = "";
+      } else {
+        tr.style.display = "none";
+      }
+    });
+  });
+
+  // --- Modal Buscar Cliente Individual ---
+  const btnOpenSearchCliente = document.getElementById("btn_open_search_cliente");
+  const btnCloseSearchModal = document.getElementById("btn_close_search_modal");
+  const btnCloseSearchFooter = document.getElementById("btn_close_search_footer");
+  const clienteQInput = document.getElementById("cliente_q_input");
+  const clienteFiltroSelect = document.getElementById("cliente_filtro_select");
+  const btnEjecutarBusqueda = document.getElementById("btn_ejecutar_busqueda");
+  const searchResultsBody = document.getElementById("search_results_body");
+
+  btnOpenSearchCliente?.addEventListener("click", () => {
+    modalBuscarCliente.style.display = "flex";
+    clienteQInput.value = "";
+    searchResultsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Ingresa un término de búsqueda para ver clientes.</td></tr>';
+    clienteQInput.focus();
+  });
+
+  btnCloseSearchModal?.addEventListener("click", () => modalBuscarCliente.style.display = "none");
+  btnCloseSearchFooter?.addEventListener("click", () => modalBuscarCliente.style.display = "none");
+
+  async function ejecutarBusquedaClientes() {
+    const q = (clienteQInput.value || "").trim();
+    const filtro = (clienteFiltroSelect.value || "nombre").trim();
+    if (!q) {
+      searchResultsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Por favor ingresa un término de búsqueda.</td></tr>';
+      return;
+    }
+    searchResultsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Buscando clientes...</td></tr>';
+    try {
+      const res = await fetch(`/clientes/buscar/?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      if (!res.ok) throw new Error("Error en la consulta");
+      const data = await res.json();
+      const results = Array.isArray(data.results) ? data.results : [];
+      if (results.length === 0) {
+        searchResultsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">No se encontraron clientes con ese criterio.</td></tr>';
+        return;
+      }
+      
+      // Obtener clientes ya asignados en la tabla
+      const assignedSns = new Set();
+      document.querySelectorAll("#tbody_clientes_asignados tr").forEach(tr => {
+        if (tr.dataset.sn) assignedSns.add(tr.dataset.sn.trim());
+      });
+
+      let html = "";
+      results.forEach(cli => {
+        const idSn = (cli.id_sn || "").trim();
+        const yaAsignado = assignedSns.has(idSn);
+        html += `
+          <tr>
+            <td><strong>${idSn}</strong></td>
+            <td>${cli.rnc_ced || "-"}</td>
+            <td>${cli.nom_socio || "-"}</td>
+            <td><strong>${cli.contacto || "-"}</strong></td>
+            <td style="text-align: center;">
+              ${yaAsignado 
+                ? '<span style="color:#16a34a; font-weight:700; font-size:11.5px;">✓ Asignado</span>' 
+                : `<button type="button" class="btn-add-client" onclick="asignarClienteDirecto('${idSn}', this)">+ Añadir</button>`}
+            </td>
+          </tr>
+        `;
+      });
+      searchResultsBody.innerHTML = html;
+    } catch (err) {
+      searchResultsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Error al consultar el servidor.</td></tr>';
+    }
+  }
+
+  btnEjecutarBusqueda?.addEventListener("click", ejecutarBusquedaClientes);
+  clienteQInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      ejecutarBusquedaClientes();
+    }
+  });
+
+  window.asignarClienteDirecto = async function(idSn, btn) {
+    if (!CURRENT_COBRADOR_ID) return;
+    btn.disabled = true;
+    btn.textContent = "Añadiendo...";
+    const formData = new FormData();
+    formData.append("action", "add_cliente");
+    formData.append("id_cobrador", CURRENT_COBRADOR_ID);
+    formData.append("id_sn", idSn);
+    formData.append("csrfmiddlewaretoken", CSRF_TOKEN);
+
+    try {
+      const res = await fetch("{% url 'cobros:registros_pagos' %}", {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: formData
+      });
+      const data = await res.json();
+      if (data.ok) {
+        btn.parentElement.innerHTML = '<span style="color:#16a34a; font-weight:700; font-size:11.5px;">✓ Añadido</span>';
+        // Recargar página para mostrar lista completa y actualizada
+        window.location.reload();
+      } else {
+        alert(data.error || "No se pudo añadir el cliente.");
+        btn.disabled = false;
+        btn.textContent = "+ Añadir";
+      }
+    } catch (err) {
+      alert("Error al conectar con el servidor.");
+      btn.disabled = false;
+      btn.textContent = "+ Añadir";
+    }
+  };
+
+  // --- Modal Añadir Clientes por Sector en Lote ---
+  const btnOpenSectorLote = document.getElementById("btn_open_sector_lote");
+  const btnCloseSectorModal = document.getElementById("btn_close_sector_modal");
+  const btnCloseSectorFooter = document.getElementById("btn_close_sector_footer");
+  const sectorLoteSelect = document.getElementById("sector_lote_select");
+  const btnCargarClientesSector = document.getElementById("btn_cargar_clientes_sector");
+  const sectorActionsBar = document.getElementById("sector_actions_bar");
+  const checkSelectAllSector = document.getElementById("check_select_all_sector");
+  const sectorSummaryText = document.getElementById("sector_summary_text");
+  const sectorClientsBody = document.getElementById("sector_clients_body");
+  const btnGuardarLoteSector = document.getElementById("btn_guardar_lote_sector");
+
+  btnOpenSectorLote?.addEventListener("click", () => {
+    modalSectorLote.style.display = "flex";
+    if (sectorLoteSelect.value) {
+      cargarClientesDelSector();
+    }
+  });
+
+  btnCloseSectorModal?.addEventListener("click", () => modalSectorLote.style.display = "none");
+  btnCloseSectorFooter?.addEventListener("click", () => modalSectorLote.style.display = "none");
+
+  async function cargarClientesDelSector() {
+    const sectorId = sectorLoteSelect.value;
+    if (!sectorId) {
+      alert("Por favor selecciona un sector.");
+      return;
+    }
+    sectorClientsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Cargando clientes del sector...</td></tr>';
+    btnGuardarLoteSector.disabled = true;
+    checkSelectAllSector.checked = false;
+
+    try {
+      const res = await fetch(`/cobros/registros-pagos/api/clientes-sector/?sector_id=${encodeURIComponent(sectorId)}&id_cobrador=${CURRENT_COBRADOR_ID || ''}`);
+      if (!res.ok) throw new Error("Error consultando sector");
+      const data = await res.json();
+      const results = Array.isArray(data.results) ? data.results : [];
+
+      if (results.length === 0) {
+        sectorClientsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">No se encontraron clientes registrados en este sector.</td></tr>';
+        sectorActionsBar.style.display = "none";
+        return;
+      }
+
+      sectorActionsBar.style.display = "flex";
+      let disponiblesCount = 0;
+      let html = "";
+
+      results.forEach(cli => {
+        const isAssigned = !!cli.ya_asignado;
+        if (!isAssigned) disponiblesCount++;
+        html += `
+          <tr class="${isAssigned ? 'assigned-row' : ''}">
+            <td style="text-align: center;">
+              <input type="checkbox" class="sector-cli-check" value="${cli.id_sn}" ${isAssigned ? 'disabled' : ''} />
+            </td>
+            <td><strong>${cli.rnc_ced || cli.id_sn}</strong></td>
+            <td><strong>${cli.contacto || "-"}</strong></td>
+            <td>${cli.nom_socio || "-"}</td>
+            <td>${isAssigned ? '<span style="color:#16a34a; font-weight:700;">✓ Ya asignado</span>' : '<span style="color:#2563eb;">Disponible</span>'}</td>
+          </tr>
+        `;
+      });
+
+      sectorClientsBody.innerHTML = html;
+      sectorSummaryText.textContent = `${results.length} total (${disponiblesCount} disponibles para asignar)`;
+
+      // Listeners en checkboxes
+      const checks = document.querySelectorAll(".sector-cli-check:not([disabled])");
+      checks.forEach(chk => {
+        chk.addEventListener("change", () => {
+          const anyChecked = Array.from(checks).some(c => c.checked);
+          btnGuardarLoteSector.disabled = !anyChecked;
+        });
+      });
+
+      checkSelectAllSector.onchange = () => {
+        checks.forEach(c => c.checked = checkSelectAllSector.checked);
+        btnGuardarLoteSector.disabled = !checkSelectAllSector.checked;
+      };
+
+    } catch (err) {
+      sectorClientsBody.innerHTML = '<tr><td colspan="5" class="empty-state-cell">Error al cargar clientes del sector.</td></tr>';
+    }
+  }
+
+  btnCargarClientesSector?.addEventListener("click", cargarClientesDelSector);
+  sectorLoteSelect?.addEventListener("change", cargarClientesDelSector);
+
+  btnGuardarLoteSector?.addEventListener("click", async () => {
+    const checks = document.querySelectorAll(".sector-cli-check:checked");
+    if (checks.length === 0) return;
+    btnGuardarLoteSector.disabled = true;
+    btnGuardarLoteSector.textContent = "Añadiendo clientes...";
+
+    const formData = new FormData();
+    formData.append("action", "add_clientes_sector");
+    formData.append("id_cobrador", CURRENT_COBRADOR_ID);
+    formData.append("sector_id", sectorLoteSelect.value);
+    formData.append("csrfmiddlewaretoken", CSRF_TOKEN);
+    checks.forEach(c => formData.append("selected_sn", c.value));
+
+    try {
+      const res = await fetch("{% url 'cobros:registros_pagos' %}", {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: formData
+      });
+      const data = await res.json();
+      if (data.ok) {
+        window.location.reload();
+      } else {
+        alert(data.error || "No se pudieron añadir los clientes.");
+        btnGuardarLoteSector.disabled = false;
+        btnGuardarLoteSector.textContent = "+ Añadir Seleccionados al Cobrador";
+      }
+    } catch (err) {
+      alert("Error al conectar con el servidor.");
+      btnGuardarLoteSector.disabled = false;
+      btnGuardarLoteSector.textContent = "+ Añadir Seleccionados al Cobrador";
+    }
+  });
+
+  // Cerrar modales con Escape o click fuera
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      modalCobrador.style.display = "none";
+      modalBuscarCliente.style.display = "none";
+      modalSectorLote.style.display = "none";
+    }
+  });
+
+  [modalCobrador, modalBuscarCliente, modalSectorLote].forEach(mod => {
+    mod?.addEventListener("click", (e) => {
+      if (e.target === mod) mod.style.display = "none";
+    });
+  });
+</script>
+{% endblock %}

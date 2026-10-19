@@ -817,8 +817,10 @@ def buscar_stock_articulos_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT TOP 800 A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(A.PRECIO_DET, 0) AS PRECIO_DET
+        SELECT TOP 800 A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(PA.PRECIO, DP.PRECIO, A.PRECIO_DET, 0) AS PRECIO_DET, COALESCE(A.PRECIO_YA, 0) AS PRECIO_YA
         FROM MAESTRO_ARTICULO A
+        LEFT JOIN PRECIO_ART PA ON PA.ID_ARTICULO = A.ID_ARTICULO AND PA.ID_PRECIO = 1
+        LEFT JOIN DET_PRECIO DP ON DP.ID_ARTICULO = A.ID_ARTICULO AND DP.ID_PRECIO = 1
         LEFT JOIN (
             SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
             FROM TARJETERO
@@ -853,6 +855,10 @@ def buscar_stock_articulos_view(request):
             precio_det = float(r[5] or 0)
         except Exception:
             precio_det = 0.0
+        try:
+            precio_ya = float(r[6] or 0)
+        except Exception:
+            precio_ya = 0.0
         results.append(
             {
                 "id_articulo": r[0] or "",
@@ -861,6 +867,7 @@ def buscar_stock_articulos_view(request):
                 "uom": r[3] or "",
                 "referencia": r[4] or "",
                 "precio_det": precio_det,
+                "precio_ya": precio_ya,
                 "precio": precio_det,
             }
         )
@@ -889,8 +896,10 @@ def stock_articulos_print_view(request):
     stock_hasta = _to_dec_or_none(stock_hasta_raw)
 
     sql = """
-        SELECT A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(A.PRECIO_DET, 0) AS PRECIO_DET
+        SELECT A.ID_ARTICULO, A.DESCRIP_ART, COALESCE(T.STOCK_TARJ, 0) AS STOCK, A.UM_INV, A.REFERENCIA, COALESCE(PA.PRECIO, DP.PRECIO, A.PRECIO_DET, 0) AS PRECIO_DET, COALESCE(A.PRECIO_YA, 0) AS PRECIO_YA
         FROM MAESTRO_ARTICULO A
+        LEFT JOIN PRECIO_ART PA ON PA.ID_ARTICULO = A.ID_ARTICULO AND PA.ID_PRECIO = 1
+        LEFT JOIN DET_PRECIO DP ON DP.ID_ARTICULO = A.ID_ARTICULO AND DP.ID_PRECIO = 1
         LEFT JOIN (
             SELECT ID_ARTICULO, SUM(CANTIDAD) AS STOCK_TARJ
             FROM TARJETERO
@@ -926,6 +935,10 @@ def stock_articulos_print_view(request):
             precio_det = float(r[5] or 0)
         except Exception:
             precio_det = 0.0
+        try:
+            precio_ya = float(r[6] or 0)
+        except Exception:
+            precio_ya = 0.0
         total_stock += stock
         articulos.append(
             {
@@ -935,6 +948,7 @@ def stock_articulos_print_view(request):
                 "uom": r[3] or "",
                 "referencia": r[4] or "",
                 "precio_det": precio_det,
+                "precio_ya": precio_ya,
                 "precio": precio_det,
             }
         )
@@ -1078,12 +1092,12 @@ def buscar_articulos_view(request):
     qs = MaestroArticulo.objects.exclude(bloqueado__iexact="Y")
 
     if q:
-        if filtro == "codigo":
-            qs = qs.filter(referencia__icontains=q)
+        if filtro in ("codigo", "articulo"):
+            qs = qs.filter(Q(referencia__icontains=q) | Q(id_articulo__icontains=q) | Q(cod_barra__icontains=q))
         else:
             qs = qs.filter(descrip_art__icontains=q)
 
-    if filtro == "codigo":
+    if filtro in ("codigo", "articulo"):
         qs = qs.order_by("referencia", "id_articulo")
     else:
         qs = qs.order_by("id_articulo")
@@ -1093,6 +1107,7 @@ def buscar_articulos_view(request):
         "descrip_art",
         "referencia",
         "precio_det",
+        "precio_ya",
         "id_impto_vt",
         "bloqueado",
     )[:80])
@@ -1109,6 +1124,7 @@ def buscar_articulos_view(request):
     if values:
         articulo_ids = [row.get("id_articulo") for row in values if row.get("id_articulo")]
         tarj_stock = {}
+        det_precios = {}
         if articulo_ids:
             with connection.cursor() as cursor:
                 placeholders = ", ".join(["%s"] * len(articulo_ids))
@@ -1117,16 +1133,31 @@ def buscar_articulos_view(request):
                     articulo_ids
                 )
                 tarj_stock = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM DET_PRECIO WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                det_precios = {str(row[0] or "").strip(): float(row[1] or 0) for row in cursor.fetchall()}
+                cursor.execute(
+                    f"SELECT ID_ARTICULO, PRECIO FROM PRECIO_ART WHERE ID_PRECIO = 1 AND ID_ARTICULO IN ({placeholders})",
+                    articulo_ids
+                )
+                for row in cursor.fetchall():
+                    k = str(row[0] or "").strip()
+                    if row[1] is not None:
+                        det_precios[k] = float(row[1] or 0)
 
         for r in values:
             art_id = r.get("id_articulo") or ""
             stock_val = tarj_stock.get(art_id, 0.0)
+            precio_credito = det_precios.get(art_id, _num(r.get("precio_det")) or 0.0)
             results.append(
                 {
                     "id_articulo": art_id,
                     "descrip_art": r.get("descrip_art") or "",
                     "referencia": r.get("referencia") or "",
-                    "precio_det": _num(r.get("precio_det")),
+                    "precio_det": precio_credito,
+                    "precio_ya": _num(r.get("precio_ya")),
                     "stock": stock_val,
                     "id_impto_vt": r.get("id_impto_vt"),
                     "bloqueado": (r.get("bloqueado") or "N"),
@@ -1262,9 +1293,11 @@ def detalle_grupo_articulos_prefactura_view(request):
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT D.ID_ARTICULO, A.DESCRIP_ART, A.UM_INV, A.PRECIO_DET, A.ID_IMPTO_VT, D.CANTIDAD, ISNULL(A.BLOQUEADO, 'N')
+            SELECT D.ID_ARTICULO, A.DESCRIP_ART, A.UM_INV, COALESCE(PA.PRECIO, DP.PRECIO, A.PRECIO_DET, 0) AS PRECIO_DET, A.ID_IMPTO_VT, D.CANTIDAD, ISNULL(A.BLOQUEADO, 'N')
             FROM GRUPO_ARTICULO_DET D
             INNER JOIN MAESTRO_ARTICULO A ON A.ID_ARTICULO = D.ID_ARTICULO
+            LEFT JOIN PRECIO_ART PA ON PA.ID_ARTICULO = A.ID_ARTICULO AND PA.ID_PRECIO = 1
+            LEFT JOIN DET_PRECIO DP ON DP.ID_ARTICULO = A.ID_ARTICULO AND DP.ID_PRECIO = 1
             WHERE D.ID_GRUPO = %s
             ORDER BY D.ORDEN, D.ID_DET
             """,

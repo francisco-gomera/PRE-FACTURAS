@@ -69,6 +69,8 @@ def ensure_base_perms():
             ("ver_acuerdos", "Ver Acuerdos"),
             ("ver_pagos_recuperados", "Ver Pagos Recuperados"),
             ("ver_cartas_enviadas", "Ver Cartas Enviadas"),
+            ("ver_registros_pagos", "Ver Registros de Pagos"),
+            ("ver_pagos_masivos", "Ver Pagos Masivos"),
         ],
         "cartas": [
             ("ver_cartas_aviso", "Ver Cartas de Aviso"),

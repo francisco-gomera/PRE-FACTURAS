@@ -395,6 +395,56 @@
       font-weight: 700;
   }
 
+  .carta-factura-row td {
+    background-color: #ffffff;
+  }
+
+  .carta-articulos-row td.carta-articulos-cell {
+    background-color: #fafbfc !important;
+    padding: 4px 8px 6px 12px !important;
+    border-top: none !important;
+  }
+
+  .carta-articulos-box {
+    margin: 2px 0 3px 0;
+  }
+
+  .carta-articulos-title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 3px;
+    display: block;
+  }
+
+  .carta-articulos-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2px;
+    font-size: 8pt;
+    background: #ffffff;
+  }
+
+  .carta-articulos-table th,
+  .carta-articulos-table td {
+    border: 1px solid #777 !important;
+    padding: 2px 6px !important;
+    text-align: left;
+  }
+
+  .carta-articulos-table th {
+    background: #f0f0f0 !important;
+    font-weight: 700;
+    font-size: 8pt;
+  }
+
+  .carta-articulos-empty {
+    font-size: 8pt;
+    font-style: italic;
+    color: #666;
+    padding: 2px 0;
+  }
+
   .carta-sign {
     margin-top: 6mm;
     text-align: center;
@@ -655,6 +705,45 @@
 		    .carta-table {
 		      margin-top: 6mm !important;
 		    }
+		    .carta-factura-row {
+		      page-break-inside: avoid !important;
+		    }
+		    .carta-articulos-row {
+		      page-break-inside: avoid !important;
+		    }
+		    .carta-articulos-cell {
+		      background-color: #fbfbfb !important;
+		      padding: 3px 6px 4px 10px !important;
+		      border-top: none !important;
+		    }
+		    .carta-articulos-title {
+		      font-size: 7.8pt !important;
+		      font-weight: bold !important;
+		      color: #111 !important;
+		      margin-bottom: 2px !important;
+		      display: block !important;
+		    }
+		    .carta-articulos-table {
+		      width: 100% !important;
+		      border-collapse: collapse !important;
+		      margin-top: 2px !important;
+		      font-size: 7.5pt !important;
+		      background: #fff !important;
+		    }
+		    .carta-articulos-table th,
+		    .carta-articulos-table td {
+		      border: 1px solid #444 !important;
+		      padding: 2px 4px !important;
+		    }
+		    .carta-articulos-table th {
+		      background: #ebebeb !important;
+		      font-weight: bold !important;
+		    }
+		    .carta-articulos-empty {
+		      font-size: 7.5pt !important;
+		      font-style: italic !important;
+		      color: #555 !important;
+		    }
 		  }
 		</style>
 
@@ -712,6 +801,16 @@
     const empresa = (data && data.empresa) || {};
     const docs = Array.isArray(facturas) ? facturas : [];
     const saldoTotal = docs.reduce((acc, item) => acc + Number(item.saldo || 0), 0);
+    const articulosUnicos = [];
+    docs.forEach((f) => {
+      const arts = Array.isArray(f.articulos) ? f.articulos : [];
+      arts.forEach((a) => {
+        const desc = String(a.descripcion || "").trim();
+        if (desc && !articulosUnicos.includes(desc)) {
+          articulosUnicos.push(desc);
+        }
+      });
+    });
     return {
       cliente_nombre: cliente.nombre || "",
       cliente_rnc: cliente.rnc_ced || "",
@@ -726,6 +825,7 @@
       carta_titulo: "CARTA DE SALDO",
       saldo_total: saldoTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       facturas_count: docs.length,
+      articulos: articulosUnicos.join(", "),
     };
   }
 
@@ -806,12 +906,18 @@
 	        const fecha = String(f.fecha_doc || "");
 	        const total = Number(f.total_doc || 0);
 	        const checked = selectedDocId && String(selectedDocId) === idDoc ? "checked" : "";
+	        const artsSummary = Array.isArray(f.articulos) && f.articulos.length
+	          ? f.articulos.map((a) => a.descripcion).filter(Boolean).join(", ")
+	          : (f.articulos_str || "");
 	        return `
 	          <tr class="facturas-row" data-doc="${encodeURIComponent(idDoc)}">
 	            <td class="facturas-radio">
 	              <input type="radio" name="saldo_factura_pick" value="${escapeHtml(idDoc)}" ${checked} aria-label="Seleccionar" />
 		            </td>
-		            <td>${escapeHtml(idDoc)}</td>
+		            <td>
+		              <strong>${escapeHtml(idDoc)}</strong>
+		              ${artsSummary ? `<div style="font-size: 11px; color: #627d98; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(artsSummary)}">${escapeHtml(artsSummary)}</div>` : ""}
+		            </td>
 		            <td>${escapeHtml(String(f.no_cuota || "Abierto"))}</td>
 		            <td>${escapeHtml(fecha)}</td>
 		            <td style="text-align:right;">${escapeHtml(total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
@@ -842,17 +948,64 @@
 	    const cliente = data.cliente;
 	    const facturas = Array.isArray(facturasOverride) ? facturasOverride : getAllFacturas(data);
 		    const rows = facturas.length
-		      ? facturas.map((f) => `
-		        <tr>
-		          <td>${escapeHtml(String(f.id_doc || ""))}</td>
-		          <td>${escapeHtml(String(f.no_cuota || "Abierto"))}</td>
-		          <td>${escapeHtml(String(f.fecha_doc || ""))}</td>
-		          <td style="text-align:right;">${escapeHtml(Number(f.total_doc || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
-		          <td style="text-align:right;">${escapeHtml(Number(f.pagado || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
-		          <td style="text-align:right;">${escapeHtml(Number(f.saldo || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
-		          <td>${escapeHtml(String(f.fecha_pago || ""))}</td>
-		        </tr>
-		      `).join("")
+		      ? facturas.map((f) => {
+		          const articulos = Array.isArray(f.articulos) ? f.articulos : [];
+		          let articulosHtml = "";
+		          if (articulos.length > 0) {
+		            const artRows = articulos.map((a) => `
+		              <tr>
+		                <td style="width: 20%;">${escapeHtml(a.id_articulo || "-")}</td>
+		                <td style="width: 65%;">${escapeHtml(a.descripcion || "")}</td>
+		                <td style="width: 15%; text-align: center;">${escapeHtml(Number(a.cantidad || 0).toLocaleString("en-US", { maximumFractionDigits: 2 }))}</td>
+		              </tr>
+		            `).join("");
+		            articulosHtml = `
+		              <tr class="carta-articulos-row">
+		                <td colspan="7" class="carta-articulos-cell">
+		                  <div class="carta-articulos-box">
+		                    <span class="carta-articulos-title">Artículos pertenecientes a la Factura No. ${escapeHtml(String(f.id_doc || ""))}:</span>
+		                    <table class="carta-articulos-table">
+		                      <thead>
+		                        <tr>
+		                          <th style="width: 20%;">Código</th>
+		                          <th style="width: 65%;">Descripción</th>
+		                          <th style="width: 15%; text-align: center;">Cant.</th>
+		                        </tr>
+		                      </thead>
+		                      <tbody>
+		                        ${artRows}
+		                      </tbody>
+		                    </table>
+		                  </div>
+		                </td>
+		              </tr>
+		            `;
+		          } else {
+		            articulosHtml = `
+		              <tr class="carta-articulos-row">
+		                <td colspan="7" class="carta-articulos-cell">
+		                  <div class="carta-articulos-box">
+		                    <span class="carta-articulos-title">Artículos pertenecientes a la Factura No. ${escapeHtml(String(f.id_doc || ""))}:</span>
+		                    <div class="carta-articulos-empty">No se registraron artículos en el detalle de esta factura.</div>
+		                  </div>
+		                </td>
+		              </tr>
+		            `;
+		          }
+
+		          return `
+		            <tr class="carta-factura-row">
+		              <td><strong>${escapeHtml(String(f.id_doc || ""))}</strong></td>
+		              <td>${escapeHtml(String(f.no_cuota || "Abierto"))}</td>
+		              <td>${escapeHtml(String(f.fecha_doc || ""))}</td>
+		              <td style="text-align:right;">${escapeHtml(Number(f.total_doc || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
+		              <td style="text-align:right;">${escapeHtml(Number(f.pagado || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
+		              <td style="text-align:right;">${escapeHtml(Number(f.saldo || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</td>
+		              <td>${escapeHtml(String(f.fecha_pago || ""))}</td>
+		            </tr>
+		            ${articulosHtml}
+		          `;
+		        }).join("")
 		      : `<tr><td colspan="7" style="text-align:center;">No hay documentos saldados para este cliente.</td></tr>`;
 
     const empresa = data.empresa || {};
@@ -1145,6 +1298,51 @@
       body.mobile-print .carta-table th,
       body.mobile-print .carta-table td {
         padding: 3px 4px !important;
+      }
+      body.mobile-print .carta-articulos-table {
+        font-size: 7.5pt !important;
+      }
+      body.mobile-print .carta-articulos-title {
+        font-size: 7.8pt !important;
+      }
+      .carta-factura-row {
+        page-break-inside: avoid !important;
+      }
+      .carta-articulos-row {
+        page-break-inside: avoid !important;
+      }
+      .carta-articulos-cell {
+        background-color: #fbfbfb !important;
+        padding: 3px 6px 4px 10px !important;
+        border-top: none !important;
+      }
+      .carta-articulos-title {
+        font-size: 7.8pt !important;
+        font-weight: bold !important;
+        color: #111 !important;
+        margin-bottom: 2px !important;
+        display: block !important;
+      }
+      .carta-articulos-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin-top: 2px !important;
+        font-size: 7.5pt !important;
+        background: #fff !important;
+      }
+      .carta-articulos-table th,
+      .carta-articulos-table td {
+        border: 1px solid #444 !important;
+        padding: 2px 4px !important;
+      }
+      .carta-articulos-table th {
+        background: #ebebeb !important;
+        font-weight: bold !important;
+      }
+      .carta-articulos-empty {
+        font-size: 7.5pt !important;
+        font-style: italic !important;
+        color: #555 !important;
       }
       body.mobile-print .carta-sign {
         margin-top: 4mm !important;

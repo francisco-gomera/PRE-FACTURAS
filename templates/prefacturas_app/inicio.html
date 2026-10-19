@@ -280,23 +280,62 @@
         }
 
         #articulo_modal_backdrop th:nth-child(1),
-        #articulo_modal_backdrop td:nth-child(1) {
-            width: 20%;
+        #articulo_modal_backdrop td:nth-child(1),
+        #facturacion_articulo_backdrop th:nth-child(1),
+        #facturacion_articulo_backdrop td:nth-child(1) {
+            width: 16%;
         }
 
         #articulo_modal_backdrop th:nth-child(2),
-        #articulo_modal_backdrop td:nth-child(2) {
-            width: 48%;
+        #articulo_modal_backdrop td:nth-child(2),
+        #facturacion_articulo_backdrop th:nth-child(2),
+        #facturacion_articulo_backdrop td:nth-child(2) {
+            width: 36%;
         }
 
         #articulo_modal_backdrop th:nth-child(3),
-        #articulo_modal_backdrop td:nth-child(3) {
-            width: 16%;
+        #articulo_modal_backdrop td:nth-child(3),
+        #facturacion_articulo_backdrop th:nth-child(3),
+        #facturacion_articulo_backdrop td:nth-child(3) {
+            width: 13%;
+            text-align: right;
         }
 
         #articulo_modal_backdrop th:nth-child(4),
-        #articulo_modal_backdrop td:nth-child(4) {
-            width: 16%;
+        #articulo_modal_backdrop td:nth-child(4),
+        #facturacion_articulo_backdrop th:nth-child(4),
+        #facturacion_articulo_backdrop td:nth-child(4) {
+            width: 13%;
+            text-align: right;
+        }
+
+        #articulo_modal_backdrop th:nth-child(5),
+        #articulo_modal_backdrop td:nth-child(5),
+        #facturacion_articulo_backdrop th:nth-child(5),
+        #facturacion_articulo_backdrop td:nth-child(5) {
+            width: 12%;
+            text-align: center;
+        }
+
+        #articulo_modal_backdrop th:nth-child(6),
+        #articulo_modal_backdrop td:nth-child(6),
+        #facturacion_articulo_backdrop th:nth-child(6),
+        #facturacion_articulo_backdrop td:nth-child(6) {
+            width: 10%;
+            text-align: right;
+        }
+
+        .art-row-tipo-precio {
+            width: 100%;
+            padding: 1px 3px;
+            font-size: 11px;
+            height: 22px;
+            border: 1px solid #a0a0a0;
+            border-radius: 3px;
+            background: #fff;
+            color: #111;
+            font-family: inherit;
+            cursor: pointer;
         }
 
         #stock_articulos_modal_backdrop th,
@@ -464,6 +503,32 @@
             font-size: 22px;
             font-weight: 700;
             line-height: 1;
+        }
+
+        .etq-precios-wrap {
+            margin-top: 1px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+  .etq-precio-tag { font-size: 1em; font-weight: inherit; margin-right: 3px; }
+
+        .etq-precio-contado,
+        .etq-precio-credito {
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .etq-precio-single {
+            margin-top: 1px;
+            margin-bottom: 2px;
+            line-height: 1.15;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         @media (max-width: 980px) {
@@ -2556,6 +2621,11 @@
                         <option value="codigo">Codigo</option>
                         <option value="grupo">Grupo</option>
                     </select>
+                    <label for="articulo_tipo_precio_global" style="margin-left: 6px;">Precio:</label>
+                    <select id="articulo_tipo_precio_global" style="max-width: 140px;">
+                        <option value="credito" selected>Crédito (Defecto)</option>
+                        <option value="contado">Contado</option>
+                    </select>
                 </div>
                 <div class="search-grid">
                     <table>
@@ -2563,12 +2633,14 @@
                             <tr>
                                 <th>Codigo</th>
                                 <th>Descripcion</th>
-                                <th>Precio</th>
-                                <th>Stock</th>
+                                <th style="text-align: right;">P. Crédito</th>
+                                <th style="text-align: right;">P. Contado</th>
+                                <th style="text-align: center;">Tipo Precio</th>
+                                <th style="text-align: right;">Stock</th>
                             </tr>
                         </thead>
                         <tbody id="articulo_results_body">
-                            <tr><td colspan="4" class="result-empty">Cargando...</td></tr>
+                            <tr><td colspan="6" class="result-empty">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2672,15 +2744,16 @@
                     <table>
                         <thead>
                             <tr>
-                                <th style="width:130px;">Codigo del articulo</th>
-                                <th style="width:130px;">Referencia</th>
+                                <th style="width:120px;">Codigo del articulo</th>
+                                <th style="width:120px;">Referencia</th>
                                 <th>Descripcion</th>
-                                <th style="width:100px; text-align:right;">Precio</th>
-                                <th style="width:90px; text-align:right;">Stock</th>
+                                <th style="width:105px; text-align:right;">Precio Crédito</th>
+                                <th style="width:105px; text-align:right;">Precio Contado</th>
+                                <th style="width:85px; text-align:right;">Stock</th>
                             </tr>
                         </thead>
                         <tbody id="stock_articulos_results_body">
-                            <tr><td colspan="5" class="result-empty">Cargando...</td></tr>
+                            <tr><td colspan="6" class="result-empty">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2706,7 +2779,27 @@
                             </select>
                             <button id="btn_etiquetas_articulos_buscar" type="button" class="btn-small">Seleccionar</button>
                         </div>
-                        <div style="margin-top: 8px; font-weight: 700;">Seleccionados</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; margin-bottom: 4px; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-weight: 700;">Seleccionados</div>
+                            <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="etiquetas_tipo_precio" style="font-weight: 700; color: #163c73;">Precios:</label>
+                                    <select id="etiquetas_tipo_precio" style="height: 28px; border-radius: 8px; border: 1px solid #d8e2f3; padding: 2px 8px; font-size: 12px; background: #fff; font-weight: 600;">
+                                        <option value="ambos" selected>Ambos (Contado y Crédito)</option>
+                                        <option value="contado">Solo al Contado</option>
+                                        <option value="credito">Solo a Crédito</option>
+                                    </select>
+                                </div>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 700; color: #163c73;">
+                                    <input id="etiquetas_chk_barcode" type="checkbox" checked style="accent-color: #1f7aed; width: 15px; height: 15px;" />
+                                    Código de barras
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 700; color: #163c73;">
+                                    <input id="etiquetas_chk_code" type="checkbox" checked style="accent-color: #1f7aed; width: 15px; height: 15px;" />
+                                    Texto del código
+                                </label>
+                            </div>
+                        </div>
                         <div class="search-grid" style="min-height: 180px; max-height: 220px;">
                             <table>
                                 <thead>
@@ -2763,8 +2856,16 @@
                         </div>
                         <div id="etiqueta_format_fields_container"></div>
                     </div>
-                    <div class="etiqueta-format-preview-shell">
-                        <div id="etiquetas_formato_preview"></div>
+                    <div class="etiqueta-format-preview-shell" style="flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px;">
+                        <div style="width: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 6px; flex-shrink: 0;">
+                            <label for="ef_modal_preview_mode" style="font-size: 11px; font-weight: 700; color: #163c73;">Vista previa:</label>
+                            <select id="ef_modal_preview_mode" style="height: 26px; border-radius: 8px; border: 1px solid #d6e1f3; background: #fff; font-size: 11px; font-weight: 600; padding: 0 6px;">
+                                <option value="ambos" selected>Ambos Precios</option>
+                                <option value="contado">Solo Contado (Precio Único)</option>
+                                <option value="credito">Solo Crédito (Precio Único)</option>
+                            </select>
+                        </div>
+                        <div id="etiquetas_formato_preview" style="display: flex; justify-content: center; align-items: center; flex: 1 1 auto; width: 100%;"></div>
                     </div>
                 </div>
             </div>
@@ -2887,6 +2988,15 @@
         const articuloSearchInput = document.getElementById("articulo_search_input");
         const articuloSearchFilter = document.getElementById("articulo_search_filter");
         const articuloResultsBody = document.getElementById("articulo_results_body");
+        const articuloTipoPrecioGlobal = document.getElementById("articulo_tipo_precio_global");
+        if (articuloTipoPrecioGlobal) {
+            articuloTipoPrecioGlobal.addEventListener("change", () => {
+                const val = articuloTipoPrecioGlobal.value || "credito";
+                articuloResultsBody.querySelectorAll(".art-row-tipo-precio").forEach((sel) => {
+                    sel.value = val;
+                });
+            });
+        }
         const grupoArticuloBackdrop = document.getElementById("grupo_articulo_modal_backdrop");
         const btnCloseGrupoArticuloModal = document.getElementById("btn_close_grupo_articulo_modal");
         const btnGaCerrar = document.getElementById("btn_ga_cerrar");
@@ -3810,17 +3920,31 @@
 
         function renderArticulosResults(rows) {
             if (!rows.length) {
-                articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se encontraron articulos.</td></tr>";
+                articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se encontraron articulos.</td></tr>";
                 return;
             }
+            const globalTipoSelect = document.getElementById("articulo_tipo_precio_global");
+            const defaultTipo = globalTipoSelect ? (globalTipoSelect.value || "credito") : "credito";
             articuloResultsBody.innerHTML = rows.map((row) => {
                 const safeJson = encodeURIComponent(JSON.stringify(row));
+                const pCred = fmtNum(row.precio_det, 2) || "0.00";
+                const pCont = (row.precio_ya !== null && row.precio_ya !== undefined && row.precio_ya !== "") ? (fmtNum(row.precio_ya, 2) || "0.00") : pCred;
+                const isGroup = !!row.is_group;
                 return `
                     <tr class="click-row" data-row="${safeJson}">
                         <td>${escapeHtml(row.referencia || row.codigo || row.id_articulo || "")}</td>
                         <td>${escapeHtml(row.descrip_art || "")}</td>
-                        <td>${escapeHtml(fmtNum(row.precio_det, 2) || "0.00")}</td>
-                        <td>${escapeHtml(fmtNum(row.stock, 2) || "0.00")}</td>
+                        <td class="art-cell-credito" style="text-align: right;" title="Clic para seleccionar precio a crédito">${isGroup ? "-" : escapeHtml(pCred)}</td>
+                        <td class="art-cell-contado" style="text-align: right;" title="Clic para seleccionar precio al contado">${isGroup ? "-" : escapeHtml(pCont)}</td>
+                        <td style="text-align: center;" onclick="event.stopPropagation();">
+                            ${isGroup ? "-" : `
+                            <select class="art-row-tipo-precio" style="width: 100%; font-size: 11px; padding: 1px 3px; height: 22px; border: 1px solid #aaa; border-radius: 3px; background: #fff;" onclick="event.stopPropagation();">
+                                <option value="credito" ${defaultTipo === "credito" ? "selected" : ""}>Crédito</option>
+                                <option value="contado" ${defaultTipo === "contado" ? "selected" : ""}>Contado</option>
+                            </select>
+                            `}
+                        </td>
+                        <td style="text-align: right;">${escapeHtml(fmtNum(row.stock, 2) || "0.00")}</td>
                     </tr>
                 `;
             }).join("");
@@ -3833,7 +3957,7 @@
             const url = filtro === "grupo"
                 ? `/grupos-articulos/buscar/?q=${encodeURIComponent(q)}&filtro=descripcion`
                 : `/articulos/buscar/?q=${encodeURIComponent(q)}&filtro=${encodeURIComponent(filtro)}`;
-            articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Buscando...</td></tr>";
+            articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Buscando...</td></tr>";
             try {
                 const mapGroups = (rows) => rows.map((r) => ({
                     is_group: true,
@@ -3848,7 +3972,7 @@
                 if (filtro === "grupo") {
                     const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
                     if (!res.ok) {
-                        articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>No se pudo consultar articulos.</td></tr>";
+                        articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se pudo consultar articulos.</td></tr>";
                         return;
                     }
                     const data = await res.json();
@@ -3885,7 +4009,7 @@
                 const rows = Array.isArray(data.results) ? data.results : [];
                 renderArticulosResults(rows);
             } catch (error) {
-                articuloResultsBody.innerHTML = "<tr><td colspan='4' class='result-empty'>Error de conexion.</td></tr>";
+                articuloResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Error de conexion.</td></tr>";
             }
         }
 
@@ -3900,9 +4024,12 @@
                 empresa: { fontSizePt: 11, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0, align: "left" },
                 articulo: { fontSizePt: 7.2, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.6, align: "left" },
                 referencia: { fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 1.2, align: "left" },
-                precio: { fontSizePt: 12, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
-                barcode: { xMm: 0, yMm: 0, heightMm: 8.5, moduleWidth: 0.96, align: "center" },
-                code: { fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 0.3, align: "center" },
+                precio_contado: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.2, align: "left" },
+                precio: { fontSizePt: 9, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
+                precio_unico_contado: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.2, align: "left" },
+                precio_unico_credito: { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0.4, align: "left" },
+                barcode: { visible: true, xMm: 0, yMm: 0, heightMm: 8.5, moduleWidth: 0.96, align: "center" },
+                code: { visible: true, fontSizePt: 7, fontFamily: "Bahnschrift", bold: false, italic: false, xMm: 0, yMm: 0.3, align: "center" },
             };
         }
 
@@ -3933,15 +4060,18 @@
                 if (typeof v === "boolean") return v;
                 return def;
             };
-            const field = (name) => ({
-                fontSizePt: clampNumber(src[name]?.fontSizePt, base[name].fontSizePt, 5, 48),
-                fontFamily: family(src[name]?.fontFamily, base[name].fontFamily),
-                bold: bool(src[name]?.bold, base[name].bold),
-                italic: bool(src[name]?.italic, base[name].italic),
-                xMm: clampNumber(src[name]?.xMm, base[name].xMm, -20, 20),
-                yMm: clampNumber(src[name]?.yMm, base[name].yMm, -20, 20),
-                align: align(src[name]?.align, base[name].align),
-            });
+            const field = (name, fallbackObj) => {
+                const fb = fallbackObj || base[name] || { fontSizePt: 10, fontFamily: "Bahnschrift", bold: true, italic: false, xMm: 0, yMm: 0, align: "left" };
+                return {
+                    fontSizePt: clampNumber(src[name]?.fontSizePt, fb.fontSizePt, 5, 48),
+                    fontFamily: family(src[name]?.fontFamily, fb.fontFamily),
+                    bold: bool(src[name]?.bold, fb.bold),
+                    italic: bool(src[name]?.italic, fb.italic),
+                    xMm: clampNumber(src[name]?.xMm, fb.xMm, -20, 20),
+                    yMm: clampNumber(src[name]?.yMm, fb.yMm, -20, 20),
+                    align: align(src[name]?.align, fb.align),
+                };
+            };
             return {
                 card: {
                     widthMm: clampNumber(src.card?.widthMm, base.card.widthMm, 20, 120),
@@ -3951,15 +4081,22 @@
                 empresa: field("empresa"),
                 articulo: field("articulo"),
                 referencia: field("referencia"),
+                precio_contado: field("precio_contado"),
                 precio: field("precio"),
+                precio_unico_contado: field("precio_unico_contado", src.precio_contado || base.precio_unico_contado),
+                precio_unico_credito: field("precio_unico_credito", src.precio || base.precio_unico_credito),
                 barcode: {
+                    visible: bool(src.barcode?.visible, base.barcode.visible),
                     xMm: clampNumber(src.barcode?.xMm, base.barcode.xMm, -20, 20),
                     yMm: clampNumber(src.barcode?.yMm, base.barcode.yMm, -20, 20),
                     heightMm: clampNumber(src.barcode?.heightMm, base.barcode.heightMm, 4, 20),
                     moduleWidth: clampNumber(src.barcode?.moduleWidth, base.barcode.moduleWidth, 0.3, 2.5),
                     align: align(src.barcode?.align, base.barcode.align),
                 },
-                code: field("code"),
+                code: {
+                    ...field("code"),
+                    visible: bool(src.code?.visible, base.code.visible),
+                },
             };
         }
 
@@ -4031,11 +4168,14 @@
             efCardPadding.value = String(cfg.card.paddingMm);
             etiquetaFormatFieldsContainer.innerHTML = [
                 buildFieldFormatGroupHtml("empresa", "Empresa"),
-                buildFieldFormatGroupHtml("articulo", "Articulo"),
+                buildFieldFormatGroupHtml("articulo", "Artículo"),
                 buildFieldFormatGroupHtml("referencia", "Referencia"),
-                buildFieldFormatGroupHtml("precio", "Precio"),
-                buildFieldFormatGroupHtml("barcode", "Codigo de barras"),
-                buildFieldFormatGroupHtml("code", "Texto del codigo"),
+                buildFieldFormatGroupHtml("precio_contado", "Precio al Contado (ambos precios)"),
+                buildFieldFormatGroupHtml("precio", "Precio a Crédito (ambos precios)"),
+                buildFieldFormatGroupHtml("precio_unico_contado", "Precio Único al Contado (cuando Crédito está en 0 u oculto)"),
+                buildFieldFormatGroupHtml("precio_unico_credito", "Precio Único a Crédito (cuando Contado está en 0 u oculto)"),
+                buildFieldFormatGroupHtml("barcode", "Código de barras"),
+                buildFieldFormatGroupHtml("code", "Texto del código"),
             ].join("");
             Object.entries(cfg).forEach(([k, obj]) => {
                 if (k === "card") return;
@@ -4217,12 +4357,23 @@
 
         function renderEtiquetaFormatoPreview() {
             const cfg = readEtiquetaFormatoEditor();
+            const mode = (document.getElementById("ef_modal_preview_mode")?.value) || "ambos";
+            let pDet = 4000;
+            let pYa = 3500;
+            if (mode === "contado") {
+                pDet = 0;
+                pYa = 3500;
+            } else if (mode === "credito") {
+                pDet = 4000;
+                pYa = 0;
+            }
             etiquetasFormatoPreview.innerHTML = buildEtiquetaCardHtml({
                 id_articulo: "IR-191",
                 descrip_art: "LICUADORA REALES BASE NEGRA",
                 referencia: "IR-191",
-                precio_det: 4000,
-            }, { isPrint: true, formato: cfg, sample: true });
+                precio_det: pDet,
+                precio_ya: pYa,
+            }, { isPrint: true, formato: cfg, sample: true, tipoPrecio: mode });
         }
 
         async function cargarFormatoEtiquetasUsuario() {
@@ -4234,6 +4385,10 @@
                 const data = await res.json().catch(() => ({}));
                 if (data && typeof data.formato === "object" && data.formato) {
                     etiquetaFormatoConfig = sanitizeEtiquetaFormatoConfig(data.formato);
+                    const chkBarcode = document.getElementById("etiquetas_chk_barcode");
+                    const chkCode = document.getElementById("etiquetas_chk_code");
+                    if (chkBarcode) chkBarcode.checked = (etiquetaFormatoConfig.barcode.visible !== false);
+                    if (chkCode) chkCode.checked = (etiquetaFormatoConfig.code.visible !== false);
                     renderEtiquetasPreview();
                 }
             } catch (error) {
@@ -4278,7 +4433,7 @@
 
         function renderStockArticulosResults(rows) {
             if (!rows.length) {
-                stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>No se encontraron articulos.</td></tr>";
+                stockArticulosResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se encontraron articulos.</td></tr>";
                 return;
             }
             stockArticulosResultsBody.innerHTML = rows.map((r) => `
@@ -4287,6 +4442,7 @@
                     <td>${escapeHtml(r.referencia || "")}</td>
                     <td>${escapeHtml(r.descrip_art || "")}</td>
                     <td style="text-align:right;">${escapeHtml(formatStockNumber(r.precio_det ?? r.precio ?? 0))}</td>
+                    <td style="text-align:right;">${escapeHtml(formatStockNumber(r.precio_ya ?? 0))}</td>
                     <td style="text-align:right;">${escapeHtml(formatStockNumber(r.stock))}</td>
                 </tr>
             `).join("");
@@ -4297,17 +4453,17 @@
             const stockDesde = (stockArticulosDesde.value || "").trim();
             const stockHasta = (stockArticulosHasta.value || "").trim();
             const url = `/articulos/stock/buscar/?q=${encodeURIComponent(q)}&stock_desde=${encodeURIComponent(stockDesde)}&stock_hasta=${encodeURIComponent(stockHasta)}`;
-            stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>Buscando...</td></tr>";
+            stockArticulosResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Buscando...</td></tr>";
             try {
                 const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
                 if (!res.ok) {
-                    stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>No se pudo consultar stock.</td></tr>";
+                    stockArticulosResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>No se pudo consultar stock.</td></tr>";
                     return;
                 }
                 const data = await res.json();
                 renderStockArticulosResults(Array.isArray(data.results) ? data.results : []);
             } catch (error) {
-                stockArticulosResultsBody.innerHTML = "<tr><td colspan='5' class='result-empty'>Error de conexion.</td></tr>";
+                stockArticulosResultsBody.innerHTML = "<tr><td colspan='6' class='result-empty'>Error de conexion.</td></tr>";
             }
         }
 
@@ -4341,6 +4497,7 @@
                 descrip_art: item.descrip_art || "",
                 referencia: item.referencia || "",
                 precio_det: parseNum(item.precio_det),
+                precio_ya: parseNum(item.precio_ya),
                 cantidad_etiquetas: 1,
             });
             renderEtiquetasSeleccionadas();
@@ -4478,18 +4635,76 @@
                 normalHeight: isPrint ? 24 : 20,
             });
             const cardStyle = `width:${cfg.card.widthMm}mm;min-height:${cfg.card.heightMm}mm;padding:${cfg.card.paddingMm}mm;`;
+            const tipoPrecio = options.tipoPrecio || (document.getElementById("etiquetas_tipo_precio") ? document.getElementById("etiquetas_tipo_precio").value : "ambos");
+
+            const valContado = parseNum(row.precio_ya);
+            const valCredito = parseNum(row.precio_det);
+            const hasContado = valContado > 0;
+            const hasCredito = valCredito > 0;
+
+            const singleContadoCfg = cfg.precio_unico_contado || {
+                ...cfg.precio_contado,
+                fontSizePt: Math.min(10, cfg.precio_contado?.fontSizePt || 10),
+                bold: true,
+            };
+            const singleCreditoCfg = cfg.precio_unico_credito || {
+                ...cfg.precio,
+                fontSizePt: Math.min(10, cfg.precio?.fontSizePt || 9.5),
+                bold: true,
+            };
+
+            let preciosHtml = "";
+            if (tipoPrecio === "contado") {
+                preciosHtml = `<div class="etq-precio-single" style="${styleFromTextCfg(singleContadoCfg)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>`;
+            } else if (tipoPrecio === "credito") {
+                preciosHtml = `<div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>`;
+            } else {
+                if (hasContado && hasCredito) {
+                    preciosHtml = `
+                        <div class="etq-precios-wrap">
+                            <div class="etq-precio-contado" style="${styleFromTextCfg(cfg.precio_contado)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>
+                            <div class="etq-precio-credito" style="${styleFromTextCfg(cfg.precio)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>
+                        </div>
+                    `;
+                } else if (hasContado && !hasCredito) {
+                    preciosHtml = `
+                        <div class="etq-precio-single" style="${styleFromTextCfg(singleContadoCfg)}"><span class="etq-precio-tag">Contado:</span> ${escapeHtml(formatEtiquetaPrecio(valContado))}</div>
+                    `;
+                } else if (!hasContado && hasCredito) {
+                    preciosHtml = `
+                        <div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}"><span class="etq-precio-tag">Crédito:</span> ${escapeHtml(formatEtiquetaPrecio(valCredito))}</div>
+                    `;
+                } else {
+                    preciosHtml = `
+                        <div class="etq-precio-single" style="${styleFromTextCfg(singleCreditoCfg)}">${escapeHtml(formatEtiquetaPrecio(0))}</div>
+                    `;
+                }
+            }
+
+            const showBarcode = options.showBarcode !== undefined ? options.showBarcode : (cfg.barcode?.visible !== false);
+            const showCodeText = options.showCodeText !== undefined ? options.showCodeText : (cfg.code?.visible !== false);
+
+            let barcodeHtml = "";
+            if (showBarcode || showCodeText) {
+                const barcodeSvgHtml = showBarcode ? `<div class="etq-barcode" style="${styleFromBarcodeCfg(cfg.barcode)}">${barcode.svg}</div>` : "";
+                const codeTextHtml = showCodeText ? `<div class="etq-code" style="${styleFromTextCfg(cfg.code)}">${escapeHtml(barcode.text)}</div>` : "";
+                barcodeHtml = `
+                    <div class="etq-barcode-wrap">
+                        <div class="etq-barcode-frame">
+                            ${barcodeSvgHtml}
+                            ${codeTextHtml}
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="etiqueta-card" style="${cardStyle}">
                     <div class="etq-empresa" style="${styleFromTextCfg(cfg.empresa)}">${escapeHtml(empresaNombre)}</div>
                     <div class="etq-articulo" style="${styleFromTextCfg(cfg.articulo)}">${escapeHtml(row.descrip_art)}</div>
                     <div class="etq-ref" style="${styleFromTextCfg(cfg.referencia)}">Ref: ${escapeHtml(row.referencia || "")}</div>
-                    <div class="etq-precio" style="${styleFromTextCfg(cfg.precio)}">${escapeHtml(formatEtiquetaPrecio(row.precio_det))}</div>
-                    <div class="etq-barcode-wrap">
-                        <div class="etq-barcode-frame">
-                            <div class="etq-barcode" style="${styleFromBarcodeCfg(cfg.barcode)}">${barcode.svg}</div>
-                            <div class="etq-code" style="${styleFromTextCfg(cfg.code)}">${escapeHtml(barcode.text)}</div>
-                        </div>
-                    </div>
+                    ${preciosHtml}
+                    ${barcodeHtml}
                 </div>
             `;
         }
@@ -4525,7 +4740,7 @@
                 uomInput.innerHTML = renderUnidadMedidaOptions(data.um_inv || "");
                 setUomByDescripcion(uomInput, data.um_inv);
             }
-            if (precioInput) precioInput.value = fmtNum(data.precio_det, 2) || "0.00";
+            if (precioInput) precioInput.value = fmtNum(data.precio_aplicado ?? data.precio_det, 2) || "0.00";
             if (idItbisCell) idItbisCell.textContent = (data.id_impto_vt == null ? "" : String(data.id_impto_vt));
             const cantInput = row.querySelector(".detalle-cant");
             if (cantInput) {
@@ -6141,6 +6356,7 @@
         efCardWidth?.addEventListener("input", renderEtiquetaFormatoPreview);
         efCardHeight?.addEventListener("input", renderEtiquetaFormatoPreview);
         efCardPadding?.addEventListener("input", renderEtiquetaFormatoPreview);
+        document.getElementById("ef_modal_preview_mode")?.addEventListener("change", renderEtiquetaFormatoPreview);
         etiquetaFormatFieldsContainer?.addEventListener("input", renderEtiquetaFormatoPreview);
         etiquetaFormatFieldsContainer?.addEventListener("change", renderEtiquetaFormatoPreview);
         btnEtiquetasImprimir?.addEventListener("click", () => {
@@ -6149,13 +6365,18 @@
                 return;
             }
             const cfg = sanitizeEtiquetaFormatoConfig(etiquetaFormatoConfig || getDefaultEtiquetaFormatoConfig());
+            const tipoPrecio = document.getElementById("etiquetas_tipo_precio") ? document.getElementById("etiquetas_tipo_precio").value : "ambos";
+            const chkBarcode = document.getElementById("etiquetas_chk_barcode");
+            const chkCode = document.getElementById("etiquetas_chk_code");
+            const showBarcode = chkBarcode ? chkBarcode.checked : (cfg.barcode?.visible !== false);
+            const showCodeText = chkCode ? chkCode.checked : (cfg.code?.visible !== false);
             const w = window.open("", "_blank");
             if (!w) return;
             const pages = [];
             etiquetasSeleccionadas.forEach((r) => {
                 const qty = Math.max(1, Math.min(5, parseInt(String(r.cantidad_etiquetas || 1), 10) || 1));
                 for (let i = 0; i < qty; i += 1) {
-                    pages.push(`<section class="print-page">${buildEtiquetaCardHtml(r, { isPrint: true, formato: cfg })}</section>`);
+                    pages.push(`<section class="print-page">${buildEtiquetaCardHtml(r, { isPrint: true, formato: cfg, tipoPrecio, showBarcode, showCodeText })}</section>`);
                 }
             });
             const html = `
@@ -6185,6 +6406,10 @@
                     justify-content: flex-start;
                     overflow: hidden;
                 }
+                .etq-precios-wrap { margin-top: 1px; display: flex; flex-direction: column; gap: 1px; }
+  .etq-precio-tag { font-size: 1em; font-weight: inherit; margin-right: 3px; }
+                .etq-precio-contado, .etq-precio-credito { line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .etq-precio-single { margin-top: 1px; margin-bottom: 2px; line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .etq-barcode-wrap { margin-top: auto; display: flex; justify-content: center; width: 100%; }
                 .etq-barcode-frame { width: 100%; display: flex; flex-direction: column; align-items: center; }
                 .etq-barcode { width: 100%; display: block; }
@@ -6198,6 +6423,19 @@
             w.document.close();
             w.focus();
             w.print();
+        });
+        document.getElementById("etiquetas_tipo_precio")?.addEventListener("change", () => renderEtiquetasPreview());
+        document.getElementById("etiquetas_chk_barcode")?.addEventListener("change", (e) => {
+            if (etiquetaFormatoConfig?.barcode) {
+                etiquetaFormatoConfig.barcode.visible = e.target.checked;
+            }
+            renderEtiquetasPreview();
+        });
+        document.getElementById("etiquetas_chk_code")?.addEventListener("change", (e) => {
+            if (etiquetaFormatoConfig?.code) {
+                etiquetaFormatoConfig.code.visible = e.target.checked;
+            }
+            renderEtiquetasPreview();
         });
         btnGaCerrar?.addEventListener("click", closeGrupoArticulosModal);
         btnGaNuevo?.addEventListener("click", () => {
@@ -6598,6 +6836,16 @@
                 closeArticuloModal();
                 return;
             }
+            const tipoSelect = row.querySelector(".art-row-tipo-precio");
+            const clickedContado = !!event.target.closest(".art-cell-contado");
+            const clickedCredito = !!event.target.closest(".art-cell-credito");
+            let tipo = tipoSelect ? (tipoSelect.value || "credito") : "credito";
+            if (clickedContado) tipo = "contado";
+            else if (clickedCredito) tipo = "credito";
+            const pCred = parseFloat(data.precio_det) || 0;
+            const pCont = (data.precio_ya !== null && data.precio_ya !== undefined && data.precio_ya !== "") ? (parseFloat(data.precio_ya) || 0) : pCred;
+            data.tipo_precio = tipo;
+            data.precio_aplicado = (tipo === "contado" && pCont > 0) ? pCont : pCred;
             await applyArticuloToPrefacturaRow(articuloTargetRow, data);
             closeArticuloModal();
         });

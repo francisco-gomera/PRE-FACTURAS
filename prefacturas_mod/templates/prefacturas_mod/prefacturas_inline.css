@@ -273,23 +273,62 @@
         }
 
         #articulo_modal_backdrop th:nth-child(1),
-        #articulo_modal_backdrop td:nth-child(1) {
-            width: 20%;
+        #articulo_modal_backdrop td:nth-child(1),
+        #facturacion_articulo_backdrop th:nth-child(1),
+        #facturacion_articulo_backdrop td:nth-child(1) {
+            width: 16%;
         }
 
         #articulo_modal_backdrop th:nth-child(2),
-        #articulo_modal_backdrop td:nth-child(2) {
-            width: 48%;
+        #articulo_modal_backdrop td:nth-child(2),
+        #facturacion_articulo_backdrop th:nth-child(2),
+        #facturacion_articulo_backdrop td:nth-child(2) {
+            width: 36%;
         }
 
         #articulo_modal_backdrop th:nth-child(3),
-        #articulo_modal_backdrop td:nth-child(3) {
-            width: 16%;
+        #articulo_modal_backdrop td:nth-child(3),
+        #facturacion_articulo_backdrop th:nth-child(3),
+        #facturacion_articulo_backdrop td:nth-child(3) {
+            width: 13%;
+            text-align: right;
         }
 
         #articulo_modal_backdrop th:nth-child(4),
-        #articulo_modal_backdrop td:nth-child(4) {
-            width: 16%;
+        #articulo_modal_backdrop td:nth-child(4),
+        #facturacion_articulo_backdrop th:nth-child(4),
+        #facturacion_articulo_backdrop td:nth-child(4) {
+            width: 13%;
+            text-align: right;
+        }
+
+        #articulo_modal_backdrop th:nth-child(5),
+        #articulo_modal_backdrop td:nth-child(5),
+        #facturacion_articulo_backdrop th:nth-child(5),
+        #facturacion_articulo_backdrop td:nth-child(5) {
+            width: 12%;
+            text-align: center;
+        }
+
+        #articulo_modal_backdrop th:nth-child(6),
+        #articulo_modal_backdrop td:nth-child(6),
+        #facturacion_articulo_backdrop th:nth-child(6),
+        #facturacion_articulo_backdrop td:nth-child(6) {
+            width: 10%;
+            text-align: right;
+        }
+
+        .art-row-tipo-precio {
+            width: 100%;
+            padding: 1px 3px;
+            font-size: 11px;
+            height: 22px;
+            border: 1px solid #a0a0a0;
+            border-radius: 3px;
+            background: #fff;
+            color: #111;
+            font-family: inherit;
+            cursor: pointer;
         }
 
         #stock_articulos_modal_backdrop th,

@@ -1121,6 +1121,11 @@
           <option value="descripcion" selected>Descripcion</option>
           <option value="codigo">Codigo</option>
         </select>
+        <label for="facturacion_articulo_tipo_precio_global" style="margin-left: 6px;">Precio:</label>
+        <select id="facturacion_articulo_tipo_precio_global" style="max-width: 140px;">
+          <option value="credito" selected>Crédito (Defecto)</option>
+          <option value="contado">Contado</option>
+        </select>
       </div>
       <div class="search-grid">
         <table>
@@ -1128,12 +1133,14 @@
             <tr>
               <th>Codigo</th>
               <th>Descripcion</th>
-              <th>Precio</th>
-              <th>Stock</th>
+              <th style="text-align:right;">P. Crédito</th>
+              <th style="text-align:right;">P. Contado</th>
+              <th style="text-align:center;">Tipo Precio</th>
+              <th style="text-align:right;">Stock</th>
             </tr>
           </thead>
           <tbody id="facturacion_articulo_results_body">
-            <tr><td colspan="4" class="result-empty">Cargando...</td></tr>
+            <tr><td colspan="6" class="result-empty">Cargando...</td></tr>
           </tbody>
         </table>
       </div>
