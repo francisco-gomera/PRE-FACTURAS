@@ -21,6 +21,10 @@ import socket
 import uuid
 from decimal import Decimal
 
+import base64
+from ajustes.user_signatures import get_user_signature_bytes
+from ajustes.print_formats import get_print_format
+
 from .models import EtiquetaFormatoUsuario
 from .models_existing import DetPedido, MaestroSn, MaestroArticulo, Usuario
 
@@ -652,6 +656,148 @@ def cambiar_password_view(request):
     return JsonResponse({"ok": True})
 
 
+def _build_inline_image_src(base64_value, image_type):
+    encoded = str(base64_value or "").strip()
+    if not encoded:
+        return ""
+    normalized_type = str(image_type or "").strip().lower()
+    if normalized_type.startswith("image/"):
+        return f"data:{normalized_type};base64,{encoded}"
+    if normalized_type:
+        return f"data:image/{normalized_type};base64,{encoded}"
+    return f"data:image/png;base64,{encoded}"
+
+
+@require_http_methods(["GET"])
+def prefactura_print_view(request):
+    auth_payload = _require_perm_or_denied(request, "prefacturas", "ver")
+    if not isinstance(auth_payload, dict):
+        return auth_payload
+
+    id_doc = (request.GET.get("id_doc") or "").strip()
+    if not id_doc:
+        return JsonResponse({"detail": "Parametro id_doc requerido"}, status=400)
+
+    try:
+        copies = int(request.GET.get("copies") or "1")
+    except Exception:
+        copies = 1
+    copies = max(1, min(copies, 20))
+    autoprint = str(request.GET.get("autoprint") or "").strip().lower() in {"1", "true", "yes", "si"}
+    mobile_print = str(request.GET.get("mobile_print") or "").strip().lower() in {"1", "true", "yes", "si"}
+
+    from core.views import _get_empresa_data
+    empresa = _get_empresa_data()
+    empresa["logo_src"] = _build_inline_image_src(empresa.get("logo_b64"), empresa.get("logo_tipo"))
+    firma_bytes = get_user_signature_bytes((auth_payload or {}).get("usuario_id"))
+    firma_src = _build_inline_image_src(base64.b64encode(firma_bytes).decode("ascii"), "image/png") if firma_bytes else ""
+
+    documento = None
+    detalles = []
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP 1
+                ID_DOC, ID_SN, NOM_SOCIO, RNC_CED, CONTACTO, FECHA_DOC, FECHA_VENC, FECHA_CONT,
+                ENT_FACTURA, ENT_MERCANCIA, COMENTARIO, SUBTOTAL, TOTAL_DESC, TOTAL_ITBIS,
+                TOTAL_DOC, CONDICION, DIA, UPPER(ISNULL(EST_DOC, ''))
+            FROM CAB_PEDIDO
+            WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
+            """,
+            [id_doc],
+        )
+        row = cursor.fetchone()
+
+        if row:
+            documento = {
+                "id_doc": str(row[0] or ""),
+                "id_sn": str(row[1] or ""),
+                "nom_socio": str(row[2] or ""),
+                "rnc_ced": str(row[3] or ""),
+                "contacto": str(row[4] or ""),
+                "fecha_doc": row[5],
+                "fecha_venc": row[6],
+                "fecha_cont": row[7],
+                "ent_factura": str(row[8] or ""),
+                "ent_mercancia": str(row[9] or ""),
+                "comentario": str(row[10] or ""),
+                "subtotal": Decimal(row[11] or 0),
+                "total_desc": Decimal(row[12] or 0),
+                "total_itbis": Decimal(row[13] or 0),
+                "total_doc": Decimal(row[14] or 0),
+                "condicion": str(row[15] or ""),
+                "dia": row[16] or 0,
+                "est_doc": str(row[17] or ""),
+            }
+
+            cursor.execute(
+                """
+                SELECT No_LINEA, ID_ARTICULO, DESCRIP_ART, CANTIDAD, MEDIDA, PRECIO,
+                       PORC_DESC, TOTAL_DESC, TOTAL_LINEA, ID_IMPTO
+                FROM DET_PEDIDO
+                WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
+                ORDER BY No_LINEA, ID_DETALLE
+                """,
+                [id_doc],
+            )
+            for d in cursor.fetchall():
+                detalles.append(
+                    {
+                        "linea": int(d[0] or 0),
+                        "id_articulo": str(d[1] or ""),
+                        "descrip_art": str(d[2] or ""),
+                        "cantidad": Decimal(d[3] or 0),
+                        "medida": str(d[4] or ""),
+                        "precio": Decimal(d[5] or 0),
+                        "porc_desc": Decimal(d[6] or 0),
+                        "total_desc": Decimal(d[7] or 0),
+                        "total_linea": Decimal(d[8] or 0),
+                        "id_impto": d[9],
+                    }
+                )
+
+    if not documento:
+        return JsonResponse({"detail": "Documento no encontrado"}, status=404)
+
+    is_cotizacion = (documento.get("est_doc", "").strip().upper() == "COTIZACION")
+    if is_cotizacion:
+        doc_label = "COTIZACIÓN"
+        doc_numero_label = "No. Cotización"
+        detalle_label = "Detalle de Cotización"
+        default_tipo_label = "Cotización"
+        page_title = f"Cotización {id_doc}"
+    else:
+        doc_label = "PRE-FACTURA"
+        doc_numero_label = "No. Pre-factura"
+        detalle_label = "Detalle de Pre-factura"
+        default_tipo_label = "Pre-factura"
+        page_title = f"Pre-factura {id_doc}"
+
+    return render(
+        request,
+        "prefacturas_app/prefactura_print.html",
+        {
+            "auth_payload": auth_payload,
+            "empresa": empresa,
+            "firma_src": firma_src,
+            "documento": documento,
+            "detalles": detalles,
+            "page_title": page_title,
+            "doc_label": doc_label,
+            "doc_numero_label": doc_numero_label,
+            "detalle_label": detalle_label,
+            "default_tipo_label": default_tipo_label,
+            "is_cotizacion": is_cotizacion,
+            "fecha_impresion": timezone.localtime(),
+            "copies_range": range(copies),
+            "autoprint": autoprint,
+            "mobile_print": mobile_print,
+            "formato_impresion": get_print_format("factura"),
+        },
+    )
+
+
 @require_http_methods(["GET"])
 def estado_cuenta_print_view(request):
     auth_payload = _require_perm_or_denied(request, "clientes", "ver_estado_cuenta")
@@ -1035,6 +1181,9 @@ def buscar_prefacturas_view(request):
         elif filtro == "nombre":
             sql += " WHERE NOM_SOCIO LIKE %s"
             params.append(f"%{query}%")
+        elif filtro == "estado":
+            sql += " WHERE EST_DOC LIKE %s"
+            params.append(f"%{query}%")
         else:
             sql += " WHERE CAST(ID_DOC AS VARCHAR(50)) LIKE %s"
             params.append(f"%{query}%")
@@ -1043,6 +1192,8 @@ def buscar_prefacturas_view(request):
         sql += " ORDER BY ID_SN, ID_DOC DESC"
     elif filtro == "nombre":
         sql += " ORDER BY NOM_SOCIO, ID_DOC DESC"
+    elif filtro == "estado":
+        sql += " ORDER BY EST_DOC, ID_DOC DESC"
     else:
         sql += " ORDER BY TRY_CAST(ID_DOC AS BIGINT) DESC, ID_DOC DESC"
 
@@ -1558,9 +1709,11 @@ def actualizar_prefactura_view(request):
         "abierto": "Abierto",
         "cerrado": "Cerrado",
         "cancelado": "Cancelado",
+        "cotizacion": "Cotizacion",
+        "cotización": "Cotizacion",
     }
     est_doc = est_map.get(est_doc_raw.lower(), "")
-    if est_doc not in {"Abierto", "Cerrado", "Cancelado"}:
+    if est_doc not in {"Abierto", "Cerrado", "Cancelado", "Cotizacion"}:
         return JsonResponse({"detail": "est_doc invalido"}, status=400)
 
     detalles = payload.get("detalles") or []
@@ -1914,7 +2067,13 @@ def crear_prefactura_view(request):
             return s
         return s if len(s) <= max_len else s[:max_len]
 
-    est_doc = "Abierto"
+    est_doc_raw = str(payload.get("est_doc") or "").strip().lower()
+    if est_doc_raw in {"cotizacion", "cotización"}:
+        est_doc = "Cotizacion"
+    elif est_doc_raw in {"cerrado", "cancelado"}:
+        est_doc = est_doc_raw.capitalize()
+    else:
+        est_doc = "Abierto"
     detalles = payload.get("detalles") or []
     if not isinstance(detalles, list):
         return JsonResponse({"detail": "detalles invalido"}, status=400)
@@ -2156,11 +2315,13 @@ def actualizar_estado_prefactura_view(request):
         "abierto": "Abierto",
         "cerrado": "Cerrado",
         "cancelado": "Cancelado",
+        "cotizacion": "Cotizacion",
+        "cotización": "Cotizacion",
     }
     est_doc = est_map.get(est_doc_raw.lower(), "")
     if not id_doc:
         return JsonResponse({"detail": "id_doc requerido"}, status=400)
-    if est_doc not in {"Abierto", "Cerrado", "Cancelado"}:
+    if est_doc not in {"Abierto", "Cerrado", "Cancelado", "Cotizacion"}:
         return JsonResponse({"detail": "est_doc invalido"}, status=400)
 
     if est_doc == "Cerrado" and not has_perm(auth_payload.get("usuario_id"), "prefacturas", "cerrar"):

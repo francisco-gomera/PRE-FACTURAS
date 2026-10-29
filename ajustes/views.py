@@ -581,6 +581,7 @@ def _sync_ecf_documentos(limit=150):
                 SELECT TOP {max(int(limit), 1)} ID_DOC, FECHA_DOC, NOM_SOCIO, RNC_CED, TOTAL_DOC,
                        ISNULL(NCF, ''), ISNULL(TIPO, ''), ISNULL(ID_NCF, 0), ISNULL(EST_DOC, '')
                 FROM CAB_PEDIDO
+                WHERE UPPER(ISNULL(EST_DOC, '')) <> 'COTIZACION'
                 ORDER BY FECHA_DOC DESC, ID_DOC DESC
                 """
             )
@@ -601,6 +602,8 @@ def _sync_ecf_documentos(limit=150):
         tipo_cab = str(row[6] or "").strip()
         id_ncf = _to_int(row[7], 0)
         est_doc = str(row[8] or "").strip().upper()
+        if est_doc == "COTIZACION":
+            continue
         tipo_ecf = _inferir_tipo_ecf(tipo_cab, id_ncf)
         estado = "PENDIENTE"
         if encf.startswith("E"):

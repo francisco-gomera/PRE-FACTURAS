@@ -1658,12 +1658,22 @@ def _sync_ecf_documentos(limit=150):
                 SELECT TOP {max(int(limit), 1)} ID_DOC, FECHA_DOC, NOM_SOCIO, RNC_CED, TOTAL_DOC,
                        ISNULL(NCF, ''), ISNULL(TIPO, ''), ISNULL(ID_NCF, 0), ISNULL(EST_DOC, '')
                 FROM CAB_PEDIDO
+                WHERE UPPER(ISNULL(EST_DOC, '')) <> 'COTIZACION'
                 ORDER BY FECHA_DOC DESC, ID_DOC DESC
                 """
             )
             documentos = list(cursor.fetchall())
     except Exception:
         return 0
+
+    try:
+        with connection.cursor() as del_cursor:
+            del_cursor.execute("SELECT ID_DOC FROM CAB_PEDIDO WHERE UPPER(ISNULL(EST_DOC, '')) = 'COTIZACION'")
+            cotiz_ids = [r[0] for r in del_cursor.fetchall() if r and r[0]]
+            if cotiz_ids:
+                FacturacionElectronicaDocumento.objects.filter(id_doc__in=cotiz_ids).delete()
+    except Exception:
+        pass
 
     sincronizados = 0
     for row in documentos:
@@ -1678,6 +1688,8 @@ def _sync_ecf_documentos(limit=150):
         tipo_cab = str(row[6] or "").strip()
         id_ncf = _to_int(row[7], 0)
         est_doc = str(row[8] or "").strip().upper()
+        if est_doc == "COTIZACION":
+            continue
         tipo_ecf = _inferir_tipo_ecf(tipo_cab, id_ncf)
         estado = "PENDIENTE"
         if encf.startswith("E"):
@@ -1789,6 +1801,7 @@ def emision_prefacturas_view(request):
             FECHA_CONT, FECHA_DOC, FECHA_VENC, COMENTARIO, TOTAL_DOC
         FROM CAB_PEDIDO
         WHERE UPPER(ISNULL(EST_DOC, '')) = 'ABIERTO'
+          AND UPPER(ISNULL(EST_DOC, '')) <> 'COTIZACION'
           AND NOT EXISTS (
                 SELECT 1
                 FROM CAB_FACTURA f
@@ -1873,6 +1886,7 @@ def emision_prefacturas_status_view(request):
             MAX(COALESCE(FECHA_ACT, FECHA_DOC)) AS max_fecha
         FROM CAB_PEDIDO
         WHERE UPPER(ISNULL(EST_DOC, '')) = 'ABIERTO'
+          AND UPPER(ISNULL(EST_DOC, '')) <> 'COTIZACION'
           AND NOT EXISTS (
                 SELECT 1
                 FROM CAB_FACTURA f
@@ -1942,7 +1956,10 @@ def emision_prefactura_lock_view(request):
         pref = cursor.fetchone()
     if not pref:
         return JsonResponse({"detail": "Prefactura no encontrada."}, status=404)
-    if str(pref[0] or "").strip() != "ABIERTO":
+    pref_status = str(pref[0] or "").strip().upper()
+    if pref_status == "COTIZACION":
+        return JsonResponse({"detail": "El documento es una cotizacion y no puede ser facturado."}, status=400)
+    if pref_status != "ABIERTO":
         return JsonResponse({"detail": "La prefactura ya no esta abierta."}, status=409)
 
     acquire_result = _prefactura_lock_acquire(
@@ -1992,6 +2009,8 @@ def emision_prefactura_detalle_view(request):
 
     if not cab:
         return JsonResponse({"detail": "Prefactura no encontrada"}, status=404)
+    if str(cab[7] or "").strip().upper() == "COTIZACION":
+        return JsonResponse({"detail": "El documento es una cotizacion y no puede ser facturado directamente."}, status=400)
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -4196,6 +4215,74 @@ def factura_print_view(request):
                 )
 
     if not factura:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1
+                    ID_DOC, ID_SN, NOM_SOCIO, RNC_CED, CONTACTO, FECHA_DOC, FECHA_VENC,
+                    ENT_FACTURA, ENT_MERCANCIA, COMENTARIO, SUBTOTAL, TOTAL_DESC, TOTAL_ITBIS,
+                    TOTAL_DOC, CONDICION, DIA, UPPER(ISNULL(EST_DOC, ''))
+                FROM CAB_PEDIDO
+                WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
+                """,
+                [id_doc],
+            )
+            pref_row = cursor.fetchone()
+            if pref_row:
+                pref_est = str(pref_row[16] or "")
+                factura = {
+                    "id_doc": str(pref_row[0] or ""),
+                    "id_doc_pv": "",
+                    "id_sn": str(pref_row[1] or ""),
+                    "nom_socio": str(pref_row[2] or ""),
+                    "rnc_ced": str(pref_row[3] or ""),
+                    "contacto": str(pref_row[4] or ""),
+                    "fecha_doc": pref_row[5],
+                    "fecha_venc": pref_row[6],
+                    "ent_factura": str(pref_row[7] or ""),
+                    "ent_mercancia": str(pref_row[8] or ""),
+                    "comentario": str(pref_row[9] or ""),
+                    "subtotal": Decimal(pref_row[10] or 0),
+                    "total_desc": Decimal(pref_row[11] or 0),
+                    "total_itbis": Decimal(pref_row[12] or 0),
+                    "total_doc": Decimal(pref_row[13] or 0),
+                    "encf": "",
+                    "id_ncf": 0,
+                    "tipo": "Cotizacion" if pref_est == "COTIZACION" else "Pre-factura",
+                    "condicion": str(pref_row[14] or ""),
+                    "dia": _to_int(pref_row[15], 0),
+                    "cancelado": False,
+                    "ncf_nc": "",
+                    "monica": None,
+                    "est_doc": pref_est,
+                }
+                cursor.execute(
+                    """
+                    SELECT No_LINEA, ID_ARTICULO, DESCRIP_ART, CANTIDAD, MEDIDA, PRECIO,
+                           PORC_DESC, TOTAL_DESC, TOTAL_LINEA, ID_IMPTO
+                    FROM DET_PEDIDO
+                    WHERE CAST(ID_DOC AS VARCHAR(50)) = %s
+                    ORDER BY No_LINEA, ID_DETALLE
+                    """,
+                    [id_doc],
+                )
+                for d in cursor.fetchall():
+                    detalles.append(
+                        {
+                            "linea": _to_int(d[0], 0),
+                            "id_articulo": str(d[1] or ""),
+                            "descrip_art": str(d[2] or ""),
+                            "cantidad": Decimal(d[3] or 0),
+                            "medida": str(d[4] or ""),
+                            "precio": Decimal(d[5] or 0),
+                            "porc_desc": Decimal(d[6] or 0),
+                            "total_desc": Decimal(d[7] or 0),
+                            "total_itbis": Decimal(0),
+                            "total_linea": Decimal(d[8] or 0),
+                        }
+                    )
+
+    if not factura:
         return JsonResponse({"detail": "Factura no encontrada"}, status=404)
 
     documento_ecf = FacturacionElectronicaDocumento.objects.filter(id_doc=_to_int(id_doc, 0)).first()
@@ -4211,9 +4298,20 @@ def factura_print_view(request):
 
     factura_encf = str((factura or {}).get("encf") or "").strip()
     factura_id_ncf = _to_int((factura or {}).get("id_ncf"), 0)
+    pref_est = str((factura or {}).get("est_doc") or "").upper()
     is_credit_note = factura_id_ncf == 34
     is_electronica = bool(documento_ecf or factura_encf.upper().startswith("E") or factura_id_ncf in ECF_ID_NCF_CODES)
-    if is_credit_note:
+    if pref_est == "COTIZACION":
+        doc_label = "COTIZACIÓN"
+        doc_numero_label = "No. Cotización"
+        detalle_label = "Detalle de Cotización"
+        is_electronica = False
+    elif pref_est in ("ABIERTO", "CERRADO", "CANCELADO"):
+        doc_label = "PRE-FACTURA"
+        doc_numero_label = "No. Pre-factura"
+        detalle_label = "Detalle de Pre-factura"
+        is_electronica = False
+    elif is_credit_note:
         doc_label = "NOTA DE CREDITO / RI e-CF" if is_electronica else "NOTA DE CREDITO"
         doc_numero_label = "No. Nota de credito"
         detalle_label = "Detalle de Nota de Credito"

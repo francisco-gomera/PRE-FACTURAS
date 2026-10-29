@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ page_title|default:"Documento" }}</title>
+    <style>
+        :root {
+            --ink: #1d1d1d;
+            --muted: #6a6a6a;
+            --line: #bfc7d6;
+            --blue: #153d8a;
+            --soft: #eef4ff;
+            --danger: #a32020;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #eceff4;
+            color: var(--ink);
+            font-family: "Bahnschrift", "Segoe UI", sans-serif;
+        }
+        .toolbar {
+            max-width: 210mm;
+            margin: 10px auto 0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 0 8px;
+        }
+        .toolbar button {
+            border: 1px solid #6b6b6b;
+            background: linear-gradient(#ffffff, #d9d9d9);
+            border-radius: 6px;
+            height: 32px;
+            min-width: 110px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 8px auto 24px;
+            background: #fff;
+            border: 1px solid #c6ccd7;
+            padding: 10mm 10mm 12mm;
+            page-break-after: always;
+            break-after: page;
+            display: flex;
+            flex-direction: column;
+        }
+        .page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+        }
+        .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--blue);
+            padding-bottom: 8px;
+            gap: 16px;
+        }
+        .company {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .company-logo {
+            max-width: 90px;
+            max-height: 60px;
+            object-fit: contain;
+            border: 1px solid #d5dbe5;
+            padding: 2px;
+            background: #fff;
+        }
+        .company h1 {
+            margin: 0;
+            font-size: 19px;
+            color: var(--blue);
+            letter-spacing: 0.5px;
+        }
+        .company .meta {
+            font-size: 11px;
+            color: var(--muted);
+            line-height: 1.35;
+            margin-top: 2px;
+        }
+        .doc-box {
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 8px 12px;
+            min-width: 220px;
+            background: var(--soft);
+            text-align: right;
+        }
+        .doc-title {
+            margin: 0 0 4px;
+            font-size: 18px;
+            color: var(--blue);
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .doc-meta {
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .section {
+            margin-top: 8px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .section-head {
+            background: #f1f4fa;
+            border-bottom: 1px solid var(--line);
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .section-body {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 14px;
+        }
+        .buyer-info {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .buyer-full {
+            grid-column: 1 / -1;
+        }
+        .buyer-muted {
+            color: #4b5563;
+        }
+        .label {
+            color: var(--muted);
+            margin-right: 4px;
+        }
+        table.detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        table.detail-table th {
+            background: #f7f9fd;
+            border-bottom: 1px solid var(--line);
+            padding: 5px 6px;
+            text-align: left;
+            font-size: 10.5px;
+            color: #2b3950;
+        }
+        table.detail-table td {
+            border-bottom: 1px solid #e7ecf3;
+            padding: 4px 6px;
+            vertical-align: middle;
+        }
+        .ticket-detail {
+            display: none;
+        }
+        .align-r { text-align: right; }
+        .align-c { text-align: center; }
+        .totals {
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .notes {
+            flex: 1;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 10.5px;
+            min-height: 72px;
+            background: #fafbfd;
+        }
+        .totals-box {
+            width: 250px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .totals-box table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .totals-box td {
+            padding: 3px 8px;
+            border-bottom: 1px solid #edf1f7;
+        }
+        .totals-box tr.grand td {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--blue);
+            background: #f3f7fd;
+            border-top: 1px solid var(--line);
+        }
+        .legal-note {
+            margin-top: 8px;
+            font-size: 8.5px;
+            line-height: 1.35;
+            color: #4a4a4a;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 5px 8px;
+            background: #fafafa;
+        }
+        .footer {
+            margin-top: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 26px;
+            align-items: end;
+            padding-top: 12px;
+        }
+        .sign-box {
+            min-height: 26mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .sign-space {
+            width: 100%;
+            min-height: 16mm;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .sign-space img {
+            max-width: 58mm;
+            max-height: 24mm;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+        .sign-line {
+            width: 100%;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.35;
+            color: #111;
+        }
+        .sign-line strong {
+            display: block;
+            font-size: 12px;
+            color: #111;
+        }
+        .sign-line .placeholder {
+            visibility: hidden;
+        }
+        .ticket-item {
+            display: none;
+        }
+
+        @page {
+            {% if formato_impresion == "80mm" %}
+            size: 80mm 297mm;
+            margin: 0;
+            {% elif formato_impresion == "58mm" %}
+            size: 58mm 297mm;
+            margin: 0;
+            {% else %}
+            size: A4 portrait;
+            margin: {% if mobile_print %}6mm 6mm 7mm{% else %}10mm{% endif %};
+            {% endif %}
+        }
+
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .page {
+                width: auto;
+                min-height: {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}auto{% elif mobile_print %}284mm{% else %}272mm{% endif %};
+                margin: 0;
+                border: none;
+                padding: 0;
+                box-shadow: none;
+                display: flex;
+                flex-direction: column;
+            }
+            body:not(.mobile-print) .footer {
+                margin-top: auto;
+                padding-top: 6px;
+            }
+            body:not(.mobile-print) .sign-box {
+                min-height: 24mm;
+            }
+            body:not(.mobile-print) .sign-space {
+                min-height: 14mm;
+            }
+            body:not(.mobile-print) .sign-space img {
+                max-height: 22mm;
+                max-width: 58mm;
+            }
+        }
+
+        /* Ticket formats (80mm / 58mm) */
+        {% if formato_impresion == "80mm" or formato_impresion == "58mm" %}
+        body.print-format-80mm,
+        body.print-format-58mm {
+            background: #fff;
+        }
+        .page {
+            width: {% if formato_impresion == "80mm" %}80mm{% else %}58mm{% endif %};
+            max-width: {% if formato_impresion == "80mm" %}80mm{% else %}58mm{% endif %};
+            min-height: auto;
+            margin: 4px auto;
+            padding: 3mm 2mm;
+            border: 1px dashed #999;
+            font-size: 11px;
+        }
+        .head {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-bottom: 1px dashed var(--line);
+            gap: 4px;
+        }
+        .company {
+            flex-direction: column;
+            text-align: center;
+        }
+        .company h1 { font-size: 14px; }
+        .doc-box {
+            min-width: 100%;
+            text-align: center;
+            background: none;
+            border: none;
+            padding: 2px 0;
+        }
+        .doc-title { font-size: 15px; }
+        .detail-table { display: none; }
+        .ticket-detail { display: block; margin-top: 6px; }
+        .ticket-head {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 9px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 2px;
+        }
+        .ticket-item {
+            display: block;
+            border-bottom: 1px dotted #ccc;
+            padding: 3px 0;
+            font-size: 9.5px;
+        }
+        .ticket-line-title { font-weight: 600; }
+        .ticket-line-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8.5px;
+            color: #555;
+        }
+        .totals {
+            flex-direction: column;
+            width: 100%;
+        }
+        .totals-box { width: 100%; }
+        .legal-note { display: none; }
+
+        body.print-format-80mm .footer,
+        body.print-format-58mm .footer {
+            display: block;
+            margin-top: 3mm;
+            padding-top: 2mm;
+            border-top: 1px dashed #000000;
+        }
+        body.print-format-80mm .sign-box,
+        body.print-format-58mm .sign-box {
+            min-height: auto;
+            margin-top: 2.4mm;
+            display: block;
+        }
+        body.print-format-80mm .sign-space,
+        body.print-format-58mm .sign-space {
+            min-height: 10mm;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        body.print-format-80mm .sign-space img,
+        body.print-format-58mm .sign-space img {
+            max-width: {% if formato_impresion == "80mm" %}36mm{% else %}26mm{% endif %};
+            max-height: 14mm;
+        }
+        body.print-format-80mm .sign-line,
+        body.print-format-58mm .sign-line {
+            width: 80%;
+            margin: 0 auto;
+            padding-top: 1mm;
+            border-top: 1px solid #000000;
+            text-align: center;
+            font-size: {% if formato_impresion == "80mm" %}8.5px{% else %}7px{% endif %};
+            line-height: 1.2;
+        }
+        {% endif %}
+    </style>
+</head>
+<body class="{% if mobile_print %}mobile-print {% endif %}print-format-{{ formato_impresion|default:'a4' }}">
+    <div class="toolbar no-print">
+        <button type="button" onclick="window.print()">Imprimir</button>
+        <button type="button" onclick="window.close()">Cerrar</button>
+    </div>
+
+    {% for copy in copies_range %}
+    <main class="page">
+        <header class="head">
+            <div class="company">
+                {% if empresa.logo_src %}
+                <img class="company-logo" src="{{ empresa.logo_src }}" alt="Logo Empresa" />
+                {% endif %}
+                <div>
+                    <h1>{{ empresa.nombre|default:"COMERCIAL ANITA SRL" }}</h1>
+                    <div class="meta">
+                        <div><span class="label">RNC:</span>{{ empresa.rnc|default:"-" }}</div>
+                        <div><span class="label">Direccion:</span>{{ empresa.direccion|default:"-" }}</div>
+                        <div><span class="label">Telefonos:</span>{{ empresa.tel1|default:"-" }} {% if empresa.tel2 %}/ {{ empresa.tel2 }}{% endif %}</div>
+                        {% if empresa.email %}<div><span class="label">Email:</span>{{ empresa.email }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="doc-box">
+                <h2 class="doc-title">{{ doc_label }}</h2>
+                <div class="doc-meta">
+                    <div><span class="label">{{ doc_numero_label }}:</span><strong>{{ documento.id_doc }}</strong></div>
+                    <div><span class="label">Estado:</span><strong>{{ documento.est_doc|default:default_tipo_label }}</strong></div>
+                    <div><span class="label">Fecha emision:</span>{{ documento.fecha_doc|date:"d/m/Y" }}</div>
+                    {% if documento.fecha_venc %}
+                    <div><span class="label">Fecha venc:</span>{{ documento.fecha_venc|date:"d/m/Y" }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+        <section class="section">
+            <div class="section-head">Datos del Cliente</div>
+            <div class="section-body grid-2 buyer-info">
+                <div class="buyer-full"><span class="label">Cliente:</span><strong>{{ documento.nom_socio|default:"-" }}</strong></div>
+                <div><span class="label">Codigo:</span>{{ documento.id_sn|default:"-" }}</div>
+                <div><span class="label">RNC/Cedula:</span>{{ documento.rnc_ced|default:"-" }}</div>
+                <div class="buyer-full buyer-muted"><span class="label">Contacto / Apodo:</span>{{ documento.contacto|default:"-" }}</div>
+                <div class="buyer-full buyer-muted"><span class="label">Dir. entrega:</span>{{ documento.ent_factura|default:"-" }}</div>
+                <div><span class="label">Condicion:</span>{{ documento.condicion|default:"-" }}</div>
+                <div><span class="label">Dias:</span>{{ documento.dia|default:"0" }}</div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-head">{{ detalle_label }}</div>
+            <div class="section-body" style="padding:0;">
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th style="width:32px;">No.</th>
+                            <th style="width:78px;">Articulo</th>
+                            <th>Descripcion</th>
+                            <th style="width:55px;">Medida</th>
+                            <th style="width:62px;" class="align-r">Cantidad</th>
+                            <th style="width:72px;" class="align-r">Precio</th>
+                            <th style="width:58px;" class="align-r">% Desc.</th>
+                            <th style="width:78px;" class="align-r">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in detalles %}
+                        <tr>
+                            <td>{{ item.linea }}</td>
+                            <td>{{ item.id_articulo }}</td>
+                            <td>{{ item.descrip_art }}</td>
+                            <td>{{ item.medida|default:"-" }}</td>
+                            <td class="align-r">{{ item.cantidad|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.precio|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.porc_desc|floatformat:2 }}</td>
+                            <td class="align-r">{{ item.total_linea|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="align-c" style="color:#6a6a6a; padding: 12px;">No hay articulos en el documento.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="ticket-detail">
+                    <div class="ticket-head">
+                        <span>Articulo / Descripcion</span>
+                        <span>Cant * Precio = Importe</span>
+                    </div>
+                    {% for item in detalles %}
+                    <article class="ticket-item">
+                        <div class="ticket-line-title">{{ item.linea }}. {{ item.descrip_art|default:item.id_articulo }}</div>
+                        <div class="ticket-line-meta">
+                            <span>{{ item.cantidad|floatformat:2 }} {{ item.medida }} x RD$ {{ item.precio|floatformat:2 }}</span>
+                            <strong>RD$ {{ item.total_linea|floatformat:2 }}</strong>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <div class="totals">
+            <div class="notes">
+                <div><span class="label">Comentario:</span></div>
+                <div>{{ documento.comentario|default:"Sin comentario adicional." }}</div>
+            </div>
+            <div class="totals-box">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Subtotal</td>
+                            <td class="align-r">RD$ {{ documento.subtotal|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>Descuento</td>
+                            <td class="align-r">RD$ {{ documento.total_desc|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>Impuesto (ITBIS)</td>
+                            <td class="align-r">RD$ {{ documento.total_itbis|floatformat:2 }}</td>
+                        </tr>
+                        <tr class="grand">
+                            <td>Total Documento</td>
+                            <td class="align-r">RD$ {{ documento.total_doc|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if is_cotizacion %}
+        <section class="legal-note">
+            Esta cotización es informativa y no constituye una factura definitiva ni reserva inventario. Los precios y disponibilidad de los artículos están sujetos a cambios sin previo aviso según las condiciones comerciales vigentes al momento de la facturación.
+        </section>
+        {% else %}
+        <section class="legal-note">
+            Esta pre-factura es un documento interno preparatorio para el proceso de facturación y despacho.
+        </section>
+        {% endif %}
+
+        <footer class="footer">
+            <section class="sign-box received">
+                <div class="sign-space"></div>
+                <div class="sign-line"><strong class="placeholder">&nbsp;</strong>Recibido por</div>
+            </section>
+            <section class="sign-box">
+                <div class="sign-space">
+                    {% if firma_src %}
+                    <img src="{{ firma_src }}" alt="Firma registrada" />
+                    {% endif %}
+                </div>
+                <div class="sign-line">
+                    {% if auth_payload.usuario_nombre %}
+                    <strong>{{ auth_payload.usuario_nombre }}</strong>
+                    {% else %}
+                    <strong class="placeholder">&nbsp;</strong>
+                    {% endif %}
+                    Preparado por
+                </div>
+            </section>
+        </footer>
+    </main>
+    {% endfor %}
+
+    {% if autoprint %}
+    <script>
+        window.addEventListener("load", () => {
+            window.print();
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
